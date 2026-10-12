@@ -138,7 +138,7 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(fetchInactiveUsage).not.toHaveBeenCalled()
   })
 
-  it('asks for a new reading of the other accounts until one is under way', () => {
+  it('asks for a new reading of the other accounts until one is under way', async () => {
     const { autoSwitch, selectAccount, fetchInactiveUsage } = setup([account('a'), account('b')])
     const hourAgo = Date.now() - 60 * 60_000
     const stale = usageState(limits(95), { b: limits(10, hourAgo) })
@@ -146,12 +146,46 @@ describe('createClaudeAccountAutoSwitch', () => {
     // The usage service skips a read it debounces, so an ask can start nothing.
     autoSwitch(stale)
     autoSwitch(stale)
+    await Promise.resolve()
     expect(fetchInactiveUsage).toHaveBeenCalledTimes(2)
 
     autoSwitch(withReadUnderWay(stale))
     autoSwitch(stale)
+    await Promise.resolve()
     expect(fetchInactiveUsage).toHaveBeenCalledTimes(2)
     expect(selectAccount).not.toHaveBeenCalled()
+  })
+
+  it('asks for the reading only after the update it reacted to has gone out', async () => {
+    const { autoSwitch, fetchInactiveUsage } = setup([account('a'), account('b')])
+    const hourAgo = Date.now() - 60 * 60_000
+
+    // The usage service publishes from inside the ask, and must not do so mid-publish.
+    autoSwitch(usageState(limits(95), { b: limits(10, hourAgo) }))
+    expect(fetchInactiveUsage).not.toHaveBeenCalled()
+
+    await Promise.resolve()
+    expect(fetchInactiveUsage).toHaveBeenCalledOnce()
+  })
+
+  it('does not count a read of another runtime as a read of its own accounts', async () => {
+    const { autoSwitch, fetchInactiveUsage } = setup([
+      account('a'),
+      account('b'),
+      account('wsl', { managedAuthRuntime: 'wsl', wslDistro: 'Ubuntu' })
+    ])
+    const hourAgo = Date.now() - 60 * 60_000
+    const state = usageState(limits(95), { b: limits(10, hourAgo), wsl: limits(0) })
+
+    autoSwitch({
+      ...state,
+      inactiveClaudeAccounts: state.inactiveClaudeAccounts.map((usage) =>
+        usage.accountId === 'wsl' ? { ...usage, isFetching: true } : usage
+      )
+    })
+    await Promise.resolve()
+
+    expect(fetchInactiveUsage).toHaveBeenCalledOnce()
   })
 
   it('never picks an account from another runtime or one that needs a sign-in', () => {
@@ -236,7 +270,7 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(selectAccount).toHaveBeenCalledWith('b', defaultDistro, expect.any(Function))
   })
 
-  it('does not wait for an account the usage service cannot read yet', () => {
+  it('does not wait for an account the usage service cannot read yet', async () => {
     const { autoSwitch, selectAccount, fetchInactiveUsage } = setup()
     const hourAgo = Date.now() - 60 * 60_000
     const insideRetryAfter = {
@@ -245,6 +279,7 @@ describe('createClaudeAccountAutoSwitch', () => {
     }
 
     autoSwitch(usageState(limits(95), { b: limits(20), c: insideRetryAfter }))
+    await Promise.resolve()
 
     expect(fetchInactiveUsage).not.toHaveBeenCalled()
     expect(selectAccount).toHaveBeenCalledWith('b', HOST, expect.any(Function))
@@ -277,11 +312,12 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(onSwitched).not.toHaveBeenCalled()
   })
 
-  it("waits for every account's reading before picking one", () => {
+  it("waits for every account's reading before picking one", async () => {
     const { autoSwitch, selectAccount, fetchInactiveUsage } = setup()
     const hourAgo = Date.now() - 60 * 60_000
 
     autoSwitch(usageState(limits(95), { b: limits(70), c: limits(0, hourAgo) }))
+    await Promise.resolve()
     expect(fetchInactiveUsage).toHaveBeenCalledOnce()
     expect(selectAccount).not.toHaveBeenCalled()
 
@@ -299,13 +335,14 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(selectAccount).toHaveBeenCalledOnce()
   })
 
-  it('picks from the accounts it could read once a read was tried', () => {
+  it('picks from the accounts it could read once a read was tried', async () => {
     const { autoSwitch, selectAccount, fetchInactiveUsage } = setup()
     const hourAgo = Date.now() - 60 * 60_000
     const state = usageState(limits(95), { b: limits(20), c: limits(10, hourAgo) })
     fetchInactiveUsage.mockImplementation(async () => autoSwitch(withReadUnderWay(state)))
 
     autoSwitch(state)
+    await Promise.resolve()
     expect(selectAccount).not.toHaveBeenCalled()
 
     autoSwitch(state)

@@ -84,7 +84,9 @@ export function createClaudeAccountAutoSwitch(
     )
     // Why: rank only once every readable candidate has a recent reading, or a read was just tried.
     if (candidates.length + unreadable.length < candidateIds.size) {
+      // Why: the usage service skips a read it debounces, so only one under way counts as tried.
       if (usages.some((usage) => usage.isFetching)) {
+        lastUsageReadAt = now
         return STAY
       }
       if (now - lastUsageReadAt >= DEFAULT_POLL_MS) {
@@ -132,20 +134,19 @@ export function createClaudeAccountAutoSwitch(
       lastSwitchAt = now
     }
     selectedAccountId = selectedId
-    // Why: the usage service skips a read it debounces, so only one under way counts as tried.
-    if (state.inactiveClaudeAccounts.some((usage) => usage.isFetching)) {
-      lastUsageReadAt = now
-    }
     if (switching) {
       return
     }
     const decision = decide(state, now)
     if (decision.kind === 'read-usage') {
-      deps.rateLimits
-        .fetchInactiveClaudeAccountsOnOpen()
-        .catch((error: unknown) =>
-          console.warn('[claude-accounts] Failed to read inactive Claude usage:', error)
-        )
+      // Why deferred: the service publishes from inside this call, and this runs mid-publish.
+      queueMicrotask(() => {
+        deps.rateLimits
+          .fetchInactiveClaudeAccountsOnOpen()
+          .catch((error: unknown) =>
+            console.warn('[claude-accounts] Failed to read inactive Claude usage:', error)
+          )
+      })
     } else if (decision.kind === 'switch') {
       switchAccount(decision.from, decision.to, state.claudeTarget)
     }

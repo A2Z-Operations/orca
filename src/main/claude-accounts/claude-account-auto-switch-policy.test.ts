@@ -105,6 +105,21 @@ describe('pickClaudeAutoSwitchTarget', () => {
     expect(pick(limits(95), [usage('b', sessionEnded(100))], COOLED_DOWN)).toBe('b')
   })
 
+  it('reads an account whose windows have all reset as empty', () => {
+    const allEnded = (usedPercent: number): ProviderRateLimits => {
+      const reading = limits(usedPercent, usedPercent)
+      const ended = { resetsAt: NOW - 60_000 }
+      return {
+        ...reading,
+        session: { ...reading.session, ...ended },
+        weekly: { ...reading.weekly, ...ended }
+      }
+    }
+
+    expect(pick(allEnded(100), [usage('b', limits(0))], COOLED_DOWN)).toBe(null)
+    expect(pick(limits(95), [usage('b', allEnded(100))], COOLED_DOWN)).toBe('b')
+  })
+
   it('stays when every account is out', () => {
     const candidates = [usage('b', limits(100)), usage('c', limits(20, 100))]
 

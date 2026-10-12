@@ -6,7 +6,7 @@ export const CLAUDE_AUTO_SWITCH_COOLDOWN_MS = 5 * 60_000
 // Why: an account only a few points under the line would cross it again within minutes.
 const MIN_PERCENT_GAINED = 10
 
-/** The tightest of the 5-hour and weekly windows, or null when usage could not be read. */
+/** The tightest 5-hour or weekly window still running (0 once both reset), or null when usage could not be read. */
 function getClaudeUsedPercent(limits: ProviderRateLimits | null, now: number): number | null {
   if (limits?.status !== 'ok') {
     return null
