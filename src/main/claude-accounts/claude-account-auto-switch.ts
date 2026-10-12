@@ -71,16 +71,19 @@ export function createClaudeAccountAutoSwitch(
       accounts
         .filter(
           (account) =>
-            account.id !== selectedId &&
-            !account.needsSignIn &&
-            isOnTarget(account, state.claudeTarget)
+            account.id !== selectedId && !account.needsSignIn && sharesRuntime(account, from)
         )
         .map((account) => account.id)
     )
     const usages = state.inactiveClaudeAccounts.filter((usage) => candidateIds.has(usage.accountId))
     const candidates = usages.filter((usage) => now - usage.updatedAt <= DEFAULT_POLL_MS)
-    // Why: rank only once every candidate has a recent reading, or a read was just tried.
-    if (candidates.length < candidateIds.size) {
+    // Why: an account inside its Retry-After cannot be read, so ranking does not wait for it.
+    const unreadable = usages.filter(
+      (usage) =>
+        !candidates.includes(usage) && (usage.rateLimits?.usageMetadata?.retryAtMs ?? 0) > now
+    )
+    // Why: rank only once every readable candidate has a recent reading, or a read was just tried.
+    if (candidates.length + unreadable.length < candidateIds.size) {
       if (usages.some((usage) => usage.isFetching)) {
         return STAY
       }
@@ -164,10 +167,16 @@ function isReadingOf(
   )
 }
 
-function isOnTarget(account: ClaudeManagedAccountSummary, target: RateLimitRuntimeTarget): boolean {
-  const accountTarget = normalizeClaudeAccountSelectionTarget({
+/** Why not the usage target: with the default WSL distro it names no distro, but accounts do. */
+function sharesRuntime(a: ClaudeManagedAccountSummary, b: ClaudeManagedAccountSummary): boolean {
+  const left = runtimeOf(a)
+  const right = runtimeOf(b)
+  return left.runtime === right.runtime && left.wslDistro === right.wslDistro
+}
+
+function runtimeOf(account: ClaudeManagedAccountSummary): RateLimitRuntimeTarget {
+  return normalizeClaudeAccountSelectionTarget({
     runtime: account.managedAuthRuntime,
     wslDistro: account.wslDistro
   })
-  return accountTarget.runtime === target.runtime && accountTarget.wslDistro === target.wslDistro
 }

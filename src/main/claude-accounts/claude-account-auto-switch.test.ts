@@ -215,6 +215,41 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(selectAccount).toHaveBeenCalledWith('b', ubuntu, expect.any(Function))
   })
 
+  it('finds the other accounts of the default WSL distro', () => {
+    const defaultDistro = { runtime: 'wsl' as const, wslDistro: null }
+    const { settings, autoSwitch, selectAccount } = setup([
+      account('a', { managedAuthRuntime: 'wsl', wslDistro: 'Ubuntu' }),
+      account('b', { managedAuthRuntime: 'wsl', wslDistro: 'Ubuntu' }),
+      account('host')
+    ])
+    settings.activeClaudeManagedAccountIdsByRuntime = { host: null, wsl: { Ubuntu: 'a' } }
+
+    autoSwitch(
+      usageState(
+        limits(95),
+        { b: limits(10), host: limits(0) },
+        'profile:a:wsl:Ubuntu',
+        defaultDistro
+      )
+    )
+
+    expect(selectAccount).toHaveBeenCalledWith('b', defaultDistro, expect.any(Function))
+  })
+
+  it('does not wait for an account the usage service cannot read yet', () => {
+    const { autoSwitch, selectAccount, fetchInactiveUsage } = setup()
+    const hourAgo = Date.now() - 60 * 60_000
+    const insideRetryAfter = {
+      ...limits(10, hourAgo),
+      usageMetadata: { retryAtMs: Date.now() + 60_000 }
+    }
+
+    autoSwitch(usageState(limits(95), { b: limits(20), c: insideRetryAfter }))
+
+    expect(fetchInactiveUsage).not.toHaveBeenCalled()
+    expect(selectAccount).toHaveBeenCalledWith('b', HOST, expect.any(Function))
+  })
+
   it('drops a queued switch once the selection changed by hand', async () => {
     const { settings, autoSwitch, onSwitched, holdNextSwitch } = setup()
     const release = holdNextSwitch()
