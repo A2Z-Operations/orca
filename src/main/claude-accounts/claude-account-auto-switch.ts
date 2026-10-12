@@ -62,7 +62,7 @@ export function createClaudeAccountAutoSwitch(
       !isReadingOf(state.claude, from) ||
       // Why: after a switch or a failed attempt, act only on a newer reading.
       (state.claude?.updatedAt ?? 0) < lastSwitchAt ||
-      !isClaudeOverAutoSwitchLine(state.claude)
+      !isClaudeOverAutoSwitchLine(state.claude, now)
     ) {
       return STAY
     }
@@ -88,7 +88,7 @@ export function createClaudeAccountAutoSwitch(
         return { kind: 'read-usage' }
       }
     }
-    const targetId = pickClaudeAutoSwitchTarget(state.claude, candidates, now - lastSwitchAt)
+    const targetId = pickClaudeAutoSwitchTarget(state.claude, candidates, { now, lastSwitchAt })
     const to = accounts.find((account) => account.id === targetId)
     return to ? { kind: 'switch', from, to } : STAY
   }
