@@ -4,6 +4,9 @@ import { CodexRuntimeHomeService } from '../codex-accounts/runtime-home-service'
 import { CodexAccountService } from '../codex-accounts/service'
 import { ClaudeRuntimeAuthService } from '../claude-accounts/runtime-auth-service'
 import { ClaudeAccountService } from '../claude-accounts/service'
+import { createClaudeAccountAutoSwitch } from '../claude-accounts/claude-account-auto-switch'
+import { getRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
+import { translateMain } from '../i18n/main-i18n'
 import { KeybindingService } from '../keybindings/keybinding-service'
 import { createCodexSessionMigrationScheduler } from '../codex/codex-session-migration-scheduler'
 import { startCodexSessionBackfillInBackground } from '../codex/codex-session-backfill'
@@ -79,6 +82,26 @@ export function initializeMainProcessAccountServices(): void {
   state.codexSessionMigration.scheduleInitialRun()
   state.claudeRuntimeAuth = new ClaudeRuntimeAuthService(store)
   state.claudeAccounts = new ClaudeAccountService(store, state.rateLimits, state.claudeRuntimeAuth)
+  state.rateLimits.onStateChange(
+    createClaudeAccountAutoSwitch({
+      getSettings: () => store.getSettings(),
+      rateLimits: state.rateLimits,
+      accounts: state.claudeAccounts,
+      onSwitched: ({ from, to }) => {
+        if (!store.getSettings().notifications.enabled) {
+          return
+        }
+        getRuntimeDesktopSurface().showNotification({
+          title: translateMain('accounts.claude.autoSwitchedTitle', 'Claude account switched'),
+          body: translateMain(
+            'accounts.claude.autoSwitchedBody',
+            '{{from}} is near its usage limit. New Claude sessions start on {{to}}.',
+            { from, to }
+          )
+        })
+      }
+    })
+  )
   // Why: quota polls are background work and must not boot a stopped distro; user-driven
   // resets call prepareForRateLimitFetch directly.
   state.rateLimits.setCodexHomePathResolver(async (target) =>

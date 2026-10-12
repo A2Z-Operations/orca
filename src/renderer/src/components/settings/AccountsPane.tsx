@@ -16,7 +16,6 @@ import {
   watchProviderAccounts
 } from '@/runtime/runtime-provider-accounts-client'
 import {
-  getAccountsClaudeSearchEntries,
   getAccountsCodexSearchEntries,
   getAccountsGeminiSearchEntries,
   getAccountsCursorSearchEntries,
@@ -28,6 +27,7 @@ import {
   getAccountsPaneSearchEntries,
   getAccountsZcodePlanSearchEntries
 } from './accounts-search'
+import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
 import { getRemoteAccountsPaneScope } from './provider-account-scope'
 import { ProviderHostScopeControl } from './ProviderHostScopeControl'
 import { SettingsSectionStack } from './SettingsSectionStack'

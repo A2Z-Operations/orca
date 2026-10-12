@@ -97,6 +97,8 @@ export type ClaudeManagedAccountSummary = {
   lastAuthenticatedAt: number
   /** Its folder holds no login yet, e.g. an account saved by an older Orca; it needs a sign-in. */
   needsSignIn?: true
+  /** Its folder holds no login, but System default is signed in to it, so it runs there. */
+  coveredBySystemDefault?: true
 }
 
 /** A sign-in to a new account folder, or to a saved account's own when `accountId` is given. */
