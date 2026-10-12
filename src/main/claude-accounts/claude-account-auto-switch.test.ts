@@ -55,6 +55,17 @@ function usageState(
   })
 }
 
+// What the usage service publishes, synchronously, once it has started reading the accounts.
+function withReadUnderWay(state: RateLimitState): RateLimitState {
+  return {
+    ...state,
+    inactiveClaudeAccounts: state.inactiveClaudeAccounts.map((usage) => ({
+      ...usage,
+      isFetching: true
+    }))
+  }
+}
+
 function setup(accounts = [account('a'), account('b'), account('c')]) {
   const settings = {
     ...getDefaultSettings('/tmp'),
@@ -127,14 +138,19 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(fetchInactiveUsage).not.toHaveBeenCalled()
   })
 
-  it('reads the other accounts again before deciding on old usage', () => {
-    const { autoSwitch, selectAccount, fetchInactiveUsage } = setup()
+  it('asks for a new reading of the other accounts until one is under way', () => {
+    const { autoSwitch, selectAccount, fetchInactiveUsage } = setup([account('a'), account('b')])
     const hourAgo = Date.now() - 60 * 60_000
+    const stale = usageState(limits(95), { b: limits(10, hourAgo) })
 
-    autoSwitch(usageState(limits(95), { b: limits(10, hourAgo) }))
-    autoSwitch(usageState(limits(95), { b: limits(10, hourAgo) }))
+    // The usage service skips a read it debounces, so an ask can start nothing.
+    autoSwitch(stale)
+    autoSwitch(stale)
+    expect(fetchInactiveUsage).toHaveBeenCalledTimes(2)
 
-    expect(fetchInactiveUsage).toHaveBeenCalledOnce()
+    autoSwitch(withReadUnderWay(stale))
+    autoSwitch(stale)
+    expect(fetchInactiveUsage).toHaveBeenCalledTimes(2)
     expect(selectAccount).not.toHaveBeenCalled()
   })
 
@@ -239,7 +255,7 @@ describe('createClaudeAccountAutoSwitch', () => {
   })
 
   it('switches once while a switch is still running', () => {
-    const { autoSwitch, selectAccount } = setup()
+    const { autoSwitch, selectAccount } = setup([account('a'), account('b')])
     selectAccount.mockReturnValue(new Promise(() => {}))
 
     autoSwitch(usageState(limits(100), { b: limits(10) }))
@@ -248,15 +264,18 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(selectAccount).toHaveBeenCalledOnce()
   })
 
-  it('switches once when reading the other accounts pushes new usage straight away', () => {
+  it('picks from the accounts it could read once a read was tried', () => {
     const { autoSwitch, selectAccount, fetchInactiveUsage } = setup()
     const hourAgo = Date.now() - 60 * 60_000
     const state = usageState(limits(95), { b: limits(20), c: limits(10, hourAgo) })
-    fetchInactiveUsage.mockImplementation(async () => autoSwitch(state))
+    fetchInactiveUsage.mockImplementation(async () => autoSwitch(withReadUnderWay(state)))
 
     autoSwitch(state)
+    expect(selectAccount).not.toHaveBeenCalled()
 
-    expect(selectAccount).toHaveBeenCalledOnce()
+    autoSwitch(state)
+    expect(fetchInactiveUsage).toHaveBeenCalledOnce()
+    expect(selectAccount).toHaveBeenCalledWith('b', HOST, expect.any(Function))
   })
 
   it('waits for a new usage reading before trying again after a failed switch', async () => {

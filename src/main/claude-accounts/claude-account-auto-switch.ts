@@ -129,12 +129,15 @@ export function createClaudeAccountAutoSwitch(
       lastSwitchAt = now
     }
     selectedAccountId = selectedId
+    // Why: the usage service skips a read it debounces, so only one under way counts as tried.
+    if (state.inactiveClaudeAccounts.some((usage) => usage.isFetching)) {
+      lastUsageReadAt = now
+    }
     if (switching) {
       return
     }
     const decision = decide(state, now)
     if (decision.kind === 'read-usage') {
-      lastUsageReadAt = now
       deps.rateLimits
         .fetchInactiveClaudeAccountsOnOpen()
         .catch((error: unknown) =>
