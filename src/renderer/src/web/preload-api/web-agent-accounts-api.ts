@@ -141,7 +141,13 @@ export function createClaudeAccountsApi(): PreloadApi['claudeAccounts'] {
         { accountId },
         ACCOUNT_MUTATION_TIMEOUT_MS
       )
-    }
+    },
+    setAutoSwitch: ({ enabled }) =>
+      callRuntimeResult<ClaudeRateLimitAccountsState>(
+        'accounts.setClaudeAutoSwitch',
+        { enabled },
+        ACCOUNT_MUTATION_TIMEOUT_MS
+      )
   }
 }
 

@@ -5,9 +5,9 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { ButtonGroup } from '../ui/button-group'
 import { Label } from '../ui/label'
-import { Switch } from '../ui/switch'
 import { ClaudeIcon } from '../status-bar/icons'
 import { SearchableSetting } from './SearchableSetting'
+import { renderClaudeAutoSwitchSetting } from './accounts-pane-claude-auto-switch'
 import {
   getProviderAccountRuntime,
   providerAccountIsActiveInView
@@ -366,37 +366,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
         </div>
       </SearchableSetting>
 
-      {!isRemoteAccountScope && visibleClaudeAccounts.length > 1 ? (
-        <SearchableSetting
-          title={translate('accounts.claude.autoSwitch', 'Switch accounts before a usage limit')}
-          description={translate(
-            'accounts.claude.autoSwitchDescription',
-            'When the selected account passes 90% of its 5-hour or weekly limit, new Claude sessions start on the account with the most room left. Running sessions keep their account.'
-          )}
-          keywords={['claude', 'account', 'auto', 'switch', 'rate limit', 'quota', 'usage']}
-          className="flex items-center justify-between gap-4 py-2"
-        >
-          <div className="space-y-0.5">
-            <Label>
-              {translate('accounts.claude.autoSwitch', 'Switch accounts before a usage limit')}
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              {translate(
-                'accounts.claude.autoSwitchDescription',
-                'When the selected account passes 90% of its 5-hour or weekly limit, new Claude sessions start on the account with the most room left. Running sessions keep their account.'
-              )}
-            </p>
-          </div>
-          <Switch
-            aria-label={translate(
-              'accounts.claude.autoSwitch',
-              'Switch accounts before a usage limit'
-            )}
-            checked={settings.claudeAutoSwitchEnabled === true}
-            onCheckedChange={(checked) => updateSettings({ claudeAutoSwitchEnabled: checked })}
-          />
-        </SearchableSetting>
-      ) : null}
+      {renderClaudeAutoSwitchSetting(model)}
     </section>
   )
 }

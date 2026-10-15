@@ -135,6 +135,14 @@ describe('ClaudeAccountService', () => {
     await expect(f.service.selectAccount('b')).resolves.toMatchObject({ activeAccountId: 'b' })
   })
 
+  it('turns automatic switching on where the accounts live, and reports it with the accounts', () => {
+    const f = fixture()
+    expect(f.service.listAccounts().autoSwitchEnabled).toBe(false)
+
+    expect(f.service.setAutoSwitch(true)).toMatchObject({ autoSwitchEnabled: true })
+    expect(f.settings().claudeAutoSwitchEnabled).toBe(true)
+  })
+
   it("reports System default's login from the user's own folder", () => {
     const f = fixture()
     mkdirSync(join(f.root, 'personal'))

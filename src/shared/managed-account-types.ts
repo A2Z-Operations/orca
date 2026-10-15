@@ -124,6 +124,8 @@ export type ClaudeRateLimitAccountsState = {
   systemDefaultEmail?: string
   /** An older Orca's copy-based switching once wrote an account's login into System default. */
   systemDefaultMayBeCopied?: boolean
+  /** Whether this host switches accounts before a usage limit; absent from older hosts. */
+  autoSwitchEnabled?: boolean
 }
 
 export type ClaudeManagedAccountRuntimeSelection = {

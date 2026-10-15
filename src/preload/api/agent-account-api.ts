@@ -63,6 +63,7 @@ export type ClaudeAccountsApi = {
     runtime?: 'host' | 'wsl'
     wslDistro?: string | null
   }) => Promise<ClaudeRateLimitAccountsState>
+  setAutoSwitch: (args: { enabled: boolean }) => Promise<ClaudeRateLimitAccountsState>
 }
 
 export type GrokAccountsApi = {

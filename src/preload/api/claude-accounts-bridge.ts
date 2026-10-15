@@ -16,5 +16,7 @@ export const claudeAccountsApi = {
     accountId: string | null
     runtime?: 'host' | 'wsl'
     wslDistro?: string | null
-  }) => ipcRenderer.invoke('claudeAccounts:select', args)
+  }) => ipcRenderer.invoke('claudeAccounts:select', args),
+  setAutoSwitch: (args: { enabled: boolean }) =>
+    ipcRenderer.invoke('claudeAccounts:setAutoSwitch', args)
 } satisfies PreloadApi['claudeAccounts']

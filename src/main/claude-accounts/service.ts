@@ -117,6 +117,10 @@ export class ClaudeAccountService {
     })
   }
 
+  setAutoSwitch(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.selection.setAutoSwitch(enabled)
+  }
+
   getRuntimeConfigDir(target?: ClaudeAccountSelectionTarget): string {
     return this.runtimeAuth.getRuntimeConfigDir(target)
   }
