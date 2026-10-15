@@ -89,7 +89,7 @@ export class ClaudeAccountSelection {
   }
 
   setAutoSwitch(enabled: boolean): ClaudeRateLimitAccountsState {
-    this.store.updateSettings({ claudeAutoSwitchEnabled: enabled })
+    this.saveSettings({ claudeAutoSwitchEnabled: enabled })
     return this.list()
   }
 

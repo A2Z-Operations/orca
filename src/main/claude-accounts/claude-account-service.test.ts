@@ -45,6 +45,7 @@ function fixture(accounts: ClaudeManagedAccount[] = [account('a'), account('b')]
     )
   }
   const covered = new Set<string>()
+  const notifiedWrites: Partial<GlobalSettings>[] = []
   let settings: GlobalSettings = {
     ...getDefaultSettings('/tmp'),
     claudeManagedAccounts: accounts,
@@ -79,8 +80,11 @@ function fixture(accounts: ClaudeManagedAccount[] = [account('a'), account('b')]
   const service = new ClaudeAccountService(
     {
       getSettings: () => settings,
-      updateSettings: (patch) => {
+      updateSettings: (patch, options) => {
         settings = { ...settings, ...patch }
+        if (options?.notifyListeners) {
+          notifiedWrites.push(patch)
+        }
       }
     },
     {
@@ -90,7 +94,17 @@ function fixture(accounts: ClaudeManagedAccount[] = [account('a'), account('b')]
     runtimeAuth,
     runLogin
   )
-  return { root, home, service, runtimeAuth, runLogin, signIn, covered, settings: () => settings }
+  return {
+    root,
+    home,
+    service,
+    runtimeAuth,
+    runLogin,
+    signIn,
+    covered,
+    notifiedWrites,
+    settings: () => settings
+  }
 }
 
 // The id the last sign-in prepared a folder for.
@@ -141,6 +155,8 @@ describe('ClaudeAccountService', () => {
 
     expect(f.service.setAutoSwitch(true)).toMatchObject({ autoSwitchEnabled: true })
     expect(f.settings().claudeAutoSwitchEnabled).toBe(true)
+    // Every window hears about it, as it does about a select.
+    expect(f.notifiedWrites).toContainEqual({ claudeAutoSwitchEnabled: true })
   })
 
   it("reports System default's login from the user's own folder", () => {

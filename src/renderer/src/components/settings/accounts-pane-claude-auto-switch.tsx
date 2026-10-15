@@ -14,29 +14,24 @@ export function renderClaudeAutoSwitchSetting(
   if (claudeAccounts.autoSwitchEnabled === undefined || model.visibleClaudeAccounts.length < 2) {
     return null
   }
+  const title = translate('accounts.claude.autoSwitch', 'Switch accounts before a usage limit')
+  const description = translate(
+    'accounts.claude.autoSwitchDescription',
+    'When the selected account passes 90% of its 5-hour or weekly limit, new Claude sessions start on the account with the most room left. Running sessions keep their account.'
+  )
   return (
     <SearchableSetting
-      title={translate('accounts.claude.autoSwitch', 'Switch accounts before a usage limit')}
-      description={translate(
-        'accounts.claude.autoSwitchDescription',
-        'When the selected account passes 90% of its 5-hour or weekly limit, new Claude sessions start on the account with the most room left. Running sessions keep their account.'
-      )}
+      title={title}
+      description={description}
       keywords={['claude', 'account', 'auto', 'switch', 'rate limit', 'quota', 'usage']}
       className="flex items-center justify-between gap-4 py-2"
     >
       <div className="space-y-0.5">
-        <Label>
-          {translate('accounts.claude.autoSwitch', 'Switch accounts before a usage limit')}
-        </Label>
-        <p className="text-xs text-muted-foreground">
-          {translate(
-            'accounts.claude.autoSwitchDescription',
-            'When the selected account passes 90% of its 5-hour or weekly limit, new Claude sessions start on the account with the most room left. Running sessions keep their account.'
-          )}
-        </p>
+        <Label>{title}</Label>
+        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       <Switch
-        aria-label={translate('accounts.claude.autoSwitch', 'Switch accounts before a usage limit')}
+        aria-label={title}
         checked={claudeAccounts.autoSwitchEnabled}
         disabled={claudeAction !== 'idle'}
         onCheckedChange={(enabled) =>
