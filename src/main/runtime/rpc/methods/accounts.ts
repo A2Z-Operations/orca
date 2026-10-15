@@ -15,6 +15,7 @@ import {
   SelectCodexAccountForTargetParams,
   SetClaudeAutoSwitchParams
 } from '../../../../shared/rpc-contract/accounts-params'
+import { HostAccountLaunchEnvParams } from '../../../../shared/host-account-launch-env'
 
 // Why: monotonically increasing per-process counter avoids the Date.now()
 // collision that fired when two near-simultaneous accounts.subscribe calls
@@ -23,6 +24,19 @@ import {
 let accountsSubscriptionSeq = 0
 
 export const ACCOUNT_METHODS = [
+  // Why runtime clients only: the desktop that owns this host's accounts (a WSL host) pushes them.
+  defineMethod({
+    name: 'accounts.setHostLaunchEnv',
+    permission: 'accounts-admin',
+    params: HostAccountLaunchEnvParams,
+    handler: async (params, { runtime, clientKind }) => {
+      if (clientKind === 'mobile') {
+        throw new Error('Only the Orca desktop that owns this host can set its accounts.')
+      }
+      runtime.setHostAccountLaunchEnv(params)
+      return {}
+    }
+  }),
   // Why local only: sign-in runs `claude auth login` in a terminal on the execution host.
   defineMethod({
     name: 'accounts.beginClaudeSignIn',

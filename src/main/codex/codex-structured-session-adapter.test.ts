@@ -157,13 +157,22 @@ describe('CodexStructuredSessionAdapter.acquire', () => {
         ? { ORCA_CLI_BIN_DIR: expect.stringMatching(/^[^:;]*[\\/]cli[\\/]bin$/) }
         : {}),
       ORCA_USER_DATA_PATH: expect.any(String),
+      ORCA_ENVIRONMENT: '',
+      ORCA_PAIRING_CODE: '',
+      ORCA_REMOTE_PAIRING: '',
       // The test host is unpackaged, so this app's CLI is the dev launcher dir, first on PATH.
       PATH: expect.stringMatching(/^[^:;]*[\\/]cli[\\/]bin[:;]/)
     })
     expect(codex.connections[0].launch.cwd).toBe('/work/repo')
     expect(codex.connections[0].calls[0]).toEqual({
       method: 'thread/start',
-      params: { cwd: '/work/repo' }
+      // A chat with no mode asks, stated outright.
+      params: {
+        cwd: '/work/repo',
+        approvalPolicy: 'on-request',
+        sandbox: 'workspace-write',
+        approvalsReviewer: 'user'
+      }
     })
     expect(acquisition.process).toEqual({
       hostId: 'host-1',
@@ -583,8 +592,8 @@ describe('CodexStructuredSessionAdapter.dispatch', () => {
     ).toEqual({
       // Built without Codex's own words, so nothing is quoted and no detail is invented.
       state: 'rejected',
-      reason: 'The provider did not accept this message.',
-      rejection: { kind: 'providerRejected' }
+      reason: "Codex didn't accept this message.",
+      rejection: { kind: 'providerRejected', neverReachedAgent: true }
     })
   })
 

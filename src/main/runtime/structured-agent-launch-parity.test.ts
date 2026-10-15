@@ -126,11 +126,15 @@ import {
 } from '../../shared/agent-hook-scrub-safe-env'
 import { STRUCTURED_WORKER_HANDLE_PREFIX } from '../../shared/structured-worker-handle'
 import { YOLO_TUI_AGENT_ARGS } from '../../shared/tui-agent-permissions'
+import { agentChatPermissionModes } from '../../shared/agent-chat-permission-mode'
 import {
   AGENT_HOOK_RUNTIME_ENV_KEYS,
   ORCA_AGENT_SESSION_CALLER_ENV_KEYS
 } from '../ipc/pty/host-env/spawn-env-keys'
-import { NATIVE_CHAT_VISUALS_DIR_ENV } from '../native-chat/native-chat-visuals-delivery'
+import {
+  LEGACY_NATIVE_CHAT_VISUALS_DIR_ENV,
+  NATIVE_CHAT_SCRATCH_DIR_ENV
+} from '../native-chat/native-chat-visuals-delivery'
 import type { StructuredAgentSessionAcquireInput } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import type { JournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database'
@@ -156,7 +160,7 @@ type Agent = (typeof AGENTS)[number]
 /** What each fake binary prints for `--version`: a release every launch gate accepts. */
 const VERSIONS: Record<Agent, string> = {
   claude: '2.1.120 (Claude Code)',
-  codex: 'codex-cli 0.130.0',
+  codex: 'codex-cli 0.136.0',
   grok: '1.0.50',
   opencode: '2.0.20',
   omp: '17.1.0',
@@ -307,7 +311,8 @@ function inheritedEnvironment(): Record<string, string> {
     [ORCA_SCRUB_SAFE_LAUNCH_ENV]: 'parent-scrub-safe-launch',
     ORCA_TERMINAL_HANDLE: 'term_parent',
     ORCA_AGENT_SESSION_SPAWN_TOKEN: 'parent-spawn-token',
-    [NATIVE_CHAT_VISUALS_DIR_ENV]: '/parent/visuals',
+    [NATIVE_CHAT_SCRATCH_DIR_ENV]: '/parent/scratch',
+    [LEGACY_NATIVE_CHAT_VISUALS_DIR_ENV]: '/parent/visuals',
     ORCA_CLI_COMMAND: '/parent/orca',
     ORCA_CLI_BIN_DIR: '/parent/bin',
     ORCA_USER_DATA_PATH: '/parent/user-data',
@@ -637,6 +642,10 @@ describe.skipIf(process.platform === 'win32')('native-chat launch parity', () =>
         },
         fence: 1,
         spawnToken: SPAWN_TOKEN,
+        // Claude and Codex chats run their own mode, which the host hands the start.
+        ...(launch.configured && agentChatPermissionModes(launch.agent)
+          ? { permissionMode: 'full-access' as const }
+          : {}),
         events: eventSink()
       }
       capture.spawns.length = 0

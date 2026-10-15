@@ -30,12 +30,14 @@ const fake = vi.hoisted(() => {
     setAutoSwitch: ReturnType<typeof vi.fn>
     rosters: Map<string, unknown>
     watchedTargets: unknown[]
+    selects: unknown[][]
   } = {
     pendingSelect: null,
     write: vi.fn(),
     setAutoSwitch: vi.fn(),
     rosters: new Map(),
-    watchedTargets: []
+    watchedTargets: [],
+    selects: []
   }
   return state
 })
@@ -86,10 +88,12 @@ vi.mock('@/runtime/runtime-provider-accounts-client', () => {
       })
       return { close: vi.fn() }
     },
-    selectClaudeProviderAccount: () =>
-      new Promise((resolve) => {
+    selectClaudeProviderAccount: (...args: unknown[]) => {
+      fake.selects.push(args)
+      return new Promise((resolve) => {
         fake.pendingSelect = resolve
-      }),
+      })
+    },
     selectCodexProviderAccount: fake.write,
     removeClaudeProviderAccount: fake.write,
     setClaudeAutoSwitch: fake.setAutoSwitch,
@@ -117,6 +121,7 @@ function claudeRoster(id: string, email: string, active: boolean): ClaudeRateLim
 beforeEach(() => {
   fake.pendingSelect = null
   fake.watchedTargets = []
+  fake.selects = []
   fake.rosters.set('local', claudeRoster('acct-l', 'local@desktop.test', false))
   fake.rosters.set('server-a', claudeRoster('acct-a', 'alpha@server-a.test', false))
   fake.rosters.set('server-b', claudeRoster('acct-b', 'beta@server-b.test', false))
@@ -203,4 +208,31 @@ it('turns on automatic switching on the server whose accounts the page shows', a
     true
   )
   expect(toggle().getAttribute('aria-checked')).toBe('true')
+})
+
+it("shows a WSL host's distro accounts from this desktop and selects for that distro", async () => {
+  const roster = claudeRoster('acct-w', 'wsl@ubuntu.test', false)
+  roster.accounts = roster.accounts.map((account) => ({
+    ...account,
+    managedAuthRuntime: 'wsl',
+    wslDistro: 'Ubuntu'
+  }))
+  fake.rosters.set('local', roster)
+  render(
+    <AccountsPane
+      settings={focusedElsewhere}
+      updateSettings={vi.fn()}
+      hostScope={scopeFor(null)}
+      wslHostDistro="Ubuntu"
+      wslSupportedPlatform
+      wslAvailable
+      wslDistros={['Ubuntu']}
+    />
+  )
+  await act(async () => {})
+  expect(fake.watchedTargets).toEqual([{ kind: 'local' }])
+  fireEvent.click(screen.getByText('wsl@ubuntu.test'))
+  expect(fake.selects).toEqual([
+    [{ kind: 'local' }, { accountId: 'acct-w', runtime: 'wsl', wslDistro: 'Ubuntu' }]
+  ])
 })
