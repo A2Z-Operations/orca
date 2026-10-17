@@ -274,6 +274,26 @@ describe('createClaudeAccountAutoSwitch', () => {
     expect(selectAccount).toHaveBeenCalledWith('b', defaultDistro, expect.any(Function))
   })
 
+  it("reports the switch on the accounts' own distro, as a switch from the menu does", async () => {
+    const { settings, autoSwitch, onSwitched } = setup([
+      account('a', { managedAuthRuntime: 'wsl', wslDistro: 'Ubuntu' }),
+      account('b', { managedAuthRuntime: 'wsl', wslDistro: 'Ubuntu' })
+    ])
+    settings.activeClaudeManagedAccountIdsByRuntime = { host: null, wsl: { Ubuntu: 'a' } }
+
+    autoSwitch(
+      usageState(limits(95), { b: limits(10) }, 'profile:a:wsl:Ubuntu', {
+        runtime: 'wsl',
+        wslDistro: null
+      })
+    )
+    await vi.runAllTimersAsync()
+
+    expect(onSwitched).toHaveBeenCalledWith(
+      expect.objectContaining({ target: { runtime: 'wsl', wslDistro: 'Ubuntu' } })
+    )
+  })
+
   it('does not wait for an account the usage service cannot read yet', async () => {
     const { autoSwitch, selectAccount, fetchInactiveUsage } = setup()
     const hourAgo = Date.now() - 60 * 60_000
