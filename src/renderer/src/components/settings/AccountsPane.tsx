@@ -15,6 +15,7 @@ import {
   getProviderAccountsOwnerKey,
   watchProviderAccounts
 } from '@/runtime/runtime-provider-accounts-client'
+import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
 import {
   getAccountsCodexSearchEntries,
   getAccountsGeminiSearchEntries,
@@ -27,7 +28,6 @@ import {
   getAccountsPaneSearchEntries,
   getAccountsZcodePlanSearchEntries
 } from './accounts-search'
-import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
 import { getRemoteAccountsPaneScope } from './provider-account-scope'
 import { ProviderHostScopeControl } from './ProviderHostScopeControl'
 import { SettingsSectionStack } from './SettingsSectionStack'
@@ -323,7 +323,7 @@ export function AccountsPane({
     recordFeatureInteraction
   })
   const runClaudeAccountAction = createClaudeAccountActionRunner({
-    settings,
+    accountOwner,
     isCurrentAccountOwner,
     accountRuntime,
     isRemoteAccountScope,

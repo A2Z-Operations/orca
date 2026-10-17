@@ -8,7 +8,9 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 import { expect, test } from './helpers/orca-app'
+import { NO_WORKSPACE_ROW_FILTERS } from '../../src/shared/workspace-view/workspace-row-filters'
 import { launchPhoneMirrorTopology } from './helpers/phone-mirror-topology'
+import { expectNoSidebarShadowMismatches } from './helpers/sidebar-shadow'
 import type { PairedMobileSocket } from './helpers/paired-mobile-client'
 import {
   filterWorktrees,
@@ -131,7 +133,11 @@ test("phone lists a server's workspaces exactly as the desktop sidebar filters t
             const serverIds = new Set(rows.map((row) => row.worktreeId))
             const phone = filterWorktrees(
               rows.map(toMobileRow),
-              { filterRepoIds: new Set(), hideSleeping, hideDefaultBranch: false },
+              {
+                ...NO_WORKSPACE_ROW_FILTERS,
+                hideSleepingWorkspaces: hideSleeping,
+                hideWorkspacesFromOtherDevices: true
+              },
               ''
             )
             shown = phone.map((row) => row.path)
@@ -151,10 +157,7 @@ test("phone lists a server's workspaces exactly as the desktop sidebar filters t
       return shown
     }
 
-    // Hide other-client workspaces: the server's own row goes, the desktop's and its phone's stay.
-    await desktop.page.evaluate(() =>
-      window.__store!.getState().setHideWorkspacesFromOtherDevices(true)
-    )
+    // The desktop marks the server's own row as another client's; the desktop's and its phone's stay.
     await expect
       .poll(
         async () => {
@@ -168,6 +171,10 @@ test("phone lists a server's workspaces exactly as the desktop sidebar filters t
         { timeout: 60_000 }
       )
       .toEqual([true, false, false])
+    // The marks are facts, so they were there before the filter; the phone applies the value.
+    await desktop.page.evaluate(() =>
+      window.__store!.getState().setHideWorkspacesFromOtherDevices(true)
+    )
     const shown = await expectPhoneMatchesSidebar(false)
     expect(shown.map((row) => path.basename(row))).toEqual(
       expect.arrayContaining(['from-desktop', 'from-phone'])
@@ -204,6 +211,7 @@ test("phone lists a server's workspaces exactly as the desktop sidebar filters t
     await expect.poll(desktopRowStatus, { timeout: 60_000 }).toBe('active')
     const awake = await expectPhoneMatchesSidebar(true)
     expect(awake.map((row) => path.basename(row))).toContain('from-desktop')
+    await expectNoSidebarShadowMismatches(desktop.page)
   } finally {
     await dispose()
   }

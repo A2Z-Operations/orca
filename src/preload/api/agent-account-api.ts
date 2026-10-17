@@ -1,5 +1,6 @@
 import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protection'
 import type {
+  ClaudeAutoSwitchedEvent,
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState
 } from '../../shared/managed-account-types'
@@ -64,6 +65,7 @@ export type ClaudeAccountsApi = {
     wslDistro?: string | null
   }) => Promise<ClaudeRateLimitAccountsState>
   setAutoSwitch: (args: { enabled: boolean }) => Promise<ClaudeRateLimitAccountsState>
+  onAutoSwitched: (callback: (switched: ClaudeAutoSwitchedEvent) => void) => () => void
 }
 
 export type GrokAccountsApi = {

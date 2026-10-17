@@ -97,8 +97,8 @@ export type ClaudeManagedAccountSummary = {
   lastAuthenticatedAt: number
   /** Its folder holds no login yet, e.g. an account saved by an older Orca; it needs a sign-in. */
   needsSignIn?: true
-  /** Its folder holds no login, but System default is signed in to it, so it runs there. */
-  coveredBySystemDefault?: true
+  /** Its folder holds no login, so its launches run on System default, signed in to it. */
+  runsOnSystemDefault?: true
 }
 
 /** A sign-in to a new account folder, or to a saved account's own when `accountId` is given. */
@@ -126,6 +126,13 @@ export type ClaudeRateLimitAccountsState = {
   systemDefaultMayBeCopied?: boolean
   /** Whether this host switches accounts before a usage limit; absent from older hosts. */
   autoSwitchEnabled?: boolean
+}
+
+/** Orca moved Claude to another account before a usage limit, so running sessions can follow. */
+export type ClaudeAutoSwitchedEvent = {
+  fromAccountId: string
+  toAccountId: string
+  target: { runtime?: 'host' | 'wsl'; wslDistro?: string | null }
 }
 
 export type ClaudeManagedAccountRuntimeSelection = {

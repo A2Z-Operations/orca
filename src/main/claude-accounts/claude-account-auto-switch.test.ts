@@ -125,7 +125,11 @@ describe('createClaudeAccountAutoSwitch', () => {
     await vi.runAllTimersAsync()
 
     expect(selectAccount).toHaveBeenCalledWith('c', HOST, expect.any(Function))
-    expect(onSwitched).toHaveBeenCalledWith({ from: 'a@example.com', to: 'c@example.com' })
+    expect(onSwitched).toHaveBeenCalledWith({
+      from: expect.objectContaining({ id: 'a', email: 'a@example.com' }),
+      to: expect.objectContaining({ id: 'c', email: 'c@example.com' }),
+      target: HOST
+    })
   })
 
   it('does nothing while auto-switch is off', () => {
@@ -227,7 +231,7 @@ describe('createClaudeAccountAutoSwitch', () => {
   })
 
   it('trusts System default usage only for an account that runs on System default', () => {
-    const covered = setup([account('a', { coveredBySystemDefault: true }), account('b')])
+    const covered = setup([account('a', { runsOnSystemDefault: true }), account('b')])
     covered.autoSwitch(usageState(limits(95), { b: limits(10) }, 'system'))
     expect(covered.selectAccount).toHaveBeenCalledWith('b', HOST, expect.any(Function))
 
