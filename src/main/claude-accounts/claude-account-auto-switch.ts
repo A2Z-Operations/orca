@@ -28,7 +28,13 @@ type ClaudeAutoSwitchDeps = {
   getSettings: () => ClaudeAutoSwitchSettings
   rateLimits: Pick<RateLimitService, 'fetchInactiveClaudeAccountsOnOpen'>
   accounts: Pick<ClaudeAccountService, 'listAccounts' | 'autoSelectAccountForTarget'>
-  onSwitched: (emails: { from: string; to: string }) => void
+  onSwitched: (switched: ClaudeAutoSwitched) => void
+}
+
+export type ClaudeAutoSwitched = {
+  from: ClaudeManagedAccountSummary
+  to: ClaudeManagedAccountSummary
+  target: RateLimitRuntimeTarget
 }
 
 type ClaudeAutoSwitchDecision =
@@ -113,7 +119,7 @@ export function createClaudeAccountAutoSwitch(
       .autoSelectAccountForTarget(to.id, target, stillWanted)
       .then((switched) => {
         if (switched) {
-          deps.onSwitched({ from: from.email, to: to.email })
+          deps.onSwitched({ from, to, target })
         }
       })
       .catch((error: unknown) => {

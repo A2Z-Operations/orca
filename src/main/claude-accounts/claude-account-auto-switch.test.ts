@@ -125,7 +125,11 @@ describe('createClaudeAccountAutoSwitch', () => {
     await vi.runAllTimersAsync()
 
     expect(selectAccount).toHaveBeenCalledWith('c', HOST, expect.any(Function))
-    expect(onSwitched).toHaveBeenCalledWith({ from: 'a@example.com', to: 'c@example.com' })
+    expect(onSwitched).toHaveBeenCalledWith({
+      from: expect.objectContaining({ id: 'a', email: 'a@example.com' }),
+      to: expect.objectContaining({ id: 'c', email: 'c@example.com' }),
+      target: HOST
+    })
   })
 
   it('does nothing while auto-switch is off', () => {

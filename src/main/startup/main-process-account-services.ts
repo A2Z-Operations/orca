@@ -19,6 +19,7 @@ import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent
 import { createAgentModelCatalogSettingsExpiry } from '../native-chat/agent-model-catalog/agent-model-catalog-account-expiry'
 import { getRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
 import { translateMain } from '../i18n/main-i18n'
+import type { ClaudeAutoSwitchedEvent } from '../../shared/managed-account-types'
 import { mainProcessState as state } from './main-process-state'
 
 // Settings that change which account or binary a new chat's agent runs under.
@@ -60,7 +61,14 @@ export function initializeMainProcessAccountServices(): void {
     codexAccountLifecycle: { onHostSystemDefaultSelected: state.codexSessionMigration.requestRun },
     setClaudeStatusLineListener: (listener) =>
       agentHookServer.setClaudeStatusLineListener(listener),
-    onClaudeAutoSwitched: ({ from, to }) => {
+    onClaudeAutoSwitched: ({ from, to, target }) => {
+      // Why: running sessions follow the running-session setting, as after a switch by hand.
+      const switched: ClaudeAutoSwitchedEvent = {
+        fromAccountId: from.id,
+        toAccountId: to.id,
+        target
+      }
+      state.mainWindow?.webContents.send('claudeAccounts:autoSwitched', switched)
       if (!store.getSettings().notifications.enabled) {
         return
       }
@@ -69,7 +77,7 @@ export function initializeMainProcessAccountServices(): void {
         body: translateMain(
           'accounts.claude.autoSwitchedBody',
           '{{from}} is near its usage limit. New Claude sessions start on {{to}}.',
-          { from, to }
+          { from: from.email, to: to.email }
         )
       })
     }
