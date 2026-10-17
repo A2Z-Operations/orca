@@ -3,7 +3,7 @@ import { handleRunningClaudeSessionsAfterSwitch } from './claude-account-switch-
 
 /** Treats running Claude sessions after an automatic switch the way a switch by hand does. */
 export async function followClaudeAutoSwitch(event: ClaudeAutoSwitchedEvent): Promise<void> {
-  const state = await window.api.claudeAccounts.list()
+  const state = { accounts: event.accounts }
   await handleRunningClaudeSessionsAfterSwitch({
     owner: { kind: 'local' },
     target: event.target,

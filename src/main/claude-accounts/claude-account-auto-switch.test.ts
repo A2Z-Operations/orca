@@ -126,6 +126,11 @@ describe('createClaudeAccountAutoSwitch', () => {
 
     expect(selectAccount).toHaveBeenCalledWith('c', HOST, expect.any(Function))
     expect(onSwitched).toHaveBeenCalledWith({
+      accounts: [
+        expect.objectContaining({ id: 'a' }),
+        expect.objectContaining({ id: 'b' }),
+        expect.objectContaining({ id: 'c' })
+      ],
       from: expect.objectContaining({ id: 'a', email: 'a@example.com' }),
       to: expect.objectContaining({ id: 'c', email: 'c@example.com' }),
       target: HOST

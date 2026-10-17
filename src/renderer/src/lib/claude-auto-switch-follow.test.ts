@@ -43,8 +43,9 @@ const row = (id: string) => ({
   updatedAt: 1,
   lastAuthenticatedAt: 1
 })
-const ROSTER = { accounts: [row('account-a'), row('account-b')], activeAccountId: 'account-b' }
+const ROSTER = { accounts: [row('account-a'), row('account-b')] }
 const SWITCHED = {
+  accounts: ROSTER.accounts,
   fromAccountId: 'account-a',
   toAccountId: 'account-b',
   target: { runtime: 'host' as const, wslDistro: null }
@@ -55,7 +56,10 @@ describe('followClaudeAutoSwitch', () => {
     vi.clearAllMocks()
     resetClaudeAccountSwitchSessionsForTests()
     store.settings = {}
-    vi.stubGlobal('window', { api: { claudeAccounts: { list: vi.fn(async () => ROSTER) } } })
+    // Why never answering: the switch carries its accounts, so nothing waits on a read meanwhile.
+    vi.stubGlobal('window', {
+      api: { claudeAccounts: { list: () => new Promise<typeof ROSTER>(() => {}) } }
+    })
   })
 
   it('restarts sessions still on the old account when the setting is Always restart', async () => {

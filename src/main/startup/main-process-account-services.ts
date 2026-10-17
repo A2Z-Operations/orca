@@ -61,9 +61,10 @@ export function initializeMainProcessAccountServices(): void {
     codexAccountLifecycle: { onHostSystemDefaultSelected: state.codexSessionMigration.requestRun },
     setClaudeStatusLineListener: (listener) =>
       agentHookServer.setClaudeStatusLineListener(listener),
-    onClaudeAutoSwitched: ({ from, to, target }) => {
+    onClaudeAutoSwitched: ({ accounts, from, to, target }) => {
       // Why: running sessions follow the running-session setting, as after a switch by hand.
       const switched: ClaudeAutoSwitchedEvent = {
+        accounts,
         fromAccountId: from.id,
         toAccountId: to.id,
         target
