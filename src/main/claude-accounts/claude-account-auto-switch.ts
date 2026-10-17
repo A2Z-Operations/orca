@@ -32,6 +32,7 @@ type ClaudeAutoSwitchDeps = {
 }
 
 export type ClaudeAutoSwitched = {
+  accounts: ClaudeManagedAccountSummary[]
   from: ClaudeManagedAccountSummary
   to: ClaudeManagedAccountSummary
   target: RateLimitRuntimeTarget
@@ -121,7 +122,12 @@ export function createClaudeAccountAutoSwitch(
         if (switched) {
           // Why the account's own runtime: with the default WSL distro the usage target names no
           // distro, but the panes on those accounts sit in the account's distro's lane.
-          deps.onSwitched({ from, to, target: runtimeOf(to) })
+          deps.onSwitched({
+            accounts: deps.accounts.listAccounts().accounts,
+            from,
+            to,
+            target: runtimeOf(to)
+          })
         }
       })
       .catch((error: unknown) => {

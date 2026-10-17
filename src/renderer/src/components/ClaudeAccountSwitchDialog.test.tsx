@@ -61,7 +61,6 @@ describe('ClaudeAccountSwitchDialog', () => {
     resetClaudeAccountSwitchSessionsForTests()
     vi.stubGlobal('api', {
       claudeAccounts: {
-        list: async () => ROSTER,
         onAutoSwitched: (callback: typeof autoSwitched) => {
           autoSwitched = callback
           return () => {}
@@ -96,6 +95,7 @@ describe('ClaudeAccountSwitchDialog', () => {
 
     act(() =>
       autoSwitched({
+        accounts: ROSTER.accounts,
         fromAccountId: 'account-a',
         toAccountId: 'account-b',
         target: { runtime: 'host' }
