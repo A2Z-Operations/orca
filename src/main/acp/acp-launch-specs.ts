@@ -14,7 +14,9 @@ import type { AcpStoredUserMessagesReader } from './acp-recovery-history'
 import { isStableCliVersionFrom, isStableCliVersionOnLine } from '../agent-cli-version-probe'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { AgentSessionModelOption } from '../../shared/agent-session-wire'
+import type { AgentChatPermissionMode } from '../../shared/agent-chat-permission-mode'
 import type { InitializeResponse } from './generated/acp-protocol.generated'
+import type { ManagedRuntime } from '../node-runtime/managed-runtime-release'
 import { readGrokModelCatalog } from './acp-dialects/grok-model-catalog'
 import {
   OPENCODE_MODEL_LISTING_ARGS,
@@ -27,6 +29,16 @@ import {
   loadOpenCodeVisualsSkill,
   type AcpVisualsSkillLoader
 } from './acp-visuals-skill'
+import type {
+  StructuredAgentSessionHistory,
+  StructuredAgentTranscriptImport
+} from '../native-chat/structured-agent-cli-conversations'
+import { GROK_SESSION_HISTORY } from '../grok/grok-session-history'
+import { GROK_TRANSCRIPT_IMPORT } from '../grok/grok-transcript-import'
+import { OPENCODE_SESSION_HISTORY } from '../opencode/opencode-session-history'
+import { OPENCODE_TRANSCRIPT_IMPORT } from '../opencode/opencode-transcript-import'
+import { OMP_SESSION_HISTORY } from '../omp/omp-session-history'
+import { OMP_TRANSCRIPT_IMPORT } from '../omp/omp-transcript-import'
 
 /** How an agent lists its models without a session: from its `initialize` answer (plus extension
  *  requests), from a listing command, or not at all. Never `authenticate` or `session/new`. */
@@ -54,7 +66,7 @@ export type AcpLaunchSpec = {
   /** The Orca agent id, which names the agent's records, its catalog label and its settings. */
   agent: TuiAgent
   command: string
-  /** Built per launch: `fullAccess` is the Agent Permissions setting's bypass posture;
+  /** Built per launch: `fullAccess` is the chat's own Full access permission mode;
    *  `pluginDir` is a plugin folder `visualsSkill` asked the agent to load. */
   args(input: { fullAccess: boolean; pluginDir: string | null }): string[]
   /** Laid over the child's environment last, after the account and the user's own variables. */
@@ -71,6 +83,8 @@ export type AcpLaunchSpec = {
     advertised: readonly string[]
     env: Readonly<Record<string, string>>
   }): string | undefined
+  /** Matches the stderr line where the agent waits for browser sign-in: the chat is signed out. */
+  signInPrompt?(line: string): boolean
   /** The account each chat pins, and how a launch points the agent at it. */
   account: AcpAccountBinding
   /** The `--version` releases a structured chat runs on, asked before a create and again at every
@@ -78,6 +92,14 @@ export type AcpLaunchSpec = {
   supportsVersion?(version: string): boolean
   /** Where the agent installs its own binary, searched after PATH. */
   installDirectories(input: { env: Readonly<Record<string, string>>; homePath: string }): string[]
+  /** A pinned copy Orca installs under its data folder when the person asks, searched last; a
+   *  start never installs it. A spec with one names no `supportsVersion`. */
+  managedRuntime?: ManagedRuntime
+  /** The agent's `mode` config option value per chat permission mode, through which it enforces
+   *  the mode itself; Orca then answers none of its permission requests for the person. */
+  permissionModeConfig?: {
+    values: { ask: string } & Partial<Record<AgentChatPermissionMode, string>>
+  }
   /** Images go to the agent when it also advertises them; off sends text prompts only. */
   imagePrompts?: true
   /** The agent compacts its conversation when sent `/compact` as a prompt; off hides `/compact`. */
@@ -87,12 +109,18 @@ export type AcpLaunchSpec = {
   modelDiscovery: AcpModelDiscovery
   /** How a launch loads the inline-visuals skill; absent, the agent's chats have no visuals. */
   visualsSkill?: AcpVisualsSkillLoader
+  /** How a chat adopts a conversation the agent's CLI recorded; null when it cannot. */
+  transcriptImport: StructuredAgentTranscriptImport | null
+  /** How the agent's chats own the Session History rows their conversations list as. */
+  sessionHistory: StructuredAgentSessionHistory
+  /** Each process gets its own temp folder: the agent's temp files collide across processes. */
+  privateTempDirectory?: true
 }
 
 const GROK_LAUNCH_SPEC: AcpLaunchSpec = {
   agent: 'grok',
   command: 'grok',
-  // `--always-approve` only for full access, as the user's setting chooses.
+  // `--always-approve` only for full access, as the chat's permission mode chooses.
   args: ({ fullAccess, pluginDir }) => [
     'agent',
     ...(fullAccess ? ['--always-approve'] : []),
@@ -119,7 +147,9 @@ const GROK_LAUNCH_SPEC: AcpLaunchSpec = {
     listingNamesConfiguredModel: false
   },
   visualsSkill: loadGrokVisualsSkill,
-  compaction: true
+  compaction: true,
+  transcriptImport: GROK_TRANSCRIPT_IMPORT,
+  sessionHistory: GROK_SESSION_HISTORY
 }
 
 // `opencode acp` on 1.x serves in-process; on 2.x it starts a private `opencode serve --stdio` child
@@ -157,7 +187,9 @@ const OPENCODE_LAUNCH_SPEC: AcpLaunchSpec = {
     listingNamesConfiguredModel: false
   },
   visualsSkill: loadOpenCodeVisualsSkill,
-  compaction: true
+  compaction: true,
+  transcriptImport: OPENCODE_TRANSCRIPT_IMPORT,
+  sessionHistory: OPENCODE_SESSION_HISTORY
 }
 
 // OMP serves ACP through `omp acp`; its environment reaches it as the user set it.
@@ -184,7 +216,9 @@ const OMP_LAUNCH_SPEC: AcpLaunchSpec = {
     reason: 'omp has no session-free listing that matches what its chats offer'
   },
   visualsSkill: loadOmpVisualsSkill,
-  compaction: true
+  compaction: true,
+  transcriptImport: OMP_TRANSCRIPT_IMPORT,
+  sessionHistory: OMP_SESSION_HISTORY
 }
 
 export const ACP_LAUNCH_SPECS: readonly AcpLaunchSpec[] = [

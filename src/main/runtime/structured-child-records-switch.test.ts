@@ -21,6 +21,7 @@ import type {
   CodexAppServerConnectionHandlers,
   openCodexAppServerConnection
 } from '../codex/codex-app-server-connection'
+import { collectRuntimeWorktreeAgentSources } from './runtime-worktree-agent-sources'
 import { AgentHookServer, _internals } from '../agent-hooks/server'
 import { computeAgentSessionPayloadFingerprint } from '../../shared/agent-session-mutation-envelope'
 import {
@@ -34,6 +35,7 @@ import {
   stopStructuredAgentSessionRuntime
 } from './structured-agent-session-runtime'
 import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
+import { scriptedCodexTransport } from './scripted-codex-transport.test-fixture'
 import { createScriptedClaudeRuntime } from './structured-claude-scripted-runtime-test-support'
 
 vi.mock('../telemetry/client', () => ({ track: vi.fn() }))
@@ -128,8 +130,7 @@ describe('the chat strip and the session list read the same host child records',
       resolveClaudeAuthPolicy: () => ({ account: 'managed' }),
       resolveCodexCommand: () => 'codex',
       resolveEnvironment: async () => ({ PATH: process.env.PATH }),
-      openCodexConnection: openConnection,
-      readProcessStartTime: async () => 1_700_000_000_000,
+      ...scriptedCodexTransport(openConnection),
       statusSink
     })
     const attachParams = hostTestAttachParams(null, { providerHandle: undefined })
@@ -179,6 +180,17 @@ describe('the chat strip and the session list read the same host child records',
     const stripRows = () => rows(strip.at(-1)?.children ?? undefined)
     const both = (expected: Row[]) => {
       expect(summaryRows()).toEqual(expected)
+      const sources = collectRuntimeWorktreeAgentSources({
+        hookSnapshots: server.getStatusSnapshot(),
+        readStructuredSummary: host.readStatusSummary,
+        mirroredWorktreeIdByTabId: new Map(),
+        connectedPtyEvidence: {
+          tabIds: new Set(),
+          paneKeys: new Set(),
+          ptyIdByTerminalHandle: new Map()
+        }
+      })
+      expect([...sources.values()].flatMap((source) => rows(source.children))).toEqual(expected)
       expect(stripRows()).toEqual(expected)
     }
 

@@ -20,6 +20,7 @@ export class ClaudeAccountService {
   private cancelPendingClaudeLogin: (() => boolean) | null = null
   private pendingSignInLink: Promise<string | null> | null = null
   private userActionCount = 0
+  private openWslSignInLink: ((signInLink: string) => void) | null = null
   private readonly selection: ClaudeAccountSelection
   private readonly registration: ClaudeAccountRegistration
 
@@ -65,6 +66,11 @@ export class ClaudeAccountService {
 
   cancelPendingLogin(): boolean {
     return this.cancelPendingClaudeLogin?.() ?? false
+  }
+
+  /** Lets the desktop open a WSL sign-in's link; orcad never sets one. */
+  setWslSignInLinkOpener(opener: ((signInLink: string) => void) | null): void {
+    this.openWslSignInLink = opener
   }
 
   beginSignIn(request: ClaudeSignInRequest = {}): Promise<ClaudeAccountSignIn> {
@@ -138,7 +144,8 @@ export class ClaudeAccountService {
               runCommand: this.runLoginCommand,
               setCancel: (cancel) => {
                 this.cancelPendingClaudeLogin = cancel
-              }
+              },
+              openWslSignInLink: this.openWslSignInLink
             },
             signInLink?.resolve
           )

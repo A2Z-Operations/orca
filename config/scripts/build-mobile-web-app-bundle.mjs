@@ -505,8 +505,10 @@ export async function mobileWebAppModuleClosure(entryModules, { absWorkingDir } 
     ...(absWorkingDir ? { absWorkingDir } : {}),
     // Extensionless, so `resolveExtensions` picks the same file the bundle ships: a route with a
     // `.web.tsx` sibling resolves to that one, and naming the `.tsx` path explicitly would measure
-    // the native switch no browser ever loads.
-    entryPoints: entryModules.map((entry) => entry.replace(/\.tsx?$/, '')),
+    // the native route file no browser ever loads.
+    entryPoints: entryModules.map((entry) =>
+      resolve(absWorkingDir ?? base.absWorkingDir, entry.replace(/\.tsx?$/, ''))
+    ),
     splitting: false,
     // `[dir]` too: `app/_layout` and `app/h/_layout` share a name.
     entryNames: '[dir]/[name]',

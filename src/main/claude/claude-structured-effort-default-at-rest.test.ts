@@ -27,7 +27,8 @@ import {
   fakeClaude,
   identityFor,
   recordingJournalSink,
-  claudeStartupSettled
+  claudeStartupSettled,
+  claudeOpened
 } from './claude-structured-session-test-support'
 
 const SESSION = 'session-1'
@@ -390,20 +391,19 @@ describe('Claude effort default at rest', () => {
 
     const result = await readAtRest(store, record)
 
-    expect(result.current).toEqual({ model: 'gpt-5.5' })
+    expect(result.current).toEqual({ model: 'gpt-5.5', permissionMode: 'ask' })
   })
 
   it("never saves the applied effort as the chat's pick, yet shows it at rest", async () => {
     const store = new AgentModelCatalogStore()
     const events: ClaudeStructuredSessionEvent[] = []
-    await startChild(store, undefined, events)
+    const adapter = await startChild(store, undefined, events)
 
-    const started = events.find((event) => event.type === 'started')
-    const reported = started?.type === 'started' ? started.reportedOptions : null
+    const reported = (await claudeOpened(adapter, SESSION)).reportedOptions
     expect(reported).not.toHaveProperty('effort')
     // The record the start persists names the listed row the catalog learned under.
     const record = restingRecord(
-      nativeSessionOptionsFromReport({ reported: reported!, restoreSkipped: [] })
+      nativeSessionOptionsFromReport({ reported: reported, restoreSkipped: [] })
     )
     expect(record.options).toEqual({ model: 'opus[1m]' })
     expect((await readAtRest(store, record)).current.effort).toBe('medium')

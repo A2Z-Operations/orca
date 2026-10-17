@@ -160,7 +160,7 @@ function isReadingOf(
 ): boolean {
   const provenance = limits?.usageMetadata?.authProvenance
   // Why: an account System default covers runs on that login, so its usage is tagged `system`.
-  if (account.coveredBySystemDefault) {
+  if (account.runsOnSystemDefault) {
     return provenance === 'system'
   }
   return (

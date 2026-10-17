@@ -227,7 +227,7 @@ describe('createClaudeAccountAutoSwitch', () => {
   })
 
   it('trusts System default usage only for an account that runs on System default', () => {
-    const covered = setup([account('a', { coveredBySystemDefault: true }), account('b')])
+    const covered = setup([account('a', { runsOnSystemDefault: true }), account('b')])
     covered.autoSwitch(usageState(limits(95), { b: limits(10) }, 'system'))
     expect(covered.selectAccount).toHaveBeenCalledWith('b', HOST, expect.any(Function))
 
