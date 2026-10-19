@@ -716,4 +716,127 @@ describe('account CLI handlers', () => {
 
     expect(callMock).toHaveBeenCalledWith('accounts.list', { refreshUsage: false })
   })
+
+  it('shows the auto-switch state in the Claude block when the host reports it', async () => {
+    callMock.mockResolvedValue({
+      id: 'test',
+      ok: true,
+      result: {
+        claude: {
+          accounts: [{ id: 'a', email: 'a@example.com' }],
+          activeAccountId: 'a',
+          autoSwitchEnabled: true
+        },
+        codex: { accounts: [], activeAccountId: null }
+      },
+      _meta: { runtimeId: 'test-runtime' }
+    })
+
+    await ACCOUNT_HANDLERS['account list']({ ...context('claude'), flags: new Map() })
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('  a@example.com (active)\n  auto-switch: on')
+    )
+  })
+
+  describe('account auto-switch', () => {
+    function autoSwitchContext(flags: [string, string | boolean][], json = false): HandlerContext {
+      return { ...context('claude', json), flags: new Map<string, string | boolean>(flags) }
+    }
+
+    it('turns Claude auto-switch on through accounts.setClaudeAutoSwitch and prints the state', async () => {
+      callMock.mockResolvedValue({
+        id: 'test',
+        ok: true,
+        result: { accounts: [], activeAccountId: null, autoSwitchEnabled: true },
+        _meta: { runtimeId: 'test-runtime' }
+      })
+
+      await ACCOUNT_HANDLERS['account auto-switch'](
+        autoSwitchContext([
+          ['agent', 'claude'],
+          ['on', true]
+        ])
+      )
+
+      expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAutoSwitch', { enabled: true })
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('auto-switch: on'))
+    })
+
+    it('turns it off with --off and defaults --agent to claude', async () => {
+      callMock.mockResolvedValue({
+        id: 'test',
+        ok: true,
+        result: { accounts: [], activeAccountId: null, autoSwitchEnabled: false },
+        _meta: { runtimeId: 'test-runtime' }
+      })
+
+      await ACCOUNT_HANDLERS['account auto-switch'](autoSwitchContext([['off', true]]))
+
+      expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAutoSwitch', { enabled: false })
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('auto-switch: off'))
+    })
+
+    it('prints only the state as JSON', async () => {
+      callMock.mockResolvedValue({
+        id: 'test',
+        ok: true,
+        result: { accounts: [], activeAccountId: null, autoSwitchEnabled: true },
+        _meta: { runtimeId: 'test-runtime' }
+      })
+
+      await ACCOUNT_HANDLERS['account auto-switch'](autoSwitchContext([['on', true]], true))
+
+      expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual({ autoSwitchEnabled: true })
+    })
+
+    it('refuses an agent other than claude', async () => {
+      await expect(
+        ACCOUNT_HANDLERS['account auto-switch'](
+          autoSwitchContext([
+            ['agent', 'codex'],
+            ['on', true]
+          ])
+        )
+      ).rejects.toThrow(/claude/)
+      expect(callMock).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      [[]],
+      [
+        [
+          ['on', true],
+          ['off', true]
+        ]
+      ]
+    ] as [[string, string | boolean][]][])(
+      'needs exactly one of --on / --off (flags %j)',
+      async (flags) => {
+        await expect(
+          ACCOUNT_HANDLERS['account auto-switch'](autoSwitchContext(flags))
+        ).rejects.toThrow(/--on or --off/)
+        expect(callMock).not.toHaveBeenCalled()
+      }
+    )
+
+    it('accepts --environment, unlike the other account commands, so a paired server can be flipped', async () => {
+      // Why: this is how the MacBook turns the switch on for the Studio's headless runtime.
+      callMock.mockResolvedValue({
+        id: 'test',
+        ok: true,
+        result: { accounts: [], activeAccountId: null, autoSwitchEnabled: true },
+        _meta: { runtimeId: 'runtime-1' }
+      })
+
+      await ACCOUNT_HANDLERS['account auto-switch'](
+        autoSwitchContext([
+          ['on', true],
+          ['environment', 'macstudio']
+        ])
+      )
+
+      expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAutoSwitch', { enabled: true })
+    })
+  })
 })

@@ -29,7 +29,9 @@ const COMMAND_PATHS = COMMAND_SPECS.flatMap((spec) => specPaths(spec))
 
 function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
   return (
-    commandPath[0] === 'account' ||
+    // Why the carve-out: auto-switch is written on the runtime whose accounts it rotates, so
+    // `--environment <server>` must reach that server (the other account commands stay local).
+    (commandPath[0] === 'account' && commandPath[1] !== 'auto-switch') ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||
     // Why: `host list` answers "what can this machine target, and with what flag". Half of that

@@ -9,6 +9,8 @@ type AccountsBlock = {
     host: string | null
     wsl: Record<string, string | null>
   }
+  /** Claude only: whether the host switches accounts before a usage limit (absent from older hosts). */
+  autoSwitchEnabled?: boolean
 }
 
 export function formatDataAccounts(label: string, state: ManagedDataAccountsState): string {
@@ -40,5 +42,8 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
         account.needsSignIn ? ' (sign in again in Orca Settings > AI Provider Accounts)' : ''
       }`
   )
+  if (block.autoSwitchEnabled !== undefined) {
+    lines.push(`  auto-switch: ${block.autoSwitchEnabled ? 'on' : 'off'}`)
+  }
   return `Managed ${label} accounts (${block.accounts.length}):\n${lines.join('\n')}`
 }

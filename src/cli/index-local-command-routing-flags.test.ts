@@ -269,6 +269,34 @@ describe('runtime-selector flags on locally pinned CLI commands', () => {
     process.exitCode = 0
   })
 
+  it('routes `account auto-switch --environment` to the named server, unlike the other account commands', async () => {
+    // Why: the switch rotates the accounts of the runtime it is written on, so the flag must
+    // reach that runtime; every other `account` command stays pinned to this machine.
+    pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
+    callMock.mockImplementation(async (method: string) => {
+      if (method === 'accounts.setClaudeAutoSwitch') {
+        return okFixture('req_auto_switch', {
+          accounts: [],
+          activeAccountId: null,
+          autoSwitchEnabled: true
+        })
+      }
+      throw new Error(`unexpected call ${method}`)
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    runtimeClientConstructorMock.mockClear()
+
+    await main(
+      ['account', 'auto-switch', '--agent', 'claude', '--on', '--environment', 'm4air', '--json'],
+      '/tmp/repo'
+    )
+
+    const printed = JSON.parse(String(logSpy.mock.calls[0]?.[0]))
+    expect(printed).toEqual({ autoSwitchEnabled: true })
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
+    expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAutoSwitch', { enabled: true })
+  })
+
   it('rejects `environment list --environment` rather than repeating the local answer', async () => {
     pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
