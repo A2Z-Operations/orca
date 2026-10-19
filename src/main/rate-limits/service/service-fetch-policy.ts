@@ -105,6 +105,21 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
 
   /** Live usage windows forwarded from a Claude session's statusLine command. */
   ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): void {
+    // Why first: a session of another managed account reports that account's own quota; keeping it in
+    // the account's entry gives the session mover a fresh reading between polls, for free.
+    const eventConfigDir = normalizeClaudeConfigDir(event.configDir)
+    const liveAccountId = eventConfigDir
+      ? (this.liveClaudeAccountResolver?.(eventConfigDir) ?? null)
+      : null
+    if (
+      liveAccountId &&
+      (this.inactiveClaudeAccountsResolver?.() ?? []).some(
+        (account) => account.id === liveAccountId
+      )
+    ) {
+      this.ingestLiveInactiveClaudeRateLimits(liveAccountId, event)
+      return
+    }
     // Why: attribution needs the selected account's config dir; until a fetch cycle captures it, drop posts rather than guess the account.
     const snapshot = this.lastClaudeAuthSnapshot
     if (!snapshot) {
@@ -162,5 +177,46 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
         }
       }
     })
+  }
+
+  // Why its own entry and not the bar: the selected account's bar must never show another account's quota.
+  protected ingestLiveInactiveClaudeRateLimits(
+    accountId: string,
+    event: ClaudeStatusLineRateLimits
+  ): void {
+    const freshSession = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
+    const freshWeekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
+    if (!freshSession && !freshWeekly) {
+      return
+    }
+    const previous = this.inactiveClaudeCache.get(accountId) ?? null
+    const session = freshSession ?? previous?.session ?? null
+    const weekly = freshWeekly ?? previous?.weekly ?? null
+    if (
+      previous?.status === 'ok' &&
+      previous.usageMetadata?.source === 'live-session' &&
+      Date.now() - previous.updatedAt < LIVE_CLAUDE_INGEST_DEDUPE_MS &&
+      isSameUsageWindow(previous.session, session) &&
+      isSameUsageWindow(previous.weekly, weekly)
+    ) {
+      return
+    }
+    this.inactiveClaudeCache.set(accountId, {
+      provider: 'claude',
+      session,
+      weekly,
+      fableWeekly: previous?.fableWeekly ?? null,
+      updatedAt: Date.now(),
+      error: null,
+      status: 'ok',
+      usageMetadata: {
+        source: 'live-session',
+        lastSuccessfulSource: 'live-session',
+        credentialSource: previous?.usageMetadata?.credentialSource,
+        retryAtMs: previous?.usageMetadata?.retryAtMs,
+        authProvenance: `profile:${accountId}`
+      }
+    })
+    this.pushToRenderer()
   }
 }

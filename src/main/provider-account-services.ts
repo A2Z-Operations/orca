@@ -24,6 +24,7 @@ import { createAccountRuntimeTargetSettingsSync } from './rate-limits/account-ru
 import { normalizeCodexRuntimeSelection } from './codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from './claude-accounts/runtime-selection'
 import type { ClaudeStatusLineRateLimits } from '../shared/claude-statusline-rate-limits'
+import { normalizeClaudeConfigDir } from './rate-limits/service/service-types'
 
 export type ProviderAccountServices = {
   rateLimits: RateLimitService
@@ -167,6 +168,17 @@ export function createProviderAccountServices(
         wslDistro: account.wslDistro,
         wslLinuxAuthPath: account.wslLinuxAuthPath
       }))
+  })
+  // Why: a statusline post names its CLAUDE_CONFIG_DIR; only the account layer knows whose folder that is.
+  rateLimits.setLiveClaudeAccountResolver((configDir) => {
+    for (const account of store.getSettings().claudeManagedAccounts) {
+      if (
+        normalizeClaudeConfigDir(claudeRuntimeAuth.router.accountHome(account.id)) === configDir
+      ) {
+        return account.id
+      }
+    }
+    return null
   })
   rateLimits.setInactiveCodexAccountsResolver(() => {
     const settings = store.getSettings()
