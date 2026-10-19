@@ -1,30 +1,68 @@
-import type { InactiveAccountUsage, ProviderRateLimits } from '../../shared/rate-limit-types'
+import type {
+  InactiveAccountUsage,
+  ProviderRateLimits,
+  RateLimitWindow
+} from '../../shared/rate-limit-types'
 
-const CLAUDE_AUTO_SWITCH_THRESHOLD_PERCENT = 90
+// BLOWZER lines (owner, 2026-10-19): the 5-hour window at 95 %, the weekly and the Fable-weekly windows at 90 %.
+export const CLAUDE_AUTO_SWITCH_LINES = { session: 95, weekly: 90, fableWeekly: 90 } as const
 // Why: a switch only reaches the next Claude started, so a fresh pick needs time to be used.
 export const CLAUDE_AUTO_SWITCH_COOLDOWN_MS = 5 * 60_000
-// Why: an account only a few points under the line would cross it again within minutes.
-const MIN_PERCENT_GAINED = 10
+// Why: an account only a few points under a line would cross it again within minutes.
+const MIN_HEADROOM_GAINED = 10
 
-/** The tightest 5-hour or weekly window still running (0 once both reset), or null when usage could not be read. */
-function getClaudeUsedPercent(limits: ProviderRateLimits | null, now: number): number | null {
+type WindowName = keyof typeof CLAUDE_AUTO_SWITCH_LINES
+type LiveWindow = { name: WindowName; used: number; line: number }
+
+/**
+ * The windows the account reports, each with its own line. A window past its reset has
+ * started over, yet an idle session still reports its old usage — so it counts as empty.
+ * Null when usage could not be read (status not ok, or no window at all).
+ */
+function liveWindows(limits: ProviderRateLimits | null, now: number): LiveWindow[] | null {
   if (limits?.status !== 'ok') {
     return null
   }
-  const windows = [limits.session, limits.weekly].filter((window) => window !== null)
-  if (windows.length === 0) {
+  const pairs: [WindowName, RateLimitWindow | null | undefined][] = [
+    ['session', limits.session],
+    ['weekly', limits.weekly],
+    ['fableWeekly', limits.fableWeekly]
+  ]
+  const present = pairs.filter(
+    (pair): pair is [WindowName, RateLimitWindow] => pair[1] !== null && pair[1] !== undefined
+  )
+  if (present.length === 0) {
     return null
   }
-  // Why: a window past its reset has started over, yet an idle session still reports its old usage.
-  const current = windows.filter((window) => window.resetsAt === null || window.resetsAt > now)
-  return Math.max(0, ...current.map((window) => window.usedPercent))
+  return present.map(([name, window]) => ({
+    name,
+    used: window.resetsAt !== null && window.resetsAt <= now ? 0 : window.usedPercent,
+    line: CLAUDE_AUTO_SWITCH_LINES[name]
+  }))
+}
+
+/** Distance to the nearest line over the account's windows (negative = over), or null when usage could not be read. */
+export function claudeAutoSwitchHeadroom(
+  limits: ProviderRateLimits | null,
+  now: number
+): number | null {
+  const live = liveWindows(limits, now)
+  if (!live) {
+    return null
+  }
+  return Math.min(...live.map((window) => window.line - window.used))
 }
 
 export function isClaudeOverAutoSwitchLine(
   limits: ProviderRateLimits | null,
   now: number
 ): boolean {
-  return (getClaudeUsedPercent(limits, now) ?? 0) >= CLAUDE_AUTO_SWITCH_THRESHOLD_PERCENT
+  const headroom = claudeAutoSwitchHeadroom(limits, now)
+  return headroom !== null && headroom <= 0
+}
+
+function isAtLimit(limits: ProviderRateLimits | null, now: number): boolean {
+  return (liveWindows(limits, now) ?? []).some((window) => window.used >= 100)
 }
 
 /** The account new Claude sessions should move to, or null to stay. */
@@ -33,30 +71,28 @@ export function pickClaudeAutoSwitchTarget(
   candidates: InactiveAccountUsage[],
   { now, lastSwitchAt }: { now: number; lastSwitchAt: number }
 ): string | null {
-  const used = getClaudeUsedPercent(active, now)
-  if (used === null || used < CLAUDE_AUTO_SWITCH_THRESHOLD_PERCENT) {
+  const activeHeadroom = claudeAutoSwitchHeadroom(active, now)
+  if (activeHeadroom === null || activeHeadroom > 0) {
     return null
   }
-  const atLimit = used >= 100
+  const atLimit = isAtLimit(active, now)
   if (!atLimit && now - lastSwitchAt < CLAUDE_AUTO_SWITCH_COOLDOWN_MS) {
     return null
   }
   const best = candidates
     .flatMap((candidate) => {
-      const candidateUsed = getClaudeUsedPercent(candidate.rateLimits, now)
-      return candidateUsed !== null && candidateUsed < 100
-        ? [{ accountId: candidate.accountId, used: candidateUsed }]
+      const headroom = claudeAutoSwitchHeadroom(candidate.rateLimits, now)
+      return headroom !== null && !isAtLimit(candidate.rateLimits, now)
+        ? [{ accountId: candidate.accountId, headroom }]
         : []
     })
-    .sort((a, b) => a.used - b.used)[0]
+    .sort((a, b) => b.headroom - a.headroom)[0]
   if (!best) {
     return null
   }
   // Why: at the limit the agent stops anyway, so any account with room beats staying.
   if (atLimit) {
-    return best.accountId
+    return best.headroom > 0 ? best.accountId : null
   }
-  const clearlyBetter =
-    best.used < CLAUDE_AUTO_SWITCH_THRESHOLD_PERCENT && best.used <= used - MIN_PERCENT_GAINED
-  return clearlyBetter ? best.accountId : null
+  return best.headroom >= MIN_HEADROOM_GAINED ? best.accountId : null
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { InactiveAccountUsage, ProviderRateLimits } from '../../shared/rate-limit-types'
 import {
   CLAUDE_AUTO_SWITCH_COOLDOWN_MS,
+  claudeAutoSwitchHeadroom,
+  isClaudeOverAutoSwitchLine,
   pickClaudeAutoSwitchTarget
 } from './claude-account-auto-switch-policy'
 
@@ -54,7 +56,7 @@ describe('pickClaudeAutoSwitchTarget', () => {
   it('moves to the account with the most room once the active account crosses the line', () => {
     const candidates = [usage('b', limits(50)), usage('c', limits(20)), usage('d', limits(35))]
 
-    expect(pick(limits(90), candidates, COOLED_DOWN)).toBe('c')
+    expect(pick(limits(95), candidates, COOLED_DOWN)).toBe('c')
   })
 
   it('counts the weekly window as well as the 5-hour one', () => {
@@ -64,15 +66,15 @@ describe('pickClaudeAutoSwitchTarget', () => {
   it('ranks candidates by their tightest window', () => {
     const candidates = [usage('b', limits(5, 85)), usage('c', limits(40, 40))]
 
-    expect(pick(limits(92), candidates, COOLED_DOWN)).toBe('c')
+    expect(pick(limits(96), candidates, COOLED_DOWN)).toBe('c')
   })
 
   it('stays when the best account is not clearly better', () => {
-    expect(pick(limits(91), [usage('b', limits(86))], COOLED_DOWN)).toBe(null)
+    expect(pick(limits(96), [usage('b', limits(86))], COOLED_DOWN)).toBe(null)
   })
 
   it('never moves to an account that is itself over the line before the limit is hit', () => {
-    expect(pick(limits(99), [usage('b', limits(90))], COOLED_DOWN)).toBe(null)
+    expect(pick(limits(99), [usage('b', limits(95))], COOLED_DOWN)).toBe(null)
   })
 
   it('skips accounts whose usage could not be read', () => {
@@ -92,7 +94,7 @@ describe('pickClaudeAutoSwitchTarget', () => {
   })
 
   it('at the limit, takes any account with room even during the cooldown', () => {
-    const candidates = [usage('b', limits(97)), usage('c', limits(100))]
+    const candidates = [usage('b', limits(94)), usage('c', limits(100))]
 
     expect(pick(limits(100), candidates, 0)).toBe('b')
   })
@@ -124,5 +126,57 @@ describe('pickClaudeAutoSwitchTarget', () => {
     const candidates = [usage('b', limits(100)), usage('c', limits(20, 100))]
 
     expect(pick(limits(100), candidates, COOLED_DOWN)).toBe(null)
+  })
+})
+
+// BLOWZER (owner, 2026-10-19): each window has its own line — 5-hour 95 %, weekly 90 %, Fable weekly 90 %.
+const now = 1_800_000_000_000
+const win = (usedPercent: number) =>
+  ({ usedPercent, resetsAt: now + 3_600_000 }) as NonNullable<ProviderRateLimits['session']>
+const lines = (session: number, weekly: number, fable?: number): ProviderRateLimits =>
+  ({
+    status: 'ok',
+    session: win(session),
+    weekly: win(weekly),
+    fableWeekly: fable === undefined ? null : win(fable)
+  }) as ProviderRateLimits
+const cand = (accountId: string, l: ProviderRateLimits): InactiveAccountUsage =>
+  ({ accountId, rateLimits: l }) as InactiveAccountUsage
+
+describe('per-window lines (BLOWZER)', () => {
+  it('5-hour window switches at 95, not 90', () => {
+    expect(isClaudeOverAutoSwitchLine(lines(94.9, 10), now)).toBe(false)
+    expect(isClaudeOverAutoSwitchLine(lines(95, 10), now)).toBe(true)
+  })
+  it('weekly window switches at 90', () => {
+    expect(isClaudeOverAutoSwitchLine(lines(10, 89.9), now)).toBe(false)
+    expect(isClaudeOverAutoSwitchLine(lines(10, 90), now)).toBe(true)
+  })
+  it('Fable weekly window switches at 90 and is ignored when absent', () => {
+    expect(isClaudeOverAutoSwitchLine(lines(10, 10, 90), now)).toBe(true)
+    expect(isClaudeOverAutoSwitchLine(lines(10, 10, 89), now)).toBe(false)
+    expect(isClaudeOverAutoSwitchLine(lines(10, 10), now)).toBe(false)
+  })
+  it('headroom is the distance to the nearest line', () => {
+    expect(claudeAutoSwitchHeadroom(lines(50, 80, 0), now)).toBe(10) // weekly 90-80
+    expect(claudeAutoSwitchHeadroom(lines(90, 10, 0), now)).toBe(5) // session 95-90
+    expect(claudeAutoSwitchHeadroom(lines(10, 10, 85), now)).toBe(5) // fable 90-85
+  })
+  it('picks the candidate with the most headroom to its nearest line', () => {
+    const active = lines(10, 10, 92)
+    const target = pickClaudeAutoSwitchTarget(
+      active,
+      [cand('a', lines(10, 50, 100)), cand('b', lines(10, 70, 0)), cand('c', lines(96, 1, 0))],
+      { now, lastSwitchAt: 0 }
+    )
+    expect(target).toBe('b')
+  })
+  it('does not switch to a candidate that is itself within 10 points of a line', () => {
+    expect(
+      pickClaudeAutoSwitchTarget(lines(10, 92), [cand('a', lines(10, 85))], {
+        now,
+        lastSwitchAt: 0
+      })
+    ).toBeNull()
   })
 })
