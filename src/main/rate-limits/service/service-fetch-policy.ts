@@ -108,9 +108,15 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     // Why first: a session of another managed account reports that account's own quota; keeping it in
     // the account's entry gives the session mover a fresh reading between polls, for free.
     const eventConfigDir = normalizeClaudeConfigDir(event.configDir)
-    const liveAccountId = eventConfigDir
-      ? (this.liveClaudeAccountResolver?.(eventConfigDir) ?? null)
-      : null
+    let liveAccountId: string | null = null
+    if (eventConfigDir) {
+      try {
+        liveAccountId = this.liveClaudeAccountResolver?.(eventConfigDir) ?? null
+      } catch (error) {
+        // Why swallow: the resolver is wired from outside; its failure must never stop the selected account's own feed.
+        console.debug('[rate-limits] live account resolver threw', { eventConfigDir, error })
+      }
+    }
     if (
       liveAccountId &&
       (this.inactiveClaudeAccountsResolver?.() ?? []).some(

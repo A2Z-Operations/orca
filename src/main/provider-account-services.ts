@@ -172,9 +172,14 @@ export function createProviderAccountServices(
   // Why: a statusline post names its CLAUDE_CONFIG_DIR; only the account layer knows whose folder that is.
   rateLimits.setLiveClaudeAccountResolver((configDir) => {
     for (const account of store.getSettings().claudeManagedAccounts) {
-      if (
-        normalizeClaudeConfigDir(claudeRuntimeAuth.router.accountHome(account.id)) === configDir
-      ) {
+      let home: string
+      try {
+        home = claudeRuntimeAuth.router.accountHome(account.id)
+      } catch {
+        // Why skip, not throw: describeClaudeProfile refuses a malformed id; one bad row must not dark the live feed.
+        continue
+      }
+      if (normalizeClaudeConfigDir(home) === configDir) {
         return account.id
       }
     }

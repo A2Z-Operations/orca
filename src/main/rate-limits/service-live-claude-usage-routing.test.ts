@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RateLimitService } from './service'
-import { resetRateLimitProviderMocks } from './rate-limit-service-test-harness'
+import { fetchClaudeRateLimits } from './claude-fetcher'
+import {
+  mockFreshBackgroundProviderFetches,
+  okProvider,
+  resetRateLimitProviderMocks
+} from './rate-limit-service-test-harness'
 
 const profileRouter = vi.hoisted((): { userConfigDir?: string } => ({}))
 vi.mock('../claude-accounts/claude-profile-installed-router', () => ({
@@ -63,6 +68,7 @@ vi.mock('../minimax/minimax-cookie-store', () => ({
 }))
 
 const HOMES: Record<string, string> = {
+  a: '/data/claude-profiles/a/home',
   b: '/data/claude-profiles/b/home',
   c: '/data/claude-profiles/c/home'
 }
@@ -141,6 +147,62 @@ describe('RateLimitService live Claude usage routing', () => {
       fiveHour: { used_percentage: 99 },
       sevenDay: null
     })
+    const state = rateLimits.getState()
+    expect(state.claude).toBeNull()
+    expect(state.inactiveClaudeAccounts).toEqual([])
+  })
+
+  it("leaves the selected account's own post on the bar path", async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 18))
+      mockFreshBackgroundProviderFetches()
+      const rateLimits = service()
+      rateLimits.setClaudeAuthPreparationResolver(async () => ({
+        configDir: HOMES.a,
+        // Why: a managed account injects its folder; the auth snapshot reads it from here.
+        envPatch: { CLAUDE_CONFIG_DIR: HOMES.a },
+        provenance: 'profile:a'
+      }))
+      await rateLimits.refresh()
+      rateLimits.ingestLiveClaudeRateLimits({
+        configDir: HOMES.a,
+        fiveHour: { used_percentage: 55 },
+        sevenDay: { used_percentage: 20 }
+      })
+      const state = rateLimits.getState()
+      expect(state.claude?.session?.usedPercent).toBe(55)
+      expect(state.claude?.weekly?.usedPercent).toBe(20)
+      expect(state.inactiveClaudeAccounts).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ignores a post that carries neither window', () => {
+    const rateLimits = service()
+    const listener = vi.fn()
+    rateLimits.onStateChange(listener)
+    rateLimits.ingestLiveClaudeRateLimits({ configDir: HOMES.b, fiveHour: null, sevenDay: null })
+    const state = rateLimits.getState()
+    expect(state.inactiveClaudeAccounts.find((usage) => usage.accountId === 'b')).toBeUndefined()
+    expect(state.claude).toBeNull()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('drops the post without throwing when the account resolver throws', () => {
+    const rateLimits = new RateLimitService()
+    rateLimits.setInactiveClaudeAccountsResolver(() => [{ id: 'b' }, { id: 'c' }])
+    rateLimits.setLiveClaudeAccountResolver(() => {
+      throw new Error('boom')
+    })
+    expect(() =>
+      rateLimits.ingestLiveClaudeRateLimits({
+        configDir: HOMES.b,
+        fiveHour: { used_percentage: 99 },
+        sevenDay: null
+      })
+    ).not.toThrow()
     const state = rateLimits.getState()
     expect(state.claude).toBeNull()
     expect(state.inactiveClaudeAccounts).toEqual([])
