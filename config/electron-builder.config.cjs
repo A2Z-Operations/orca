@@ -793,16 +793,20 @@ module.exports = {
   // on Intel Macs. The beforeBuild hook performs Orca's targeted rebuild and
   // returns false so electron-builder does not rebuild optional cpu-features.
   npmRebuild: true,
-  publish: {
-    provider: 'github',
-    owner: 'stablyai',
-    repo: devChannelRepo ?? 'orca',
-    // Why draft on the main repo: `--publish always` otherwise creates a
-    // public GitHub release as soon as the first platform uploads, and
-    // /releases/latest serves a missing Windows exe. release-cut undrafts
-    // only after every required asset exists.
-    releaseType: devChannelRepo ? 'prerelease' : 'draft'
-  }
+  // BLOWZER: ORCA_NO_PUBLISH=1 builds no app-update.yml, so a self-built Orca never tries to replace itself with a stock release.
+  publish:
+    process.env.ORCA_NO_PUBLISH === '1'
+      ? null
+      : {
+          provider: 'github',
+          owner: 'stablyai',
+          repo: devChannelRepo ?? 'orca',
+          // Why draft on the main repo: `--publish always` otherwise creates a
+          // public GitHub release as soon as the first platform uploads, and
+          // /releases/latest serves a missing Windows exe. release-cut undrafts
+          // only after every required asset exists.
+          releaseType: devChannelRepo ? 'prerelease' : 'draft'
+        }
 }
 
 // Stamp the effective channel version where node-mode CLI code can read it.
