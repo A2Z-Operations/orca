@@ -47,6 +47,11 @@ export class ClaudeRuntimeAuthService {
     return wsl ? wsl.router.prepareLaunch(wsl.distro) : this.router.prepareLaunch()
   }
 
+  /** A launch on a chosen host account (the session mover's resume). WSL accounts are out of scope here. */
+  prepareForClaudeLaunchOnAccount(accountId: string): Promise<ClaudeRuntimeAuthPreparation> {
+    return this.router.prepareLaunchFor(accountId)
+  }
+
   async prepareForRateLimitFetch(
     target?: ClaudeAccountSelectionTarget
   ): Promise<ClaudeRuntimeAuthPreparation> {

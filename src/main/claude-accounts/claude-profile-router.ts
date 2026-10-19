@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: the per-account launch siblings (launchEnvFor/preparationFor/prepareLaunchFor) mirror launchEnv/preparation/prepareLaunch and share their private setUp/describe, so they stay beside them. */
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -285,6 +286,63 @@ export class ClaudeProfileRouter {
       // Why nothing for System default: the user's inherited CLAUDE_CONFIG_DIR must pass through.
       ...(home ? { CLAUDE_CONFIG_DIR: home, [CLAUDE_INJECTED_CONFIG_DIR_ENV]: home } : {})
     }
+  }
+
+  /** Env for a launch Orca makes itself on `accountId`, selected or not. Throws like routedHome. */
+  launchEnvFor(accountId: string): ClaudeEnvPatch {
+    if (this.coveredBySystemDefault(accountId)) {
+      // Why nothing more: the account runs on System default's login, so the user's inherited CLAUDE_CONFIG_DIR must pass through.
+      return { [CLAUDE_PROFILE_POINTER_ENV]: this.pointerPath }
+    }
+    const home = this.accountHome(accountId)
+    if (!isDirectory(home)) {
+      throw claudeProfileMissing()
+    }
+    return {
+      [CLAUDE_PROFILE_POINTER_ENV]: this.pointerPath,
+      CLAUDE_CONFIG_DIR: home,
+      [CLAUDE_INJECTED_CONFIG_DIR_ENV]: home
+    }
+  }
+
+  /**
+   * `preparation()` for a chosen account: what a launch on it runs with and how its usage is tagged.
+   * The read-side counterpart is `accountUsagePreparation()`, which probes usage without the pointer.
+   */
+  preparationFor(accountId: string): ClaudeRuntimeAuthPreparation {
+    const covered = this.coveredBySystemDefault(accountId)
+    return {
+      configDir: covered ? this.systemDefaultHome() : this.accountHome(accountId),
+      runtime: 'host',
+      wslDistro: null,
+      wslLinuxConfigDir: null,
+      envPatch: this.launchEnvFor(accountId),
+      provenance: covered ? 'system' : `profile:${accountId}`
+    }
+  }
+
+  /** `prepareLaunch()` for a chosen account (the session mover's resume on the account it moves to). */
+  async prepareLaunchFor(accountId: string): Promise<ClaudeRuntimeAuthPreparation> {
+    await this.envReady
+    if (this.coveredBySystemDefault(accountId)) {
+      return this.preparationFor(accountId)
+    }
+    const profile = this.describe(accountId)
+    // Why the marker: setup writes it last, so a missing folder is set up too.
+    if (!existsSync(claudeProfileMarkerPath(profile))) {
+      const report = await this.setUp(profile).catch(() => null)
+      if (report?.outcome !== 'prepared') {
+        throw claudeProfileSetupFailed()
+      }
+      return this.preparationFor(accountId)
+    }
+    // Why capped and never thrown: a set-up folder runs on its last refresh rather than not at all.
+    const refresh = this.setUp(profile).catch((error: unknown) => {
+      console.warn('[claude-profile] Account refresh failed:', error)
+    })
+    const waitMs = this.args.refreshWaitMs ?? REFRESH_WAIT_MS
+    await Promise.race([refresh, new Promise((resolve) => setTimeout(resolve, waitMs).unref())])
+    return this.preparationFor(accountId)
   }
 
   /** A pane's spawn env. Never throws, so a broken selection cannot stop a terminal opening. */
