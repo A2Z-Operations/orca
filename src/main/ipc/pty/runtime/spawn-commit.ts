@@ -11,6 +11,7 @@ import {
   recordCodexPaneAccountForSpawn,
   codexReattachedHomeRouteField
 } from '../host-env/codex-home'
+import { recordClaudePaneAccountForSpawn } from '../host-env/claude-pane-account'
 import { registerPty } from '../../../memory/pty-registry'
 import { rememberPaneKeyForPty } from '../pane/key-state'
 import {
@@ -234,6 +235,16 @@ async function commitReservedRuntimePtySpawn(ctx: RuntimePtySpawnState) {
   }
   // Why: runtime-owned CLI PTYs bypass the renderer pty:spawn handler; record paneKey here too since hook titles and cache cleanup need this reverse lookup.
   const paneKey = rememberPaneKeyForPty(ctx.result.id, ctx.env?.ORCA_PANE_KEY)
+  // Why: Claude's twin of the Codex record above; it waits for the remembered paneKey so lookups by paneKey match ptyPaneKey.
+  recordClaudePaneAccountForSpawn({
+    ptyId: ctx.result.id,
+    paneKey,
+    isClaudeLaunch: ctx.isClaudeLaunch,
+    isReattach: ctx.result.isReattach === true,
+    claudeAuth: ctx.claudeAuth,
+    settings: ctx.deps.getSettings?.(),
+    target: ctx.codexSelectionTarget
+  })
   const pendingSerializer = paneKey ? pendingByPaneKey.get(paneKey) : undefined
   const inheritRendererReadiness =
     ctx.result.isReattach === true &&

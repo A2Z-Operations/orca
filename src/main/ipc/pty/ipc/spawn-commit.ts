@@ -9,6 +9,7 @@ import {
   codexReattachedHomeRouteField
 } from '../host-env/codex-home'
 import { rememberPaneKeyForPty } from '../pane/key-state'
+import { recordClaudePaneAccountForSpawn } from '../host-env/claude-pane-account'
 import { resolvePaneSpawnReservation } from '../pane/spawn-reservation'
 import { seedTerminalRestoreRecordsFromSpawnResult } from '../pane/agent-session-owners'
 import { seedResumeLaunchIdentityFromSpawn } from '../pane/resume-launch-identity'
@@ -129,6 +130,17 @@ async function commitReservedPtyIpcSpawn(ctx: PtyIpcSpawnState): Promise<PtySpaw
   const rememberedPaneKey = ctx.validatedPaneKey
     ? rememberPaneKeyForPty(ctx.result.id, ctx.validatedPaneKey)
     : null
+  // Why: Claude's twin of the Codex record in publishPtyIpcSpawnCommit; recorded here, after the
+  // paneKey was remembered, so lookups by paneKey match ptyPaneKey.
+  recordClaudePaneAccountForSpawn({
+    ptyId: ctx.result.id,
+    paneKey: rememberedPaneKey,
+    isClaudeLaunch: ctx.isClaudeLaunch,
+    isReattach: ctx.result.isReattach === true,
+    claudeAuth: ctx.claudeAuth,
+    settings: ctx.deps.getSettings?.(),
+    target: ctx.codexSelectionTarget
+  })
   if (ctx.legacySpawnPaneKey && ctx.migrationUnsupportedPaneKey) {
     agentHookServer.registerPaneKeyAlias(
       ctx.legacySpawnPaneKey.paneKey,
