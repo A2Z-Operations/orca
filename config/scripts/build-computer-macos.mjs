@@ -29,8 +29,23 @@ createHelperApp()
 
 function buildUniversalBinary() {
   const builtBinaries = universalTriples.map((triple) => {
-    run('swift', ['build', '-c', 'release', '--package-path', packagePath, '--triple', triple])
-    return path.join(packagePath, '.build', triple, 'release', 'orca-computer-use-macos')
+    // Why a scratch path per triple: Swift 6.4's build backend writes every triple's products to
+    // `.build/out/Products/Release` (the `release` symlink), so two plain builds overwrite each
+    // other and `.build/<triple>/release` never exists. With its own scratch dir each build's
+    // `release` symlink points at that triple's binary, on the old layout and the new one.
+    const scratchPath = path.join(packagePath, '.build', triple)
+    run('swift', [
+      'build',
+      '-c',
+      'release',
+      '--package-path',
+      packagePath,
+      '--scratch-path',
+      scratchPath,
+      '--triple',
+      triple
+    ])
+    return path.join(scratchPath, 'release', 'orca-computer-use-macos')
   })
   mkdirSync(path.dirname(binaryPath), { recursive: true })
   run('lipo', ['-create', ...builtBinaries, '-output', binaryPath])
