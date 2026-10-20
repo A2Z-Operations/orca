@@ -191,24 +191,33 @@ export class ClaudeProfileRouter {
     // Why: a sign-in or a System default login change since the last publish moves the route.
     this.writePointer()
     const profile = this.routedProfile()
-    if (!profile) {
-      return this.preparation()
+    if (profile) {
+      await this.setUpForLaunch(profile)
     }
-    // Why the marker: setup writes it last, so a missing folder is set up too.
+    return this.preparation()
+  }
+
+  /**
+   * The setup a launch waits on. Why the marker: setup writes it last, so a missing folder is set
+   * up too, and that first setup must succeed. Why capped and never thrown after that: a set-up
+   * folder runs on its last refresh rather than not at all.
+   */
+  private async setUpForLaunch(profile: ClaudeProfileDescriptor): Promise<void> {
     if (!existsSync(claudeProfileMarkerPath(profile))) {
-      const report = await this.setUp(profile).catch(() => null)
+      const report = await this.setUp(profile).catch((error: unknown) => {
+        console.warn('[claude-profile] Account setup failed:', error)
+        return null
+      })
       if (report?.outcome !== 'prepared') {
         throw claudeProfileSetupFailed()
       }
-      return this.preparation()
+      return
     }
-    // Why capped and never thrown: a set-up folder runs on its last refresh rather than not at all.
     const refresh = this.setUp(profile).catch((error: unknown) => {
       console.warn('[claude-profile] Account refresh failed:', error)
     })
     const waitMs = this.args.refreshWaitMs ?? REFRESH_WAIT_MS
     await Promise.race([refresh, new Promise((resolve) => setTimeout(resolve, waitMs).unref())])
-    return this.preparation()
   }
 
   /** An account's folder on this host, whether or not it exists yet. */
@@ -288,60 +297,60 @@ export class ClaudeProfileRouter {
     }
   }
 
-  /** Env for a launch Orca makes itself on `accountId`, selected or not. Throws like routedHome. */
+  /**
+   * Env for a launch on a chosen account (the session mover's resume): a bare CLAUDE_CONFIG_DIR.
+   * Why never the pointer or the injected marker: the pane's `claude` function re-reads the
+   * selected-host pointer whenever CLAUDE_CONFIG_DIR equals ORCA_CLAUDE_INJECTED_CONFIG_DIR, so a
+   * launch carrying both ran on the selected account; a bare value passes through as typed.
+   * Throws for an unknown account and, like routedHome, for a missing folder.
+   */
   launchEnvFor(accountId: string): ClaudeEnvPatch {
-    if (this.coveredBySystemDefault(accountId)) {
-      // Why nothing more: the account runs on System default's login, so the user's inherited CLAUDE_CONFIG_DIR must pass through.
-      return { [CLAUDE_PROFILE_POINTER_ENV]: this.pointerPath }
+    this.assertKnownAccount(accountId)
+    return this.launchEnvForKnown(accountId, this.coveredBySystemDefault(accountId))
+  }
+
+  /** Why refuse: the mover names ids from its registry; an id no saved account explains is a bug, never a folder to create. */
+  private assertKnownAccount(accountId: string): void {
+    if (!findClaudeAccount(this.args.getSettings(), accountId)) {
+      throw new Error('claude_account_unknown')
+    }
+  }
+
+  private launchEnvForKnown(accountId: string, covered: boolean): ClaudeEnvPatch {
+    if (covered) {
+      // Why the user's own value, unresolved: Claude keys its login by the literal string (as terminalEnv).
+      const own = readUserClaudeConfigDirAsSet(this.env)
+      return own ? { CLAUDE_CONFIG_DIR: own } : {}
     }
     const home = this.accountHome(accountId)
     if (!isDirectory(home)) {
       throw claudeProfileMissing()
     }
-    return {
-      [CLAUDE_PROFILE_POINTER_ENV]: this.pointerPath,
-      CLAUDE_CONFIG_DIR: home,
-      [CLAUDE_INJECTED_CONFIG_DIR_ENV]: home
-    }
+    return { CLAUDE_CONFIG_DIR: home }
   }
 
-  /**
-   * `preparation()` for a chosen account: what a launch on it runs with and how its usage is tagged.
-   * The read-side counterpart is `accountUsagePreparation()`, which probes usage without the pointer.
-   */
+  /** Like preparation(), for a chosen account. */
   preparationFor(accountId: string): ClaudeRuntimeAuthPreparation {
+    this.assertKnownAccount(accountId)
     const covered = this.coveredBySystemDefault(accountId)
     return {
       configDir: covered ? this.systemDefaultHome() : this.accountHome(accountId),
       runtime: 'host',
       wslDistro: null,
       wslLinuxConfigDir: null,
-      envPatch: this.launchEnvFor(accountId),
+      envPatch: this.launchEnvForKnown(accountId, covered),
       provenance: covered ? 'system' : `profile:${accountId}`
     }
   }
 
-  /** `prepareLaunch()` for a chosen account (the session mover's resume on the account it moves to). */
+  /** Like prepareLaunch(), for a chosen account: its folder is set up or refreshed first. */
   async prepareLaunchFor(accountId: string): Promise<ClaudeRuntimeAuthPreparation> {
+    this.assertKnownAccount(accountId)
+    // Why wait: whether System default covers the account depends on the login shell's CLAUDE_CONFIG_DIR.
     await this.envReady
-    if (this.coveredBySystemDefault(accountId)) {
-      return this.preparationFor(accountId)
+    if (!this.coveredBySystemDefault(accountId)) {
+      await this.setUpForLaunch(this.describe(accountId))
     }
-    const profile = this.describe(accountId)
-    // Why the marker: setup writes it last, so a missing folder is set up too.
-    if (!existsSync(claudeProfileMarkerPath(profile))) {
-      const report = await this.setUp(profile).catch(() => null)
-      if (report?.outcome !== 'prepared') {
-        throw claudeProfileSetupFailed()
-      }
-      return this.preparationFor(accountId)
-    }
-    // Why capped and never thrown: a set-up folder runs on its last refresh rather than not at all.
-    const refresh = this.setUp(profile).catch((error: unknown) => {
-      console.warn('[claude-profile] Account refresh failed:', error)
-    })
-    const waitMs = this.args.refreshWaitMs ?? REFRESH_WAIT_MS
-    await Promise.race([refresh, new Promise((resolve) => setTimeout(resolve, waitMs).unref())])
     return this.preparationFor(accountId)
   }
 
