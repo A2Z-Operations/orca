@@ -117,6 +117,8 @@ const REASON_WORDS = {
     historyInOtherAccount: { fact: 'historyInOtherAccount', action: 'actFirst' },
     claudeAccountFolderMissing: { fact: 'claudeAccountFolderMissing', action: 'actFirst' },
     claudeAccountSetupFailed: { fact: 'claudeAccountSetupFailed', action: 'retry' },
+    claudeAccountUnknown: { fact: 'claudeAccountUnknown', action: 'actFirst' },
+    claudeAccountWslUnsupported: { fact: 'claudeAccountWslUnsupported', action: 'actFirst' },
     agentCommandNotRunnable: { fact: 'agentCommandNotRunnable', action: 'actFirst' },
     runtimeNotInstalled: { fact: 'runtimeNotInstalled', action: 'actFirst' },
     attachFailed: codeWords('retry')

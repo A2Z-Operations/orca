@@ -36,6 +36,8 @@ export const AGENT_SESSION_FAILURE_KINDS = [
   'historyInOtherAccount',
   'claudeAccountFolderMissing',
   'claudeAccountSetupFailed',
+  'claudeAccountUnknown',
+  'claudeAccountWslUnsupported',
   'agentCommandNotRunnable',
   'runtimeNotInstalled',
   'providerExited',

@@ -215,14 +215,18 @@ describe('ClaudeProfileRouter.launchEnvFor', () => {
     })
     expect(existsSync(claudeProfileMarkerPath(f.describe('b')))).toBe(true)
 
-    // Why no timer: a hang past refreshWaitMs (10 ms) fails this test on vitest's own timeout.
+    // Why under a second: the launch waits at most refreshWaitMs (10 ms) on a hanging refresh.
     f.setup.hang = true
+    const started = performance.now()
     await expect(f.router.prepareLaunchFor('b')).resolves.toMatchObject({ provenance: 'profile:b' })
+    const waitedMs = performance.now() - started
+    expect(waitedMs).toBeLessThan(1000)
     expect(f.setup.calls).toEqual(['b', 'b'])
   })
 })
 
 // Why not win32: runs the POSIX claude function under bash.
+// PowerShell's function has the same first branch (a CLAUDE_CONFIG_DIR unlike the injected and own values passes through), so a bare value runs as typed there too.
 describe.skipIf(process.platform === 'win32')(
   'the pane claude function with a chosen account',
   () => {

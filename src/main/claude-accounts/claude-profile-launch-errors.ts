@@ -19,11 +19,14 @@ export function claudeProfileSetupFailed(): AgentSessionPreSpawnError {
   })
 }
 
-// Why no reason: both are Orca bugs (a mover naming a bad id), which only the log reads.
 export function claudeAccountUnknown(): AgentSessionPreSpawnError {
-  return new AgentSessionPreSpawnError(new Error(CLAUDE_ACCOUNT_UNKNOWN_MESSAGE))
+  return new AgentSessionPreSpawnError(new Error(CLAUDE_ACCOUNT_UNKNOWN_MESSAGE), {
+    reason: 'claudeAccountUnknown'
+  })
 }
 
 export function claudeAccountWslUnsupported(): AgentSessionPreSpawnError {
-  return new AgentSessionPreSpawnError(new Error(CLAUDE_ACCOUNT_WSL_UNSUPPORTED_MESSAGE))
+  return new AgentSessionPreSpawnError(new Error(CLAUDE_ACCOUNT_WSL_UNSUPPORTED_MESSAGE), {
+    reason: 'claudeAccountWslUnsupported'
+  })
 }

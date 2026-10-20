@@ -252,6 +252,7 @@ export class ClaudeProfileRouter {
   private readonly chosen: ChosenAccountRouting = {
     getSettings: () => this.args.getSettings(),
     coveredBySystemDefault: (id) => this.coveredBySystemDefault(id),
+    hasOwnLogin: (id) => Boolean(this.accountLogin(id)),
     accountHome: (id) => this.accountHome(id),
     systemDefaultHome: () => this.systemDefaultHome(),
     env: () => this.env,

@@ -16,6 +16,8 @@ import { findClaudeAccount } from './runtime-selection'
 export type ChosenAccountRouting = {
   getSettings: () => Pick<GlobalSettings, 'claudeManagedAccounts'>
   coveredBySystemDefault: (accountId: string) => boolean
+  /** Whether the account's own folder holds a login. */
+  hasOwnLogin: (accountId: string) => boolean
   accountHome: (accountId: string) => string
   systemDefaultHome: () => string
   /** The login shell's env once resolved. */
@@ -73,7 +75,15 @@ export function chosenAccountPreparation(
   accountId: string
 ): ClaudeRuntimeAuthPreparation {
   assertKnownHostAccount(routing, accountId)
-  const covered = routing.coveredBySystemDefault(accountId)
+  return preparationForKnown(routing, accountId, routing.coveredBySystemDefault(accountId))
+}
+
+/** Why `covered` is passed in: a sign-in between two reads could set up one folder and name another. */
+function preparationForKnown(
+  routing: ChosenAccountRouting,
+  accountId: string,
+  covered: boolean
+): ClaudeRuntimeAuthPreparation {
   return {
     configDir: covered ? routing.systemDefaultHome() : routing.accountHome(accountId),
     runtime: 'host',
@@ -90,10 +100,14 @@ export async function prepareChosenAccountLaunch(
   accountId: string
 ): Promise<ClaudeRuntimeAuthPreparation> {
   assertKnownHostAccount(routing, accountId)
-  // Why wait: whether System default covers the account depends on the login shell's CLAUDE_CONFIG_DIR.
-  await routing.envReady()
-  if (!routing.coveredBySystemDefault(accountId)) {
+  // Why wait only without the account's own login (as prepareLaunch): coverage then depends on the
+  // login shell's CLAUDE_CONFIG_DIR; with one it is false whatever that is, and setup awaits it itself.
+  if (!routing.hasOwnLogin(accountId)) {
+    await routing.envReady()
+  }
+  const covered = routing.coveredBySystemDefault(accountId)
+  if (!covered) {
     await routing.setUpForLaunch(accountId)
   }
-  return chosenAccountPreparation(routing, accountId)
+  return preparationForKnown(routing, accountId, covered)
 }

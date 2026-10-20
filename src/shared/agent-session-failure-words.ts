@@ -9,14 +9,13 @@
 
 import {
   isSubmissionRejectionFact,
-  type AgentSessionAttachmentProblem,
-  type AgentSessionAttachmentProblemReason,
   type AgentSessionFailureFact,
   type AgentSessionFailureKind,
   type ProviderDiagnostic,
   type SubmissionRejectionFact,
   type SubmissionRejectionKind
 } from './agent-session-failure'
+import { attachmentProblemSentence } from './agent-session-attachment-sentences'
 import type { AgentSessionConversationCommand } from './agent-session-conversation-command'
 import { cliMissingSentence, notSignedInSentence } from './agent-session-availability-sentences'
 import {
@@ -76,7 +75,6 @@ export type AgentSessionFailureWordsContext = {
 
 /** Person-facing provider text is quoted, but bounded so the sentence stays one. */
 const MAX_QUOTED_DETAIL_CHARS = 512
-const BYTES_PER_MB = 1024 * 1024
 
 type Sentence = (
   context: AgentSessionFailureWordsContext,
@@ -168,35 +166,6 @@ function couldNot(verb: 'couldNotStart' | 'couldNotRestart'): Sentence {
   }
 }
 
-// The number only; each language's sentence carries its own unit.
-function megabytes(bytes: number): string {
-  return String(Math.round((bytes / BYTES_PER_MB) * 10) / 10)
-}
-
-const ATTACHMENT_SENTENCES = {
-  empty: (say) => say('attachmentEmpty'),
-  tooLarge: (say, _, { limit }) =>
-    limit ? say('attachmentLargerThan', { size: megabytes(limit) }) : say('attachmentTooLarge'),
-  tooMany: (say, context, { limit }) =>
-    limit
-      ? say('attachmentAtMost', { ...agent(say, context), limit: String(limit) })
-      : say('attachmentTooMany'),
-  totalTooLarge: (say, _, { limit }) =>
-    limit
-      ? say('attachmentTotalMoreThan', { size: megabytes(limit) })
-      : say('attachmentTotalTooLarge'),
-  unsupportedType: (say, context) => say('attachmentUnsupportedType', agent(say, context)),
-  notAFile: (say) => say('attachmentNotAFile'),
-  noSource: (say) => say('attachmentNoSource')
-} satisfies Record<
-  AgentSessionAttachmentProblemReason,
-  (
-    say: AgentSessionFailureSay,
-    context: AgentSessionFailureWordsContext,
-    problem: AgentSessionAttachmentProblem
-  ) => string
->
-
 const FAILURE_SENTENCES = {
   providerStartFailed: (context, _fact, _surface, say) =>
     joinSentences([say('providerStartFailed', agent(say, context)), ...startRetry(say, context)]),
@@ -211,6 +180,9 @@ const FAILURE_SENTENCES = {
   historyInOtherAccount: (_context, _fact, _surface, say) => say('historyInOtherAccount'),
   claudeAccountFolderMissing: (_context, _fact, _surface, say) => say('claudeAccountFolderMissing'),
   claudeAccountSetupFailed: (_context, _fact, _surface, say) => say('claudeAccountSetupFailed'),
+  claudeAccountUnknown: (_context, _fact, _surface, say) => say('claudeAccountUnknown'),
+  claudeAccountWslUnsupported: (_context, _fact, _surface, say) =>
+    say('claudeAccountWslUnsupported'),
   agentCommandNotRunnable: namingAgent('agentCommandNotRunnable'),
   runtimeNotInstalled: namingAgent('runtimeNotInstalled'),
   managedAccountUnsupported: (context, _fact, _surface, say) =>
@@ -242,7 +214,7 @@ const FAILURE_SENTENCES = {
     ),
   attachmentInvalid: (context, fact, _surface, say) =>
     fact.attachment
-      ? ATTACHMENT_SENTENCES[fact.attachment.reason](say, context, fact.attachment)
+      ? attachmentProblemSentence(say, agent(say, context), fact.attachment)
       : say('attachmentInvalid'),
   attachmentUnreadable: (_context, _fact, _surface, say) => say('attachmentUnreadable'),
   emptyMessage: (_context, _fact, _surface, say) => say('emptyMessage'),
