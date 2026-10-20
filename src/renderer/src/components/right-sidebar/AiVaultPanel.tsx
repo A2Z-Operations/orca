@@ -1,15 +1,8 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
-import {
-  useActiveRepo,
-  useActiveWorktree,
-  useActiveWorktreeId,
-  useAllWorktrees,
-  useProjectHostSetupProjection,
-  useRepos
-} from '@/store/selectors'
+import { useAllWorktrees, useProjectHostSetupProjection, useRepos } from '@/store/selectors'
 import { useAiVaultPanelSessions } from './ai-vault-session-filters'
 import {
   deriveAiVaultScopeSessionPaths,
@@ -37,7 +30,6 @@ import { AiVaultSessionVirtualList } from './AiVaultSessionVirtualList'
 import { useAiVaultSessionRefresh } from './ai-vault-session-refresh'
 import { useAiVaultPanelHostScope } from './ai-vault-host-scope'
 import { useAiVaultPanelScope } from './use-ai-vault-panel-scope'
-import { useAiVaultSearchFocusRequest } from './use-ai-vault-search-focus-request'
 import { usePersistedAiVaultViewOptions } from './use-persisted-ai-vault-view-options'
 import { AgentSessionContinuationDialog } from '@/components/agent-session-continuation/AgentSessionContinuationDialog'
 import { AiVaultScanIssueBanners } from './AiVaultScanIssueBanners'
@@ -49,10 +41,27 @@ import { useAiVaultPanelSessionResume } from './use-ai-vault-panel-session-resum
 import { AiVaultScanProgressStrip } from './AiVaultScanProgressStrip'
 import { useAiVaultScanProgress } from './ai-vault-scan-progress-store'
 import { aiVaultLocalScanKey } from '../../../../shared/ai-vault-local-scan-key'
-export default function AiVaultPanel(): React.JSX.Element {
-  const activeWorktreeId = useActiveWorktreeId()
-  const activeWorktree = useActiveWorktree()
-  const activeRepo = useActiveRepo()
+import { useAiVaultPanelWorkspace } from './use-ai-vault-panel-workspace'
+import {
+  aiVaultPanelKeyboardRootProps,
+  type AiVaultSessionListKeyboard
+} from './use-ai-vault-session-keyboard-navigation'
+import { useAiVaultPanelHandle, type AiVaultPanelProps } from './ai-vault-panel-handle'
+
+export default function AiVaultPanel({
+  ref,
+  workspace,
+  initialQuery = '',
+  initialAgents,
+  headerAction,
+  onSessionOpened,
+  resumeHere
+}: AiVaultPanelProps): React.JSX.Element {
+  const {
+    workspaceId: activeWorktreeId,
+    worktree: activeWorktree,
+    repo: activeRepo
+  } = useAiVaultPanelWorkspace(workspace)
   const repos = useRepos()
   const allWorktrees = useAllWorktrees()
   const projectHostSetupProjection = useProjectHostSetupProjection()
@@ -69,7 +78,10 @@ export default function AiVaultPanel(): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const agentCmdOverrides = settings?.agentCmdOverrides
   const paneActions = useAiVaultOriginalPaneActions()
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
+  const [focusSearchRequestId, setFocusSearchRequestId] = useState(0)
+  const listKeyboardRef = useRef<AiVaultSessionListKeyboard>(null)
+  const keyboardRows = onSessionOpened !== undefined
   // Why: scope depends on current workspace/project availability, so only stable view options persist.
   const {
     agents,
@@ -86,7 +98,7 @@ export default function AiVaultPanel(): React.JSX.Element {
     setAgentEnabled,
     setAllAgentsEnabled,
     resetViewOptions
-  } = usePersistedAiVaultViewOptions()
+  } = usePersistedAiVaultViewOptions(initialAgents)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const { executionHostScope, onExecutionHostScopeChange, hostScopeOptions } =
     useAiVaultPanelHostScope(activeWorktreeId ?? null, resumeTargetState)
@@ -118,14 +130,16 @@ export default function AiVaultPanel(): React.JSX.Element {
   const scopePaths = useMemo(
     () =>
       deriveAiVaultScopeSessionPaths(activeWorktree ?? null, allWorktrees, {
+        scope,
         activeProjectKey,
         projectHostSetupProjection
       }),
-    [activeProjectKey, activeWorktree, allWorktrees, projectHostSetupProjection]
+    [activeProjectKey, activeWorktree, allWorktrees, projectHostSetupProjection, scope]
   )
   const {
     error,
     loading,
+    scopePending,
     refresh,
     scanResult,
     sessions: history,
@@ -213,10 +227,12 @@ export default function AiVaultPanel(): React.JSX.Element {
     )
   }, [])
 
-  // Settings asks for "everything, ready to type".
-  const focusSearchRequestId = useAiVaultSearchFocusRequest(
-    useCallback(() => handleScopeChange('all'), [handleScopeChange])
-  )
+  useAiVaultPanelHandle(ref, {
+    query,
+    setQuery,
+    changeScope: handleScopeChange,
+    setFocusSearchRequestId
+  })
 
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((current) => {
@@ -236,7 +252,10 @@ export default function AiVaultPanel(): React.JSX.Element {
   })
 
   return (
-    <div className="@container/ai-vault flex h-full min-h-0 flex-col bg-sidebar">
+    <div
+      className="@container/ai-vault flex h-full min-h-0 flex-col bg-sidebar outline-none"
+      {...aiVaultPanelKeyboardRootProps(keyboardRows ? listKeyboardRef : undefined)}
+    >
       <AiVaultPanelHeader
         query={query}
         searching={searching}
@@ -253,6 +272,10 @@ export default function AiVaultPanel(): React.JSX.Element {
         sessionLimit={sessionLimit}
         adjustmentCount={viewAdjustmentCount}
         focusSearchRequestId={focusSearchRequestId}
+        headerAction={headerAction}
+        onSearchKeyDown={
+          keyboardRows ? (event) => listKeyboardRef.current?.handleKeyDown(event) : undefined
+        }
         onQueryChange={setQuery}
         onScopeChange={handleScopeChange}
         onExecutionHostScopeChange={onExecutionHostScopeChange}
@@ -299,6 +322,7 @@ export default function AiVaultPanel(): React.JSX.Element {
             groups={groups}
             collapsedGroups={collapsedGroups}
             loading={searching ? search.loading : loading}
+            scopePending={!searching && scopePending}
             scanProgressShown={stripProgress !== null}
             sessionsCount={sessions.length}
             filteredSessionsCount={filteredSessions.length}
@@ -313,7 +337,16 @@ export default function AiVaultPanel(): React.JSX.Element {
             getSessionLiveState={paneActions.getSessionLiveState}
             getWorktreeInfo={getSessionWorktreeInfo}
             onToggleGroup={toggleGroup}
-            onJumpToOriginalPane={paneActions.jumpToOriginalPane}
+            keyboardRef={keyboardRows ? listKeyboardRef : undefined}
+            query={query}
+            resumeHere={resumeHere}
+            onJumpToOriginalPane={(session) =>
+              void paneActions.jumpToOriginalPane(session).then((opened) => {
+                if (opened) {
+                  onSessionOpened?.()
+                }
+              })
+            }
             onJumpToWorktree={paneActions.jumpToWorktree}
             onResume={launchActions.handleResume}
             getSessionResumeInChat={getSessionResumeInChat}
@@ -356,6 +389,7 @@ export default function AiVaultPanel(): React.JSX.Element {
           open
           request={launchActions.continuationRequest}
           onOpenChange={launchActions.handleContinuationDialogOpenChange}
+          onStarted={onSessionOpened}
         />
       )}
     </div>
