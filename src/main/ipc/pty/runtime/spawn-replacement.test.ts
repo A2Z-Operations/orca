@@ -7,6 +7,7 @@ import {
   paneSpawnReservationsByOwnerKey,
   rejectPaneSpawnReservation
 } from '../pane/spawn-reservation'
+import { ptyPaneKey } from '../pane/key-state'
 import type { ReplacedPaneOwner } from '../pane/pane-owner-replacement'
 import {
   beginRuntimePaneReplacement,
@@ -35,6 +36,17 @@ function storeBinding(ptyId: string): Store {
   } as unknown as Store
 }
 
+function storeUnbound(): Store {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the owner resolvers read only getWorkspaceSession.
+  return {
+    getWorkspaceSession: () => ({
+      tabsByWorktree: { [worktreeId]: [{ id: tabId, worktreeId }] },
+      terminalLayoutsByTabId: { [tabId]: { ptyIdsByLeafId: {} } },
+      terminalPtyIncarnationsByPaneKey: {}
+    })
+  } as unknown as Store
+}
+
 function deps(store: Store) {
   return {
     runtime: undefined,
@@ -47,6 +59,7 @@ function deps(store: Store) {
 }
 
 afterEach(() => {
+  ptyPaneKey.delete('old')
   for (const [key, reservation] of paneSpawnReservationsByOwnerKey) {
     rejectPaneSpawnReservation(key, reservation, new Error('test teardown'))
   }
@@ -81,15 +94,50 @@ describe('beginRuntimePaneReplacement', () => {
     expect(replacement.replaced).toEqual(stopped)
   })
 
-  it('needs a pane to replace into', async () => {
+  it('needs a pane to replace into and stops nothing without one', async () => {
+    const stop = vi.fn(async () => {})
     await expect(
-      beginRuntimePaneReplacement(deps(storeBinding('old')), {
-        replacesPtyId: 'old',
-        paneKey: null,
-        worktreeId,
-        connectionId: null
-      })
+      beginRuntimePaneReplacement(
+        deps(storeBinding('old')),
+        { replacesPtyId: 'old', paneKey: null, worktreeId, connectionId: null },
+        stop
+      )
     ).rejects.toThrow('terminal_pane_owner_unknown')
+    expect(stop).not.toHaveBeenCalled()
+    expect(paneSpawnReservationsByOwnerKey.size).toBe(0)
+  })
+
+  it("replaces an unbound pane's PTY when the id's own pane-key record proves it lives there", async () => {
+    ptyPaneKey.set('old', paneKey)
+    const stop = vi.fn(async () => {})
+    const replacement = await beginRuntimePaneReplacement(
+      deps(storeUnbound()),
+      { replacesPtyId: 'old', paneKey, worktreeId, connectionId: null },
+      stop
+    )
+    expect(stop).toHaveBeenCalledWith('old')
+    expect(replacement.replaced).toEqual(stopped)
+  })
+
+  it('never stops an unproven id in an unbound pane: it refuses and releases the pane', async () => {
+    ptyPaneKey.set('old', makePaneKey('other-tab', TEST_LEAF_1))
+    const stop = vi.fn(async () => {})
+    await expect(
+      beginRuntimePaneReplacement(
+        deps(storeUnbound()),
+        { replacesPtyId: 'old', paneKey, worktreeId, connectionId: null },
+        stop
+      )
+    ).rejects.toThrow('terminal_pane_owner_unknown')
+    expect(stop).not.toHaveBeenCalled()
+    expect(paneSpawnReservationsByOwnerKey.size).toBe(0)
+    // The pane is free again for the next spawn.
+    const next = await beginRuntimePaneReplacement(
+      deps(storeBinding('old')),
+      { replacesPtyId: 'old', paneKey, worktreeId, connectionId: null },
+      stop
+    )
+    expect(next.replaced).toEqual(stopped)
   })
 })
 
@@ -120,12 +168,12 @@ describe('the runtime commit bind for a replacement', () => {
     expect(typeof lost === 'function' ? lost() : lost).toBeNull()
   })
 
-  it('names its refusal by kind and rethrows only that refusal', () => {
+  it('throws the refusal that fits the spawn and rethrows either refusal as is', () => {
     expect(runtimePaneBindRefusal(stopped)).toBe('terminal_pane_owner_changed')
     expect(runtimePaneBindRefusal(null)).toBe('terminal_split_source_not_found')
-    expect(isRuntimePaneBindRefusal(new Error('terminal_pane_owner_changed'), stopped)).toBe(true)
-    expect(isRuntimePaneBindRefusal(new Error('terminal_pane_owner_changed'), null)).toBe(false)
-    expect(isRuntimePaneBindRefusal(new Error('terminal_split_source_not_found'), null)).toBe(true)
-    expect(isRuntimePaneBindRefusal('terminal_pane_owner_changed', stopped)).toBe(false)
+    expect(isRuntimePaneBindRefusal(new Error('terminal_pane_owner_changed'))).toBe(true)
+    expect(isRuntimePaneBindRefusal(new Error('terminal_split_source_not_found'))).toBe(true)
+    expect(isRuntimePaneBindRefusal(new Error('disk full'))).toBe(false)
+    expect(isRuntimePaneBindRefusal('terminal_pane_owner_changed')).toBe(false)
   })
 })

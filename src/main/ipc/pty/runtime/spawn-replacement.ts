@@ -10,6 +10,7 @@ import {
   type ReplacedPaneOwner
 } from '../pane/pane-owner-replacement'
 import { resolveStablePaneOwner, type StablePaneOwner } from '../pane/stable-owner'
+import { ptyPaneKey } from '../pane/key-state'
 import {
   makePaneSpawnReservationKey,
   rejectPaneSpawnReservation,
@@ -58,6 +59,19 @@ export async function beginRuntimePaneReplacement(
   }
   const reservation = await reserveIdlePaneSpawn(reservationKey)
   try {
+    // Why: upstream's stop proves the id only against a bound owner and stops an unproven id when the
+    // pane is unbound; a move must never stop a stranger's PTY, so an unbound pane needs the id's
+    // own pane-key record.
+    const owner = resolveStablePaneOwner(
+      deps.runtime,
+      deps.store,
+      args.paneKey,
+      args.worktreeId,
+      args.connectionId
+    )
+    if (!owner && ptyPaneKey.get(args.replacesPtyId) !== args.paneKey) {
+      throw new Error('terminal_pane_owner_unknown')
+    }
     const replaced = await stopReplacedPaneOwner(
       { runtime: deps.runtime, store: deps.store, stopReplacedPty },
       args
@@ -103,10 +117,11 @@ export function runtimePaneBindRefusal(
   return replaced ? 'terminal_pane_owner_changed' : 'terminal_split_source_not_found'
 }
 
-/** The refusal the commit rethrows as is; every other failure is a save failure. */
-export function isRuntimePaneBindRefusal(
-  error: unknown,
-  replaced: ReplacedPaneOwner | null
-): boolean {
-  return error instanceof Error && error.message === runtimePaneBindRefusal(replaced)
+/** Either refusal the commit rethrows as is, whatever the spawn; every other failure is a save failure. */
+export function isRuntimePaneBindRefusal(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message === 'terminal_pane_owner_changed' ||
+      error.message === 'terminal_split_source_not_found')
+  )
 }

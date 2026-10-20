@@ -158,7 +158,7 @@ async function commitReservedRuntimePtySpawn(ctx: RuntimePtySpawnState) {
     } catch (err) {
       console.error('[pty] failed to persist runtime PTY binding after spawn:', err)
       await discardUnpersistedPtySpawn(ctx.provider, ctx.result, ctx.deps.runtime)
-      if (isRuntimePaneBindRefusal(err, ctx.replacedPaneOwner)) {
+      if (isRuntimePaneBindRefusal(err)) {
         throw err
       }
       throw Object.assign(new Error(createTerminalSessionStateSaveFailureMessage(err)), {

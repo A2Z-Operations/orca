@@ -11,6 +11,8 @@ import { resolveStablePaneOwner } from '../pane/stable-owner'
 import { releaseStoppedPaneBinding } from '../pane/pane-owner-replacement'
 import { resolveRuntimeClaudeAuth } from './spawn-claude-auth'
 import { beginRuntimePaneReplacement } from './spawn-replacement'
+import { resolveRuntimeHostSessionBinding } from './spawn-host-binding'
+import { isClaudeLaunchCommand } from '../host-env/fresh-spawn-routing'
 import { restoreProvisionalPtySize } from '../spawn-options-assembly'
 import type { PtyRuntimeControllerDeps } from './controller-deps'
 import { adoptMaterializedRuntimePtySpawn } from './spawn-early'
@@ -45,29 +47,29 @@ export async function spawnPtyFromRuntimeController(
   args: RuntimePtySpawnArgs
 ) {
   const ctx = createRuntimePtySpawnState(deps, args)
-  const leafId =
-    typeof args.leafId === 'string' && isTerminalLeafId(args.leafId) ? args.leafId : null
-  const paneKey =
-    typeof args.worktreeId === 'string' &&
-    typeof args.tabId === 'string' &&
-    isValidTerminalTabId(args.tabId) &&
-    args.tabId.length <= 512 &&
-    leafId
-      ? makePaneKey(args.tabId, leafId)
-      : null
   if (args.replacesPtyId !== undefined) {
+    // Why hoisted: only cheap input checks refuse before the stop. What can still refuse after it
+    // (execution owner unavailable, requested shell/cwd resolution, daemon session minting) is
+    // accepted for parity with the renderer lane (ipc/spawn-run.ts), which also stops before
+    // preflight; the catch below releases the stopped binding, so the pane is left clean.
+    const binding = resolveRuntimeHostSessionBinding(deps, args)
+    if (!binding) {
+      throw new Error('replacesPtyId requires persistHostSessionBinding')
+    }
+    ctx.hostSessionBinding = binding
     // Why refuse: an adopted pane or an agent-session claim names the owner to keep, not to stop.
     if (args.adoptedStablePane || args.agentSessionEnsure) {
       throw new Error('terminal_pane_owner_unknown')
     }
     // Why before the stop: a target account that cannot launch refuses the move, not the session.
-    if (args.claudeAccountId !== undefined) {
+    // A non-Claude command has no account to prepare.
+    if (args.claudeAccountId !== undefined && isClaudeLaunchCommand(args.command)) {
       ctx.claudeAuth = await resolveRuntimeClaudeAuth(ctx)
     }
     // Why before the try: a refused replacement settled its own reservation and stopped nothing.
     const replacement = await beginRuntimePaneReplacement(deps, {
       replacesPtyId: args.replacesPtyId,
-      paneKey,
+      paneKey: makePaneKey(binding.tabId, binding.leafId),
       worktreeId: args.worktreeId,
       connectionId: args.connectionId
     })
@@ -75,6 +77,16 @@ export async function spawnPtyFromRuntimeController(
     ctx.paneSpawnReservation = replacement.reservation
     ctx.replacedPaneOwner = replacement.replaced
   } else if (!args.adoptedStablePane) {
+    const leafId =
+      typeof args.leafId === 'string' && isTerminalLeafId(args.leafId) ? args.leafId : null
+    const paneKey =
+      typeof args.worktreeId === 'string' &&
+      typeof args.tabId === 'string' &&
+      isValidTerminalTabId(args.tabId) &&
+      args.tabId.length <= 512 &&
+      leafId
+        ? makePaneKey(args.tabId, leafId)
+        : null
     const ownerKey = makePaneSpawnReservationKey(args.worktreeId, args.connectionId, paneKey)
     const existingOwner = paneKey
       ? resolveStablePaneOwner(
