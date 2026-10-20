@@ -20,9 +20,11 @@ import {
   CLAUDE_PROFILE_SETUP_FAILED_MESSAGE
 } from '../../shared/claude-profile-routing'
 import { getPosixClaudeShellFunction } from '../../shared/claude-shell-function'
+import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { ClaudeProfileSetupReport } from './claude-profile-setup'
 import { claudeProfileMarkerPath, describeClaudeProfile } from './claude-profile-paths'
 import { ClaudeProfileRouter, type ClaudeProfileRouterSettings } from './claude-profile-router'
+import { applyClaudeEnvPatch } from './environment'
 
 const roots: string[] = []
 
@@ -103,6 +105,16 @@ function signIn(stateDir: string, email: string, organizationUuid?: string): voi
   utimesSync(stateFile, mtime, mtime)
 }
 
+/** The error a sync call throws, so a test can pin its typed reason as well as its message. */
+function thrownBy(call: () => unknown): unknown {
+  try {
+    call()
+  } catch (error) {
+    return error
+  }
+  throw new Error('expected the call to throw')
+}
+
 /** A `claude` on PATH that prints the CLAUDE_CONFIG_DIR it runs with, under the pane's shell function. */
 function claudeShellProbe(root: string): (env: NodeJS.ProcessEnv) => string {
   const bin = join(root, 'bin')
@@ -144,6 +156,12 @@ describe('ClaudeProfileRouter.launchEnvFor', () => {
     expect(() => f.router.launchEnvFor('zzz')).toThrow('claude_account_unknown')
     expect(() => f.router.preparationFor('zzz')).toThrow('claude_account_unknown')
     await expect(f.router.prepareLaunchFor('zzz')).rejects.toThrow('claude_account_unknown')
+    const unknown = { reason: 'claudeAccountUnknown' }
+    expect(thrownBy(() => f.router.launchEnvFor('zzz'))).toBeInstanceOf(AgentSessionPreSpawnError)
+    expect(thrownBy(() => f.router.launchEnvFor('zzz'))).toMatchObject(unknown)
+    expect(thrownBy(() => f.router.preparationFor('zzz'))).toMatchObject(unknown)
+    await expect(f.router.prepareLaunchFor('zzz')).rejects.toBeInstanceOf(AgentSessionPreSpawnError)
+    await expect(f.router.prepareLaunchFor('zzz')).rejects.toMatchObject(unknown)
     expect(f.setup.calls).toEqual([])
   })
 
@@ -153,6 +171,10 @@ describe('ClaudeProfileRouter.launchEnvFor', () => {
 
     await expect(f.router.prepareLaunchFor('w')).rejects.toThrow('claude_account_wsl_unsupported')
     expect(() => f.router.preparationFor('w')).toThrow('claude_account_wsl_unsupported')
+    const wsl = { reason: 'claudeAccountWslUnsupported' }
+    await expect(f.router.prepareLaunchFor('w')).rejects.toBeInstanceOf(AgentSessionPreSpawnError)
+    await expect(f.router.prepareLaunchFor('w')).rejects.toMatchObject(wsl)
+    expect(thrownBy(() => f.router.preparationFor('w'))).toMatchObject(wsl)
     expect(f.setup.calls).toEqual([])
     expect(existsSync(f.home('w'))).toBe(false)
   })
@@ -163,6 +185,10 @@ describe('ClaudeProfileRouter.launchEnvFor', () => {
     mkdirSync(f.home('w'), { recursive: true })
 
     expect(() => f.router.launchEnvFor('w')).toThrow('claude_account_wsl_unsupported')
+    expect(thrownBy(() => f.router.launchEnvFor('w'))).toBeInstanceOf(AgentSessionPreSpawnError)
+    expect(thrownBy(() => f.router.launchEnvFor('w'))).toMatchObject({
+      reason: 'claudeAccountWslUnsupported'
+    })
   })
 
   it('passes through when System default already covers the account', async () => {
@@ -257,6 +283,31 @@ describe.skipIf(process.platform === 'win32')(
           [CLAUDE_INJECTED_CONFIG_DIR_ENV]: f.home('b')
         })
       ).toBe(f.home('a'))
+    })
+
+    it("runs a covered account on its own folder from a base env free of Orca's routing keys", () => {
+      const own = mkdtempSync(join(tmpdir(), 'claude-router-own-'))
+      roots.push(own)
+      // b is covered twice over: by the default folder and by the user's own CLAUDE_CONFIG_DIR.
+      const plain = fixture()
+      const withOwn = fixture({ CLAUDE_CONFIG_DIR: own })
+      signIn(plain.userHome, 'b@example.test')
+      signIn(own, 'b@example.test')
+      for (const f of [plain, withOwn]) {
+        mkdirSync(f.home('a'), { recursive: true })
+        mkdirSync(dirname(f.router.pointerPath), { recursive: true })
+        writeFileSync(f.router.pointerPath, f.home('a'))
+      }
+      const probe = claudeShellProbe(plain.root)
+
+      // No own value: CLAUDE_CONFIG_DIR stays unset, so Claude uses its default folder, never a's.
+      expect(probe(applyClaudeEnvPatch({}, plain.router.launchEnvFor('b')))).toBe('unset')
+      expect(probe(applyClaudeEnvPatch({}, withOwn.router.launchEnvFor('b')))).toBe(own)
+      // Why the contract: layered over the selected account's routing, the additive patch keeps a's.
+      const selected = applyClaudeEnvPatch({}, plain.router.launchEnv())
+      expect(probe(applyClaudeEnvPatch(selected, plain.router.launchEnvFor('b')))).toBe(
+        plain.home('a')
+      )
     })
   }
 )

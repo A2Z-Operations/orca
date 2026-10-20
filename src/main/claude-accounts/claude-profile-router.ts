@@ -96,7 +96,10 @@ export class ClaudeProfileRouter {
           }
         })
     this.setups = new ClaudeProfileSetupQueue({
-      ...args,
+      getSettings: args.getSettings,
+      dataRoot: args.dataRoot,
+      runSetup: args.runSetup,
+      refreshWaitMs: args.refreshWaitMs,
       userHome: () => this.userHome,
       userConfigDir: () => this.userConfigDir(),
       envReady: this.envReady
@@ -260,12 +263,20 @@ export class ClaudeProfileRouter {
     setUpForLaunch: (id) => this.setups.runForLaunch(this.describe(id))
   }
 
-  /** Env for a launch on a chosen host account. Throws for an unknown or WSL account and a missing folder. */
+  /**
+   * Env for a launch on a chosen host account. Throws for an unknown or WSL account and a missing folder.
+   * Apply it to a base env free of Orca's routing keys (see chosenAccountLaunchEnv), or a covered
+   * account can run on the selected one. Before the login shell resolves (a Dock launch) coverage is
+   * judged against process.env and can misclassify; real launches use prepareLaunchFor.
+   */
   launchEnvFor(accountId: string): ClaudeEnvPatch {
     return chosenAccountLaunchEnv(this.chosen, accountId)
   }
 
-  /** Like preparation(), for a chosen host account. */
+  /**
+   * Like preparation(), for a chosen host account. Before the login shell resolves (a Dock launch)
+   * coverage is judged against process.env and can misclassify; real launches use prepareLaunchFor.
+   */
   preparationFor(accountId: string): ClaudeRuntimeAuthPreparation {
     return chosenAccountPreparation(this.chosen, accountId)
   }

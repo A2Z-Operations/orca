@@ -61,6 +61,12 @@ function envForKnown(
  * A bare CLAUDE_CONFIG_DIR. Why never the pointer or the injected marker: the pane's `claude`
  * function re-reads the selected-host pointer whenever CLAUDE_CONFIG_DIR equals
  * ORCA_CLAUDE_INJECTED_CONFIG_DIR, so a launch carrying both ran on the selected account.
+ *
+ * Contract: the patch only sets keys (applyClaudeEnvPatch never clears), and a covered account's
+ * patch is `{}` or the user's own CLAUDE_CONFIG_DIR. So the base env must carry none of Orca's
+ * routing keys: CLAUDE_CONFIG_DIR, ORCA_CLAUDE_PROFILE_POINTER, ORCA_CLAUDE_INJECTED_CONFIG_DIR,
+ * ORCA_CLAUDE_USER_CONFIG_DIR. A caller starting from a pane/terminal env deletes them first, or a
+ * covered account can run on the selected one.
  */
 export function chosenAccountLaunchEnv(
   routing: ChosenAccountRouting,
