@@ -1,0 +1,99 @@
+// Launches on a chosen Claude account (the session mover's resume), whatever the selection is.
+// The router owns the folders and setup; these functions only decide what a chosen launch gets.
+import type { GlobalSettings } from '../../shared/global-settings-types'
+import {
+  claudeAccountUnknown,
+  claudeAccountWslUnsupported,
+  claudeProfileMissing
+} from './claude-profile-launch-errors'
+import { isDirectory } from './claude-profile-installed-router'
+import { readUserClaudeConfigDirAsSet } from './claude-profile-paths'
+import type { ClaudeEnvPatch } from './environment'
+import type { ClaudeRuntimeAuthPreparation } from './runtime-auth/runtime-auth-types'
+import { findClaudeAccount } from './runtime-selection'
+
+/** What the router lends a chosen-account launch. */
+export type ChosenAccountRouting = {
+  getSettings: () => Pick<GlobalSettings, 'claudeManagedAccounts'>
+  coveredBySystemDefault: (accountId: string) => boolean
+  accountHome: (accountId: string) => string
+  systemDefaultHome: () => string
+  /** The login shell's env once resolved. */
+  env: () => NodeJS.ProcessEnv
+  envReady: () => Promise<unknown>
+  setUpForLaunch: (accountId: string) => Promise<void>
+}
+
+/**
+ * Why refuse an unknown id: the mover names ids from its registry, so one no saved account explains
+ * is a bug, never a folder to create. Why refuse WSL: host setup would hand back an empty host folder.
+ */
+function assertKnownHostAccount(routing: ChosenAccountRouting, accountId: string): void {
+  const account = findClaudeAccount(routing.getSettings(), accountId)
+  if (!account) {
+    throw claudeAccountUnknown()
+  }
+  if (account.managedAuthRuntime === 'wsl') {
+    throw claudeAccountWslUnsupported()
+  }
+}
+
+function envForKnown(
+  routing: ChosenAccountRouting,
+  accountId: string,
+  covered: boolean
+): ClaudeEnvPatch {
+  if (covered) {
+    // Why the user's own value, unresolved: Claude keys its login by the literal string (as terminalEnv).
+    const own = readUserClaudeConfigDirAsSet(routing.env())
+    return own ? { CLAUDE_CONFIG_DIR: own } : {}
+  }
+  const home = routing.accountHome(accountId)
+  if (!isDirectory(home)) {
+    throw claudeProfileMissing()
+  }
+  return { CLAUDE_CONFIG_DIR: home }
+}
+
+/**
+ * A bare CLAUDE_CONFIG_DIR. Why never the pointer or the injected marker: the pane's `claude`
+ * function re-reads the selected-host pointer whenever CLAUDE_CONFIG_DIR equals
+ * ORCA_CLAUDE_INJECTED_CONFIG_DIR, so a launch carrying both ran on the selected account.
+ */
+export function chosenAccountLaunchEnv(
+  routing: ChosenAccountRouting,
+  accountId: string
+): ClaudeEnvPatch {
+  assertKnownHostAccount(routing, accountId)
+  return envForKnown(routing, accountId, routing.coveredBySystemDefault(accountId))
+}
+
+export function chosenAccountPreparation(
+  routing: ChosenAccountRouting,
+  accountId: string
+): ClaudeRuntimeAuthPreparation {
+  assertKnownHostAccount(routing, accountId)
+  const covered = routing.coveredBySystemDefault(accountId)
+  return {
+    configDir: covered ? routing.systemDefaultHome() : routing.accountHome(accountId),
+    runtime: 'host',
+    wslDistro: null,
+    wslLinuxConfigDir: null,
+    envPatch: envForKnown(routing, accountId, covered),
+    provenance: covered ? 'system' : `profile:${accountId}`
+  }
+}
+
+/** Its folder is set up or refreshed first. */
+export async function prepareChosenAccountLaunch(
+  routing: ChosenAccountRouting,
+  accountId: string
+): Promise<ClaudeRuntimeAuthPreparation> {
+  assertKnownHostAccount(routing, accountId)
+  // Why wait: whether System default covers the account depends on the login shell's CLAUDE_CONFIG_DIR.
+  await routing.envReady()
+  if (!routing.coveredBySystemDefault(accountId)) {
+    await routing.setUpForLaunch(accountId)
+  }
+  return chosenAccountPreparation(routing, accountId)
+}

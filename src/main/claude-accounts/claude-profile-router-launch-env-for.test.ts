@@ -81,7 +81,7 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
   const describe = (id: string) =>
     describeClaudeProfile(dataRoot, id, { executionHostId: 'local', runtime: 'host' })
   const home = (id: string) => describe(id).home
-  return { root, userHome, dataRoot, router, describe, home, setup }
+  return { root, userHome, dataRoot, router, describe, home, setup, settings, account }
 }
 
 /** Claude's own sign-in state in a folder (the login the router reads). Copied from claude-profile-router.test.ts. */
@@ -145,6 +145,24 @@ describe('ClaudeProfileRouter.launchEnvFor', () => {
     expect(() => f.router.preparationFor('zzz')).toThrow('claude_account_unknown')
     await expect(f.router.prepareLaunchFor('zzz')).rejects.toThrow('claude_account_unknown')
     expect(f.setup.calls).toEqual([])
+  })
+
+  it('refuses a WSL account before any setup, leaving no host folder behind', async () => {
+    const f = fixture()
+    f.settings.claudeManagedAccounts.push({ ...f.account('w'), managedAuthRuntime: 'wsl' })
+
+    await expect(f.router.prepareLaunchFor('w')).rejects.toThrow('claude_account_wsl_unsupported')
+    expect(() => f.router.preparationFor('w')).toThrow('claude_account_wsl_unsupported')
+    expect(f.setup.calls).toEqual([])
+    expect(existsSync(f.home('w'))).toBe(false)
+  })
+
+  it('refuses a WSL account in launchEnvFor too', () => {
+    const f = fixture()
+    f.settings.claudeManagedAccounts.push({ ...f.account('w'), managedAuthRuntime: 'wsl' })
+    mkdirSync(f.home('w'), { recursive: true })
+
+    expect(() => f.router.launchEnvFor('w')).toThrow('claude_account_wsl_unsupported')
   })
 
   it('passes through when System default already covers the account', async () => {
