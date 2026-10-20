@@ -384,6 +384,11 @@ export abstract class OrcaRuntimeWithRuntimeId extends RuntimeConstructionServic
 
   protected ptyController: RuntimePtyController | null = null
 
+  /** The installed controller, for main-side callers that spawn into a pane (the Claude session mover). */
+  getPtyController(): RuntimePtyController | null {
+    return this.ptyController
+  }
+
   protected readonly ptyLivenessVerdictByPtyId = new Map<
     string,
     { verdict: PtyLivenessVerdict; observedAt: number }

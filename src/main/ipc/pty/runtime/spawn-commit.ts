@@ -34,6 +34,11 @@ import {
   discardUnpersistedPtySpawn,
   registerPersistedPtySpawn
 } from '../pane/spawn-registration'
+import {
+  isRuntimePaneBindRefusal,
+  runtimePaneBindingInput,
+  runtimePaneBindRefusal
+} from './spawn-replacement'
 
 export async function commitRuntimePtySpawn(ctx: RuntimePtySpawnState) {
   return commitPtyWithOpenCodePromptIntent(ctx, () => commitReservedRuntimePtySpawn(ctx))
@@ -143,14 +148,17 @@ async function commitReservedRuntimePtySpawn(ctx: RuntimePtySpawnState) {
         ...(placement ? { placement } : {}),
         origin: spawnCommitBindingOrigin(ctx.result, expectedSourceBinding)
       }
-      const persisted = await store.persistPtyBinding(binding)
+      // Why the swap: the leaf still names the stopped id (or the renderer cleared it); any other owner wins.
+      const persisted = await store.persistPtyBinding(
+        runtimePaneBindingInput(store, binding, ctx.replacedPaneOwner)
+      )
       if (persisted === false) {
-        throw new Error('terminal_split_source_not_found')
+        throw new Error(runtimePaneBindRefusal(ctx.replacedPaneOwner))
       }
     } catch (err) {
       console.error('[pty] failed to persist runtime PTY binding after spawn:', err)
       await discardUnpersistedPtySpawn(ctx.provider, ctx.result, ctx.deps.runtime)
-      if (err instanceof Error && err.message === 'terminal_split_source_not_found') {
+      if (isRuntimePaneBindRefusal(err, ctx.replacedPaneOwner)) {
         throw err
       }
       throw Object.assign(new Error(createTerminalSessionStateSaveFailureMessage(err)), {

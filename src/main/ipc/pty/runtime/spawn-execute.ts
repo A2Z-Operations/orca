@@ -9,7 +9,8 @@ import {
   assertSpawnReplyWasLive,
   reconcileAgentSessionOwnerListings
 } from '../pane/agent-session-owners'
-import { spawnForStablePane, resolveStablePaneOwner } from '../pane/stable-owner'
+import { spawnForStablePane } from '../pane/stable-owner'
+import { resolveRuntimeStablePaneOwner } from './spawn-replacement'
 import { clearProviderPtyState } from '../provider/state-cleanup'
 import { isProviderAgentSessionOwnerLive } from '../provider/liveness'
 import { failPtySpawnExecute } from '../spawn-execute-failure'
@@ -36,13 +37,7 @@ export async function executeRuntimePtySpawn(ctx: RuntimePtySpawnState): Promise
       ? ctx.preAdoptedStablePane.owner
       : args.agentSessionEnsure
         ? null
-        : resolveStablePaneOwner(
-            ctx.deps.runtime,
-            ctx.deps.store,
-            ctx.spawnIdentityPaneKey,
-            args.worktreeId,
-            args.connectionId
-          )
+        : resolveRuntimeStablePaneOwner(ctx)
     const expectedPtyId =
       stablePaneOwnerCandidate?.ptyId ?? ctx.effectiveSessionAppId ?? ctx.sessionId
     if (!stablePaneOwnerCandidate) {
@@ -146,14 +141,7 @@ export async function executeRuntimePtySpawn(ctx: RuntimePtySpawnState): Promise
             owner: stablePaneOwnerCandidate,
             worktreeId: args.worktreeId,
             connectionId: args.connectionId,
-            resolveOwner: () =>
-              resolveStablePaneOwner(
-                ctx.deps.runtime,
-                ctx.deps.store,
-                ctx.spawnIdentityPaneKey,
-                args.worktreeId,
-                args.connectionId
-              ),
+            resolveOwner: () => resolveRuntimeStablePaneOwner(ctx),
             onFreshSpawn: ctx.reportPtySpawnCommitted
           })
       ctx.result = stablePaneSpawn.result

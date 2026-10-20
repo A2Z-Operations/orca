@@ -8,6 +8,9 @@ import {
   reservePaneSpawn
 } from '../pane/spawn-reservation'
 import { resolveStablePaneOwner } from '../pane/stable-owner'
+import { releaseStoppedPaneBinding } from '../pane/pane-owner-replacement'
+import { resolveRuntimeClaudeAuth } from './spawn-claude-auth'
+import { beginRuntimePaneReplacement } from './spawn-replacement'
 import { restoreProvisionalPtySize } from '../spawn-options-assembly'
 import type { PtyRuntimeControllerDeps } from './controller-deps'
 import { adoptMaterializedRuntimePtySpawn } from './spawn-early'
@@ -42,17 +45,36 @@ export async function spawnPtyFromRuntimeController(
   args: RuntimePtySpawnArgs
 ) {
   const ctx = createRuntimePtySpawnState(deps, args)
-  if (!args.adoptedStablePane) {
-    const leafId =
-      typeof args.leafId === 'string' && isTerminalLeafId(args.leafId) ? args.leafId : null
-    const paneKey =
-      typeof args.worktreeId === 'string' &&
-      typeof args.tabId === 'string' &&
-      isValidTerminalTabId(args.tabId) &&
-      args.tabId.length <= 512 &&
-      leafId
-        ? makePaneKey(args.tabId, leafId)
-        : null
+  const leafId =
+    typeof args.leafId === 'string' && isTerminalLeafId(args.leafId) ? args.leafId : null
+  const paneKey =
+    typeof args.worktreeId === 'string' &&
+    typeof args.tabId === 'string' &&
+    isValidTerminalTabId(args.tabId) &&
+    args.tabId.length <= 512 &&
+    leafId
+      ? makePaneKey(args.tabId, leafId)
+      : null
+  if (args.replacesPtyId !== undefined) {
+    // Why refuse: an adopted pane or an agent-session claim names the owner to keep, not to stop.
+    if (args.adoptedStablePane || args.agentSessionEnsure) {
+      throw new Error('terminal_pane_owner_unknown')
+    }
+    // Why before the stop: a target account that cannot launch refuses the move, not the session.
+    if (args.claudeAccountId !== undefined) {
+      ctx.claudeAuth = await resolveRuntimeClaudeAuth(ctx)
+    }
+    // Why before the try: a refused replacement settled its own reservation and stopped nothing.
+    const replacement = await beginRuntimePaneReplacement(deps, {
+      replacesPtyId: args.replacesPtyId,
+      paneKey,
+      worktreeId: args.worktreeId,
+      connectionId: args.connectionId
+    })
+    ctx.paneSpawnReservationKey = replacement.reservationKey
+    ctx.paneSpawnReservation = replacement.reservation
+    ctx.replacedPaneOwner = replacement.replaced
+  } else if (!args.adoptedStablePane) {
     const ownerKey = makePaneSpawnReservationKey(args.worktreeId, args.connectionId, paneKey)
     const existingOwner = paneKey
       ? resolveStablePaneOwner(
@@ -103,6 +125,10 @@ export async function spawnPtyFromRuntimeController(
         ctx.rejectedRegistrationCandidate?.incarnationId
       )
       ctx.pendingRegistrationPtyId = null
+    }
+    // Why: a failed replacement must not leave the stopped id bound for the remount to reattach.
+    if (ctx.replacedPaneOwner) {
+      await releaseStoppedPaneBinding(deps.store, ctx.replacedPaneOwner)
     }
     // Why: once the reservation is created, any later throw — spawn
     // failure, persist failure, or a post-spawn helper such as

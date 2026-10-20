@@ -9,6 +9,7 @@ import type { CodexPaneHomeRoute } from '../../../codex/codex-pane-account-regis
 import type { CodexAccountSelectionTarget } from '../../../codex-accounts/runtime-selection'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import type { StablePaneOwner } from '../pane/stable-owner'
+import type { ReplacedPaneOwner } from '../pane/pane-owner-replacement'
 import type { PaneSpawnReservation } from '../pane/spawn-reservation'
 import type { AdoptStablePaneResult } from '../ipc/spawn-types'
 import type { PtyBindingSourceExpectation } from '../../../persistence'
@@ -29,6 +30,8 @@ export type RuntimePtySpawnState = {
   codexHomeLaunchStartedAt: Date | undefined
   codexHomeLaunchStartedSequence: number | undefined
   preAdoptedStablePane: AdoptStablePaneResult | null
+  /** The owner a replacing spawn stopped; the commit's bind swaps its binding. */
+  replacedPaneOwner: ReplacedPaneOwner | null
   reattachedCodexHomeRoutes: Map<string, CodexPaneHomeRoute | null>
   cwd: string | undefined
   provider: IPtyProvider
@@ -117,6 +120,8 @@ export type RuntimePtySpawnArgs = {
   isNewSession?: boolean
   /** No renderer view exists at spawn; main owns delivery and query replies until one mounts. */
   initiallyHidden?: boolean
+  replacesPtyId?: string
+  claudeAccountId?: string
   persistHostSessionBinding?: boolean
   expectedSourceBinding?: PtyBindingSourceExpectation
   placement?: TerminalPanePlacement
@@ -154,6 +159,7 @@ export function createRuntimePtySpawnState(
     codexHomeLaunchStartedAt: undefined,
     codexHomeLaunchStartedSequence: undefined,
     preAdoptedStablePane: null,
+    replacedPaneOwner: null,
     reattachedCodexHomeRoutes: new Map(),
     cwd: undefined,
     provider: localProvider,
