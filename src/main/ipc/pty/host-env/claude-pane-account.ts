@@ -17,12 +17,13 @@ type ClaudePaneAccountSettings = Partial<
 
 /**
  * `profile:<id>` (or `profile:<id>:wsl:<distro>`) names the account; `system` (or `wsl:<distro>:system`) means System default,
- * which runs the selected account when it covers it; anything else names no managed account.
+ * which runs the named account when supplied, otherwise the selected account; anything else names no managed account.
  */
 export function claudeAccountIdFromProvenance(
   provenance: string,
   settings: ClaudePaneAccountSettings | undefined,
-  target: ClaudeAccountSelectionTarget
+  target: ClaudeAccountSelectionTarget,
+  claudeAccountId?: string
 ): string | null {
   if (provenance.startsWith('profile:')) {
     const id = provenance.split(':')[1]
@@ -34,6 +35,9 @@ export function claudeAccountIdFromProvenance(
   // that login IS the account's; record that account, not "no account".
   // Why WSL too: a WSL System-default pane (`wsl:<distro>:system`) runs the selected WSL account the
   // same way the host one does; the caller's target is that WSL runtime.
+  if (provenance === 'system' && claudeAccountId !== undefined) {
+    return claudeAccountId
+  }
   if (provenance === 'system' || /^wsl:[^:]+:system$/.test(provenance)) {
     return getSelectedClaudeAccountIdForTarget(settings ?? {}, target)
   }
@@ -51,6 +55,7 @@ export function recordClaudePaneAccountForSpawn(args: {
   isClaudeLaunch: boolean
   isReattach: boolean
   claudeAuth: ClaudeRuntimeAuthPreparation | null
+  claudeAccountId?: string
   settings: ClaudePaneAccountSettings | undefined
   target: ClaudeAccountSelectionTarget
   now?: number
@@ -67,7 +72,8 @@ export function recordClaudePaneAccountForSpawn(args: {
   const accountId = claudeAccountIdFromProvenance(
     args.claudeAuth.provenance,
     args.settings,
-    args.target
+    args.target,
+    args.claudeAccountId
   )
   if (!accountId) {
     forgetClaudePaneAccount(args.ptyId)

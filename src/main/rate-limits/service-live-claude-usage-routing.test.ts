@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ProviderRateLimits } from '../../shared/rate-limit-types'
 import { RateLimitService } from './service'
 import { fetchClaudeRateLimits } from './claude-fetcher'
 import {
@@ -73,8 +74,14 @@ const HOMES: Record<string, string> = {
   c: '/data/claude-profiles/c/home'
 }
 
-function service(): RateLimitService {
-  const rateLimits = new RateLimitService()
+class LiveRoutingService extends RateLimitService {
+  seedPolledReading(accountId: string, reading: ProviderRateLimits) {
+    this.inactiveClaudeCache.set(accountId, reading)
+  }
+}
+
+function service(): LiveRoutingService {
+  const rateLimits = new LiveRoutingService()
   rateLimits.setInactiveClaudeAccountsResolver(() => [{ id: 'b' }, { id: 'c' }])
   rateLimits.setLiveClaudeAccountResolver(
     (configDir) => Object.entries(HOMES).find(([, home]) => home === configDir)?.[0] ?? null
@@ -138,6 +145,32 @@ describe('RateLimitService live Claude usage routing', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('keeps newer polled windows and their age when an inactive idle statusline arrives', () => {
+    const rateLimits = service()
+    const now = Date.now()
+    const resetsAt = Math.floor(now / 1000) * 1000 + 600_000
+    const window = { usedPercent: 80, windowMinutes: 300, resetsAt, resetDescription: null }
+    const newer: ProviderRateLimits = {
+      provider: 'claude',
+      session: window,
+      weekly: { ...window, windowMinutes: 10080 },
+      updatedAt: now - 1000,
+      status: 'ok',
+      error: null
+    }
+    rateLimits.seedPolledReading('b', newer)
+    rateLimits.ingestLiveClaudeRateLimits({
+      configDir: HOMES.b,
+      fiveHour: { used_percentage: 20, resets_at: resetsAt / 1000 },
+      sevenDay: { used_percentage: 80, resets_at: resetsAt / 1000 }
+    })
+    const reading = rateLimits
+      .getState()
+      .inactiveClaudeAccounts.find((entry) => entry.accountId === 'b')?.rateLimits
+    expect(reading).toBe(newer)
+    expect(reading?.updatedAt).toBe(now - 1000)
   })
 
   it('still drops a post from a folder no managed account owns', () => {

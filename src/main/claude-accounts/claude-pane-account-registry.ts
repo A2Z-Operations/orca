@@ -1,3 +1,4 @@
+import { claudeAccountHomeKey } from './claude-account-home-attribution'
 import { normalizeClaudeConfigDir } from '../rate-limits/service/service-types'
 
 /**
@@ -54,12 +55,6 @@ export function listClaudePaneAccountsByAccount(accountId: string): ClaudePaneAc
 
 export type ClaudeAccountHomes = { id: string; homes: readonly (string | null | undefined)[] }
 
-function comparableFolder(path: string | null | undefined): string | null {
-  const normalized = normalizeClaudeConfigDir(path)
-  // Why: Windows paths differ only by case between what Claude reports and what Orca built.
-  return normalized && process.platform === 'win32' ? normalized.toLowerCase() : normalized
-}
-
 /**
  * The account whose folder holds the transcript (`<CLAUDE_CONFIG_DIR>/projects/<project>/<file>`).
  * STRICTER than the renderer's resolveClaudeSessionAccountId on purpose: it requires `<project>/<file>`
@@ -80,9 +75,9 @@ export function inferClaudeAccountIdFromTranscript(
   }
   // Why: report the folder as Claude wrote it; only the comparison ignores Windows case.
   const configDir = transcript.slice(0, projectsIndex)
-  const comparableConfigDir = comparableFolder(configDir)
+  const comparableConfigDir = claudeAccountHomeKey(configDir)
   for (const account of accounts) {
-    if (account.homes.some((home) => comparableFolder(home) === comparableConfigDir)) {
+    if (account.homes.some((home) => claudeAccountHomeKey(home) === comparableConfigDir)) {
       return { accountId: account.id, configDir }
     }
   }

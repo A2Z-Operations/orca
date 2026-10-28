@@ -90,6 +90,7 @@ export function publishCommittedPtySpawn(input: PtySpawnCommitInput): PtySpawnOu
     isClaudeLaunch: state.isClaudeLaunch,
     isReattach: result.isReattach === true,
     claudeAuth: state.claudeAuth,
+    claudeAccountId: args.claudeAccountId,
     settings: deps.getSettings?.(),
     target: state.codexSelectionTarget
   })

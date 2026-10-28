@@ -23,7 +23,7 @@ import { createAccountRuntimeTargetSettingsSync } from './rate-limits/account-ru
 import { normalizeCodexRuntimeSelection } from './codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from './claude-accounts/runtime-selection'
 import type { ClaudeStatusLineRateLimits } from '../shared/claude-statusline-rate-limits'
-import { normalizeClaudeConfigDir } from './rate-limits/service/service-types'
+import { resolveClaudeAccountHome } from './claude-accounts/claude-account-home-attribution'
 
 export type ProviderAccountServices = {
   rateLimits: RateLimitService
@@ -171,21 +171,11 @@ export function createProviderAccountServices(
       }))
   })
   // Why: a statusline post names its CLAUDE_CONFIG_DIR; only the account layer knows whose folder that is.
-  rateLimits.setLiveClaudeAccountResolver((configDir) => {
-    for (const account of store.getSettings().claudeManagedAccounts) {
-      let home: string
-      try {
-        home = claudeRuntimeAuth.router.accountHome(account.id)
-      } catch {
-        // Why skip, not throw: describeClaudeProfile refuses a malformed id; one bad row must not dark the live feed.
-        continue
-      }
-      if (normalizeClaudeConfigDir(home) === configDir) {
-        return account.id
-      }
-    }
-    return null
-  })
+  rateLimits.setLiveClaudeAccountResolver((configDir) =>
+    resolveClaudeAccountHome(configDir, store.getSettings().claudeManagedAccounts, (id) =>
+      claudeRuntimeAuth.router.accountHome(id)
+    )
+  )
   rateLimits.setInactiveCodexAccountsResolver(() => {
     const settings = store.getSettings()
     const activeIds = new Set(

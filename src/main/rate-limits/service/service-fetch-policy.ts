@@ -10,10 +10,9 @@ import {
   type NormalizedClaudeAccountSelectionTarget,
   type ProviderRateLimits
 } from './service-types'
-import type { RateLimitWindow } from '../../../shared/rate-limit-types'
 import {
   isSameClaudeUsageWindow,
-  isStaleClaudeUsageWindow,
+  keepNewerClaudeUsageWindow,
   mapClaudeUsageWindow
 } from '../claude-usage-window'
 import { readUserClaudeConfigDir } from '../../claude-accounts/claude-profile-paths'
@@ -146,20 +145,10 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     }
     const previous = this.state.claude
     const now = Date.now()
-    // An idle session's older snapshot must not roll back newer account usage.
-    const keepIfNewer = (
-      incoming: RateLimitWindow | null,
-      current: RateLimitWindow | null | undefined
-    ): RateLimitWindow | null => {
-      if (!incoming || isStaleClaudeUsageWindow(current, incoming, now)) {
-        return null
-      }
-      return isSameClaudeUsageWindow(current ?? null, incoming) ? (current ?? null) : incoming
-    }
     const incomingSession = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
     const incomingWeekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
-    const freshSession = keepIfNewer(incomingSession, previous?.session)
-    const freshWeekly = keepIfNewer(incomingWeekly, previous?.weekly)
+    const freshSession = keepNewerClaudeUsageWindow(incomingSession, previous?.session, now)
+    const freshWeekly = keepNewerClaudeUsageWindow(incomingWeekly, previous?.weekly, now)
     if (!freshSession && !freshWeekly) {
       return
     }
@@ -214,14 +203,29 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     accountId: string,
     event: ClaudeStatusLineRateLimits
   ): void {
-    const freshSession = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
-    const freshWeekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
+    const previous = this.inactiveClaudeCache.get(accountId) ?? null
+    const now = Date.now()
+    const incomingSession = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
+    const incomingWeekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
+    const freshSession = keepNewerClaudeUsageWindow(incomingSession, previous?.session, now)
+    const freshWeekly = keepNewerClaudeUsageWindow(incomingWeekly, previous?.weekly, now)
     if (!freshSession && !freshWeekly) {
       return
     }
-    const previous = this.inactiveClaudeCache.get(accountId) ?? null
-    const session = freshSession ?? previous?.session ?? null
-    const weekly = freshWeekly ?? previous?.weekly ?? null
+    // Kept snapshots can outlive a reset; never relabel a past-reset window as live.
+    const inherited = previous ? withoutResetWindows(previous, now) : null
+    // Partial statusline payloads leave unreported windows unchanged.
+    const session = freshSession ?? inherited?.session ?? null
+    const weekly = freshWeekly ?? inherited?.weekly ?? null
+    // Stale posts that repeat the surviving window must not refresh live-feed age.
+    const droppedStale = (incomingSession && !freshSession) || (incomingWeekly && !freshWeekly)
+    if (
+      droppedStale &&
+      isSameClaudeUsageWindow(previous?.session ?? null, session) &&
+      isSameClaudeUsageWindow(previous?.weekly ?? null, weekly)
+    ) {
+      return
+    }
     if (
       previous?.status === 'ok' &&
       previous.usageMetadata?.source === 'live-session' &&
@@ -235,7 +239,7 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
       provider: 'claude',
       session,
       weekly,
-      fableWeekly: previous?.fableWeekly ?? null,
+      fableWeekly: inherited?.fableWeekly ?? null,
       updatedAt: Date.now(),
       error: null,
       status: 'ok',

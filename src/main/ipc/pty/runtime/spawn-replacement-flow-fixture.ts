@@ -59,8 +59,12 @@ export function replacementRouter(root: string): ClaudeProfileRouter {
   return new ClaudeProfileRouter({
     getSettings: () => ({
       ...getDefaultSettings(root),
-      claudeManagedAccounts: [account, { ...account, id: 'w', managedAuthRuntime: 'wsl' }],
-      activeClaudeManagedAccountId: null,
+      claudeManagedAccounts: [
+        account,
+        { ...account, id: 'a', email: 'a@example.test' },
+        { ...account, id: 'w', managedAuthRuntime: 'wsl' }
+      ],
+      activeClaudeManagedAccountId: 'a',
       agentStatusHooksEnabled: false
     }),
     dataRoot: join(root, 'data'),

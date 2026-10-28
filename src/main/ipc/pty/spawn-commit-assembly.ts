@@ -50,6 +50,7 @@ export type PtySpawnCommitState = {
     | 'resumeProviderSession'
     | 'onResumeOutcome'
     | 'telemetry'
+    | 'claudeAccountId'
   >
   result: PtySpawnResult
   provider: IPtyProvider
