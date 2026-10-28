@@ -1,3 +1,4 @@
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import { retireAtRestCommandContext } from '../native-chat/agent-session-wire/at-rest-command-context'
 import { hasAppEnvironment } from '../../shared/app-environment'
@@ -202,6 +203,10 @@ export class RuntimeAccountController {
 
   selectClaude(accountId: string | null): Promise<ClaudeRateLimitAccountsState> {
     return this.requireServices().claudeAccounts.selectAccount(accountId)
+  }
+
+  setClaudeSessionMover(setting: ClaudeSessionMoverSetting): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setSessionMover(setting)
   }
 
   setClaudeAutoSwitch(enabled: boolean): ClaudeRateLimitAccountsState {

@@ -29,9 +29,10 @@ const COMMAND_PATHS = COMMAND_SPECS.flatMap((spec) => specPaths(spec))
 
 function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
   return (
-    // Why the carve-out: auto-switch is written on the runtime whose accounts it rotates, so
-    // `--environment <server>` must reach that server (the other account commands stay local).
-    (commandPath[0] === 'account' && commandPath[1] !== 'auto-switch') ||
+    // Account policies belong to the target runtime; other account commands stay local.
+    (commandPath[0] === 'account' &&
+      commandPath[1] !== 'auto-switch' &&
+      commandPath[1] !== 'session-mover') ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||
     // Paired servers come from the local store; routing SSH lookup would mix two machines in one list.

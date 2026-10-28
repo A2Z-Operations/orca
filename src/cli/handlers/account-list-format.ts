@@ -9,6 +9,8 @@ type AccountsBlock = {
   }
   /** Claude only: whether the host switches accounts before a usage limit (absent from older hosts). */
   autoSwitchEnabled?: boolean
+  /** Claude only: what the host does with running sessions near a usage limit (absent from older hosts). */
+  sessionMover?: 'off' | 'ask' | 'move'
 }
 
 export function formatDataAccounts(label: string, state: ManagedDataAccountsState): string {
@@ -41,6 +43,9 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   )
   if (block.autoSwitchEnabled !== undefined) {
     lines.push(`  auto-switch: ${block.autoSwitchEnabled ? 'on' : 'off'}`)
+  }
+  if (block.sessionMover !== undefined) {
+    lines.push(`  session-mover: ${block.sessionMover}`)
   }
   return `Managed ${label} accounts (${block.accounts.length}):\n${lines.join('\n')}`
 }

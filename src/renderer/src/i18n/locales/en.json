@@ -21343,6 +21343,17 @@
         "notMovedOne": "1 other session wasn't moved.",
         "notMovedOther": "{{count}} other sessions weren't moved.",
         "review": "Review"
+      },
+      "sessionMover": {
+        "settingTitle": "Move running sessions before a usage limit",
+        "settingDescription": "A running Claude session whose own account nears its limit continues on the account with the most room, between turns, in the same pane.",
+        "settingOff": "Off",
+        "settingAsk": "Ask",
+        "settingMove": "Move",
+        "noticeTitle": "Claude session mover",
+        "movedBody": "{{from}} is near its usage limit. The session continues on {{to}}.",
+        "askBody": "A session on {{from}} is near its usage limit. Set \"Move running sessions before a usage limit\" to Move to move it automatically.",
+        "failedBody": "A session on {{from}} could not be moved: {{detail}}"
       }
     },
     "managedData": {

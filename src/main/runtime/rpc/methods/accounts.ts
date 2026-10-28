@@ -17,6 +17,7 @@ import {
   SelectAccountParams,
   SelectCodexAccountForTargetParams,
   SetClaudeAutoSwitchParams,
+  SetClaudeSessionMoverParams,
   HostAccountSignInStartParams,
   HostAccountSignInWaitParams,
   HostAccountSignInFlowParams,
@@ -150,6 +151,12 @@ export const ACCOUNT_METHODS = [
     permission: 'accounts-admin',
     params: SetClaudeAutoSwitchParams,
     handler: async (params, { runtime }) => runtime.setClaudeAutoSwitch(params.enabled)
+  }),
+  defineMethod({
+    name: 'accounts.setClaudeSessionMover',
+    permission: 'accounts-admin',
+    params: SetClaudeSessionMoverParams,
+    handler: async (params, { runtime }) => runtime.setClaudeSessionMover(params.setting)
   }),
   defineMethod({
     name: 'accounts.selectCodex',
