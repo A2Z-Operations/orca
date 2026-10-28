@@ -64,6 +64,10 @@ function createInitialProfileStateAdmission(): ProfileStateRuntimeAdmission | un
   return undefined
 }
 
+function createInitialSessionMoverCleanup(): (() => void) | null {
+  return null
+}
+
 /** Mutable composition-root state shared by startup, window, serve, and quit phases. */
 export const mainProcessState = {
   mainWindow: null as BrowserWindow | null,
@@ -85,6 +89,7 @@ export const mainProcessState = {
   claudeRuntimeAuth: null as ClaudeRuntimeAuthService | null,
   runtime: null as OrcaRuntimeService | null,
   rateLimits: null as RateLimitService | null,
+  stopClaudeSessionMover: createInitialSessionMoverCleanup(),
   runtimeRpc: null as OrcaRuntimeRpcServer | null,
   serveReadinessPublisher: new ServeReadinessPublisher(),
   desktopRelayService: null as DesktopRelayService | null,

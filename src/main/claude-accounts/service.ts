@@ -1,5 +1,7 @@
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeAccountSignIn,
+  ClaudeSessionMoveSummary,
   ClaudeRateLimitAccountsState,
   ClaudeSignInRequest
 } from '../../shared/managed-account-types'
@@ -138,6 +140,14 @@ export class ClaudeAccountService {
 
   setAutoSwitch(enabled: boolean): ClaudeRateLimitAccountsState {
     return this.selection.setAutoSwitch(enabled)
+  }
+
+  setSessionMover(setting: ClaudeSessionMoverSetting): ClaudeRateLimitAccountsState {
+    return this.selection.setSessionMover(setting)
+  }
+
+  setSessionMovesProvider(provider: (() => ClaudeSessionMoveSummary[]) | null): void {
+    this.selection.setSessionMovesProvider(provider)
   }
 
   getRuntimeConfigDir(target?: ClaudeAccountSelectionTarget): string {

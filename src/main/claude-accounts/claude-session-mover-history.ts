@@ -1,0 +1,101 @@
+import type {
+  ClaudeManagedAccountSummary,
+  ClaudeSessionMoveSummary
+} from '../../shared/managed-account-types'
+import type { ProviderRateLimits } from '../../shared/rate-limit-types'
+import { worstClaudeWindow, type ClaudeTargetClaim } from './claude-session-mover-policy'
+import type { ClaudeMoverSessionView } from './claude-session-mover-sessions'
+import type {
+  ClaudeSessionMoverDeps,
+  ClaudeSessionMoveNotice,
+  ClaudeSessionMoveReason
+} from './claude-session-mover-types'
+
+export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
+  const lastMoveAt = new Map<string, number>()
+  const lastFailureAt = new Map<string, number>()
+  const lastAskAt = new Map<string, number>()
+  const lastDecision = new Map<string, ClaudeSessionMoveSummary>()
+  const targetClaims = new Map<string, ClaudeTargetClaim>()
+  const inflight = new Set<string>()
+  const inflightPanes = new Set<string>()
+  const log = deps.log ?? ((line, record) => console.info(`[claude-session-mover] ${line}`, record))
+
+  const remember = (
+    view: ClaudeMoverSessionView,
+    from: ClaudeManagedAccountSummary,
+    to: ClaudeManagedAccountSummary | null,
+    reason: ClaudeSessionMoveReason,
+    usage: ProviderRateLimits | null,
+    now: number,
+    detail?: string
+  ): void => {
+    const window = worstClaudeWindow(usage, now)
+    const record: ClaudeSessionMoveSummary = {
+      ptyId: view.record.ptyId,
+      paneKey: view.paneKey,
+      fromAccountId: from.id,
+      toAccountId: to?.id ?? null,
+      window: window?.name ?? null,
+      percent: window?.percent ?? null,
+      line: window?.line ?? null,
+      reason,
+      at: now
+    }
+    // Why once per reason: the service publishes every 15 s; a repeated "stay" is not news.
+    if (lastDecision.get(view.record.ptyId)?.reason !== reason) {
+      log(
+        `${reason}${detail ? ` (${detail})` : ''} pty=${record.ptyId} from=${from.email} to=${to?.email ?? '-'}`,
+        record
+      )
+    }
+    lastDecision.set(view.record.ptyId, record)
+  }
+
+  const settle =
+    (
+      view: ClaudeMoverSessionView,
+      from: ClaudeManagedAccountSummary,
+      to: ClaudeManagedAccountSummary,
+      usage: ProviderRateLimits | null
+    ) =>
+    (kind: ClaudeSessionMoveNotice['kind'], detail: string): void => {
+      const now = Date.now()
+      if (kind === 'moved') {
+        lastMoveAt.set(view.record.ptyId, now)
+        lastMoveAt.set(detail, now)
+        lastDecision.delete(view.record.ptyId)
+      } else {
+        lastFailureAt.set(view.record.ptyId, now)
+      }
+      remember(
+        kind === 'moved' ? { ...view, record: { ...view.record, ptyId: detail } } : view,
+        from,
+        kind === 'moved' ? to : null,
+        kind,
+        usage,
+        now,
+        detail
+      )
+      deps.onNotice({
+        kind,
+        ptyId: view.record.ptyId,
+        from,
+        to: kind === 'moved' ? to : null,
+        detail
+      })
+    }
+
+  return {
+    lastMoveAt,
+    lastFailureAt,
+    lastAskAt,
+    lastDecision,
+    targetClaims,
+    inflight,
+    inflightPanes,
+    remember,
+    settle
+  }
+}
+export type ClaudeMoverHistory = ReturnType<typeof createClaudeMoverHistory>

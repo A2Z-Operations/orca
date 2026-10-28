@@ -1,6 +1,8 @@
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeManagedAccount,
   ClaudeManagedAccountSummary,
+  ClaudeSessionMoveSummary,
   ClaudeRateLimitAccountsState
 } from '../../shared/managed-account-types'
 import type { GlobalSettings } from '../../shared/global-settings-types'
@@ -32,6 +34,7 @@ export type ClaudeAccountSettings = Pick<
   | 'activeClaudeManagedAccountId'
   | 'activeClaudeManagedAccountIdsByRuntime'
   | 'claudeAutoSwitchEnabled'
+  | 'claudeSessionMover'
 >
 
 export type ClaudeAccountStore = {
@@ -68,6 +71,17 @@ export class ClaudeAccountSelection {
     private readonly runtimeAuth: ClaudeAccountRuntime
   ) {}
 
+  private sessionMovesProvider: (() => ClaudeSessionMoveSummary[]) | null = null
+
+  setSessionMovesProvider(provider: (() => ClaudeSessionMoveSummary[]) | null): void {
+    this.sessionMovesProvider = provider
+  }
+
+  setSessionMover(setting: ClaudeSessionMoverSetting): ClaudeRateLimitAccountsState {
+    this.saveSettings({ claudeSessionMover: setting })
+    return this.list()
+  }
+
   list(): ClaudeRateLimitAccountsState {
     this.pruneSelection()
     const settings = this.store.getSettings()
@@ -91,6 +105,8 @@ export class ClaudeAccountSelection {
       activeAccountId: selection.host,
       activeAccountIdsByRuntime: selection,
       autoSwitchEnabled: settings.claudeAutoSwitchEnabled === true,
+      sessionMover: settings.claudeSessionMover ?? 'ask',
+      sessionMoves: this.sessionMovesProvider?.() ?? [],
       ...(accounts.length > 0
         ? { systemDefaultHome: this.runtimeAuth.router.systemDefaultHome() }
         : {}),

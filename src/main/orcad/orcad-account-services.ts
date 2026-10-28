@@ -39,7 +39,10 @@ type OrcadAccountServices = {
   attachToRuntime: (
     runtime: Pick<
       OrcaRuntimeService,
-      'setAccountServices' | 'setCommitMessageAgentEnvironmentResolvers'
+      | 'setAccountServices'
+      | 'setCommitMessageAgentEnvironmentResolvers'
+      | 'getPtyController'
+      | 'dispatchMobileNotification'
     >
   ) => void
 }
@@ -62,11 +65,29 @@ export function createOrcadAccountServices(args: {
     return null
   }
   const { store, clientCodexHomes } = args
+  let attachedRuntime: Pick<
+    OrcaRuntimeService,
+    'getPtyController' | 'dispatchMobileNotification'
+  > | null = null
   const services = createProviderAccountServices(store, {
-    setClaudeStatusLineListener: args.setClaudeStatusLineListener
+    setClaudeStatusLineListener: args.setClaudeStatusLineListener,
+    sessionMover: {
+      headless: true,
+      getController: () => attachedRuntime?.getPtyController() ?? null,
+      // Why the notification stream: no window is attached here; a paired client sees it when it next connects.
+      onNotice: (notice) =>
+        attachedRuntime?.dispatchMobileNotification({
+          type: 'notification',
+          source: 'plugin',
+          title: 'Claude session mover',
+          body: `${notice.kind}: session ${notice.ptyId} on ${notice.from.email}${notice.to ? ` → ${notice.to.email}` : ''} (${notice.detail})`
+        })
+    }
   })
   // Refresh usage on demand through list/subscribe rather than starting a background poller.
   args.registerCleanup(() => {
+    services.sessionMover?.stop()
+    attachedRuntime = null
     services.rateLimits.stop()
     args.setClaudeStatusLineListener(null)
   })
@@ -110,6 +131,7 @@ export function createOrcadAccountServices(args: {
     },
     listCodexSessionHomes: () => codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery(),
     attachToRuntime: (runtime) => {
+      attachedRuntime = runtime
       runtime.setAccountServices({
         claudeAccounts: services.claudeAccounts,
         codexAccounts: services.codexAccounts,

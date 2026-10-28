@@ -53,13 +53,15 @@ it('keeps startup services live when the updater has vetoed before-quit', async 
   const unsubscribeAgentAwakeStatusChanges = vi.fn()
   const dispose = vi.fn()
   const stop = vi.fn()
+  const stopClaudeSessionMover = vi.fn()
   const state = {
     isQuitting: false,
     desktopRelayService: { fenceAndCloseNow },
     runtimeRpc: { setMobileRelayPairingProvider },
     unsubscribeAgentAwakeStatusChanges,
     agentAwakeService: { dispose },
-    rateLimits: { stop }
+    rateLimits: { stop },
+    stopClaudeSessionMover
   }
   vi.doMock('electron', () => ({ app }))
   vi.doMock('./main-process-state', () => ({ mainProcessState: state }))
@@ -78,6 +80,7 @@ it('keeps startup services live when the updater has vetoed before-quit', async 
   expect(unsubscribeAgentAwakeStatusChanges).not.toHaveBeenCalled()
   expect(dispose).not.toHaveBeenCalled()
   expect(stop).not.toHaveBeenCalled()
+  expect(stopClaudeSessionMover).not.toHaveBeenCalled()
   expect(state.agentAwakeService).toEqual({ dispose })
   expect(state.unsubscribeAgentAwakeStatusChanges).toBe(unsubscribeAgentAwakeStatusChanges)
 
@@ -89,6 +92,8 @@ it('keeps startup services live when the updater has vetoed before-quit', async 
   expect(unsubscribeAgentAwakeStatusChanges).toHaveBeenCalledOnce()
   expect(dispose).toHaveBeenCalledOnce()
   expect(stop).toHaveBeenCalledOnce()
+  expect(stopClaudeSessionMover).toHaveBeenCalledOnce()
+  expect(state.stopClaudeSessionMover).toBeNull()
   for (const listener of process.listeners('exit')) {
     if (!exitListenersBefore.includes(listener)) {
       process.removeListener('exit', listener)

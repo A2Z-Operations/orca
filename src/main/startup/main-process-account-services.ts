@@ -58,6 +58,38 @@ export function initializeMainProcessAccountServices(): void {
     startIndexHeal: startCodexSessionIndexHealInBackground
   })
   const services = createProviderAccountServices(store, {
+    sessionMover: {
+      headless: false,
+      // Why lazy: the runtime is built after the account services; the mover reads it per move.
+      getController: () => state.runtime?.getPtyController() ?? null,
+      onNotice: (notice) => {
+        if (notice.kind === 'skipped' || !store.getSettings().notifications.enabled) {
+          return
+        }
+        const body =
+          notice.kind === 'moved'
+            ? translateMain(
+                'accounts.claude.sessionMover.movedBody',
+                '{{from}} is near its usage limit. The session continues on {{to}}.',
+                { from: notice.from.email, to: notice.to?.email ?? '' }
+              )
+            : notice.kind === 'ask'
+              ? translateMain(
+                  'accounts.claude.sessionMover.askBody',
+                  'A session on {{from}} is near its usage limit. Set "Move running sessions before a usage limit" to Move to move it automatically.',
+                  { from: notice.from.email }
+                )
+              : translateMain(
+                  'accounts.claude.sessionMover.failedBody',
+                  'A session on {{from}} could not be moved: {{detail}}',
+                  { from: notice.from.email, detail: notice.detail }
+                )
+        getRuntimeDesktopSurface().showNotification({
+          title: translateMain('accounts.claude.sessionMover.noticeTitle', 'Claude session mover'),
+          body
+        })
+      }
+    },
     codexAccountLifecycle: { onHostSystemDefaultSelected: state.codexSessionMigration.requestRun },
     setClaudeStatusLineListener: (listener) =>
       agentHookServer.setClaudeStatusLineListener(listener),
@@ -83,6 +115,7 @@ export function initializeMainProcessAccountServices(): void {
       })
     }
   })
+  state.stopClaudeSessionMover = services.sessionMover?.stop ?? null
   state.rateLimits = services.rateLimits
   state.codexRuntimeHome = services.codexRuntimeHome
   state.codexAccounts = services.codexAccounts
