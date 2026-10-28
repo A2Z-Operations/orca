@@ -41,6 +41,7 @@ export abstract class RateLimitServiceState {
   // Async Keychain/desktop DB probing belongs in fetch cycles, never synchronous construction.
   protected cursorAuthConfigured = false
   protected openCodeGoApiKeyConfigured = false
+  protected pollWithoutWindow = false
   protected pollInterval: number = DEFAULT_POLL_MS
   protected timer: ReturnType<typeof setInterval> | null = null
   protected deferredStartupRefreshTimer: ReturnType<typeof setTimeout> | null = null

@@ -11,6 +11,7 @@ import { ACCOUNT_METHODS } from '../runtime/rpc/methods/accounts'
 import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import { getClaudeAgentViewService } from '../claude/agent-view-service'
 import { createOrcadAccountServices } from './orcad-account-services'
+import { RateLimitService } from '../rate-limits/service'
 import { USAGE_CREDENTIALS_RUNTIME_CAPABILITY } from '../../shared/account-runtime-capabilities'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
 
@@ -108,6 +109,37 @@ async function call(runtime: OrcaRuntimeService, name: string, params: unknown):
 }
 
 describe('orcad account services', () => {
+  it('follows usage settings and cannot restart polling after cleanup', async () => {
+    const { store } = createRuntime()
+    store.updateSettings({ claudeSessionMover: 'off', claudeAutoSwitchEnabled: false })
+    const start = vi.spyOn(RateLimitService.prototype, 'start').mockImplementation(() => {})
+    const stop = vi.spyOn(RateLimitService.prototype, 'stop').mockImplementation(() => {})
+    try {
+      expect(create(store, false)).not.toBeNull()
+      expect(start).not.toHaveBeenCalled()
+      store.updateSettings({ claudeSessionMover: 'move' }, { notifyListeners: true })
+      expect(start).toHaveBeenCalledExactlyOnceWith({
+        fetchImmediately: true,
+        pollWithoutWindow: true
+      })
+      store.updateSettings({ claudeSessionMover: 'off' }, { notifyListeners: true })
+      expect(stop).toHaveBeenCalledTimes(1)
+      store.updateSettings({ claudeAutoSwitchEnabled: true }, { notifyListeners: true })
+      expect(start).toHaveBeenCalledTimes(2)
+      const cleanup = cleanups.pop()
+      expect(cleanup).toBeDefined()
+      await cleanup?.({ failed: false })
+      expect(stop).toHaveBeenCalledTimes(2)
+      store.updateSettings({ claudeAutoSwitchEnabled: false }, { notifyListeners: true })
+      store.updateSettings({ claudeSessionMover: 'move' }, { notifyListeners: true })
+      expect(start).toHaveBeenCalledTimes(2)
+      expect(stop).toHaveBeenCalledTimes(2)
+    } finally {
+      start.mockRestore()
+      stop.mockRestore()
+    }
+  })
+
   it('serves accounts.* from this host', async () => {
     const { runtime, store } = createRuntime()
     expect(install(runtime, store, false)).not.toBeNull()

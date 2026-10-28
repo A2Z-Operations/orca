@@ -115,7 +115,8 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
     this.detachWindowListeners = detachWindowListeners
   }
 
-  start(options: { fetchImmediately?: boolean } = {}): void {
+  start(options: { fetchImmediately?: boolean; pollWithoutWindow?: boolean } = {}): void {
+    this.pollWithoutWindow = options.pollWithoutWindow === true
     if (options.fetchImmediately !== false) {
       void this.fetchAll()
     } else {
@@ -125,6 +126,7 @@ export abstract class RateLimitServiceConfiguration extends RateLimitServiceAcco
   }
 
   stop(): void {
+    this.pollWithoutWindow = false
     this.abortActiveFetchCycle()
     this.clearQueuedFetches()
     this.inactiveClaudeFetching.clear()
