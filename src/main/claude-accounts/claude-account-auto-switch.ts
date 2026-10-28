@@ -206,3 +206,6 @@ function runtimeOf(account: ClaudeManagedAccountSummary): RateLimitRuntimeTarget
     wslDistro: account.wslDistro
   })
 }
+
+// Why exported: the session mover attributes the selected account's reading and ranks candidates the same way.
+export { isReadingOf as isClaudeUsageReadingOf, sharesRuntime as claudeAccountsShareRuntime }

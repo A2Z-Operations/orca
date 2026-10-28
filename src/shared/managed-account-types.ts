@@ -1,3 +1,5 @@
+import type { ClaudeSessionMoverSetting } from './claude-account-switch-settings'
+
 export type ManagedDataAccountProvider = 'opencode' | 'devin'
 
 export type ManagedDataAccountSummary = {
@@ -128,6 +130,23 @@ export type ClaudeRateLimitAccountsState = {
   systemDefaultMayBeCopied?: boolean
   /** Whether this host switches accounts before a usage limit; absent from older hosts. */
   autoSwitchEnabled?: boolean
+  /** What this host does with running sessions near a usage limit; absent from older hosts. */
+  sessionMover?: ClaudeSessionMoverSetting
+  /** The mover's last decision per live session, newest first. */
+  sessionMoves?: ClaudeSessionMoveSummary[]
+}
+
+/** The session mover's last decision for a live Claude session (`orca account list --json`). */
+export type ClaudeSessionMoveSummary = {
+  ptyId: string
+  paneKey: string | null
+  fromAccountId: string
+  toAccountId: string | null
+  window: 'session' | 'weekly' | 'fableWeekly' | null
+  percent: number | null
+  line: number | null
+  reason: string
+  at: number
 }
 
 /** Orca moved Claude to another account before a usage limit, so running sessions can follow. */

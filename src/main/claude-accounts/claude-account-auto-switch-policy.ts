@@ -96,3 +96,8 @@ export function pickClaudeAutoSwitchTarget(
   }
   return best.headroom >= MIN_HEADROOM_GAINED ? best.accountId : null
 }
+
+export type ClaudeAutoSwitchWindowName = WindowName
+export type ClaudeAutoSwitchWindow = LiveWindow
+// Why exported: the session mover decides per session with the same windows, lines and limit test.
+export { liveWindows as claudeAutoSwitchWindows, isAtLimit as isClaudeAtLimit }
