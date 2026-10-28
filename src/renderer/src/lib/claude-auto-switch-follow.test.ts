@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeAccountSwitchRunningSessions } from '../../../shared/claude-account-switch-settings'
 import type * as AccountMove from './claude-session-account-move'
+import { findClaudeSwitchSessions } from './claude-session-account-move'
 import {
   getClaudeAccountSwitchPrompt,
   resetClaudeAccountSwitchSessionsForTests
@@ -27,9 +28,11 @@ vi.mock('@/store', () => ({ useAppStore: { getState: () => store } }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
 vi.mock('./claude-session-account-move', async (importOriginal) => ({
   ...(await importOriginal<typeof AccountMove>()),
-  findMovableClaudeSessions: vi.fn(async () => [
-    { ptyId: 'pty-1', worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-1' }
-  ]),
+  findClaudeSwitchSessions: vi.fn(async () => ({
+    onAccount: [{ ptyId: 'pty-1', worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-1' }],
+    elsewhere: [],
+    cantMove: []
+  })),
   findQueuedClaudeRestartsOnAccount: vi.fn(() => [])
 }))
 
@@ -46,6 +49,9 @@ const row = (id: string) => ({
 const ROSTER = { accounts: [row('account-a'), row('account-b')] }
 const SWITCHED = {
   accounts: ROSTER.accounts,
+  systemDefaultHome: '/home/user/.claude',
+  systemDefaultEmail: 'personal@example.com',
+  systemDefaultOrganizationUuid: 'personal-org',
   fromAccountId: 'account-a',
   toAccountId: 'account-b',
   target: { runtime: 'host' as const, wslDistro: null }
@@ -68,12 +74,22 @@ describe('followClaudeAutoSwitch', () => {
     await followClaudeAutoSwitch(SWITCHED)
 
     expect(store.queuePaneAccountRestarts).toHaveBeenCalledWith(['pty-1'], 'claude')
+    expect(findClaudeSwitchSessions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: {
+          accounts: SWITCHED.accounts,
+          systemDefaultHome: SWITCHED.systemDefaultHome,
+          systemDefaultEmail: SWITCHED.systemDefaultEmail,
+          systemDefaultOrganizationUuid: SWITCHED.systemDefaultOrganizationUuid
+        }
+      })
+    )
   })
 
   it('asks about them by default, as a switch by hand does', async () => {
     await followClaudeAutoSwitch(SWITCHED)
 
-    expect(getClaudeAccountSwitchPrompt()?.sessions).toHaveLength(1)
+    expect(getClaudeAccountSwitchPrompt()?.sessions.onAccount).toHaveLength(1)
     expect(store.queuePaneAccountRestarts).not.toHaveBeenCalled()
   })
 })
