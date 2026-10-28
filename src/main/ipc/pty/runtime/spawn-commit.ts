@@ -75,6 +75,7 @@ function runtimeSpawnPaneBinding(
       origin: spawnCommitBindingOrigin(ctx.result, expectedSourceBinding)
     },
     absentOwner: ctx.args.paneSpawnOperation?.absentOwner,
+    replacementAccountId: ctx.isClaudeLaunch ? ctx.args.claudeAccountId : undefined,
     refusal: ctx.replacedPaneOwner
       ? 'terminal_pane_owner_changed'
       : 'terminal_split_source_not_found',

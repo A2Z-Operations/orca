@@ -23,6 +23,7 @@ export type PtySpawnPaneBinding = {
   /** What a refused bind throws; each lane's callers match on their own message. */
   refusal: 'terminal_pane_owner_changed' | 'terminal_split_source_not_found'
   failureLog: string
+  replacementAccountId?: string
 }
 
 /** Saves the binding, or a swap over the replaced owner; a failed save discards the new process. */
@@ -33,7 +34,7 @@ export async function savePtySpawnPaneBinding(
     replacedPaneOwner?: ReplacedPaneOwner | null
     deps: { runtime?: OrcaRuntimeService }
   },
-  { store, binding, absentOwner, refusal, failureLog }: PtySpawnPaneBinding,
+  { store, binding, absentOwner, refusal, failureLog, replacementAccountId }: PtySpawnPaneBinding,
   connectionId: string | null | undefined
 ): Promise<void> {
   const replaced = state.replacedPaneOwner
@@ -47,6 +48,14 @@ export async function savePtySpawnPaneBinding(
     if (replaced) {
       // The swap holds the live binding now: a later failure must not retire it under the same id.
       state.replacedPaneOwner = null
+      if (replacementAccountId !== undefined) {
+        const paneKey = replaced.pane
+          ? makePaneKey(replaced.pane.tabId, replaced.pane.leafId)
+          : 'none'
+        console.info(
+          `[claude-session-mover] replaced pty ${replaced.ptyId} with ${state.result.id} on account ${replacementAccountId} (pane ${paneKey})`
+        )
+      }
     }
   } catch (err) {
     console.error(failureLog, err)
