@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Store } from '../../../persistence'
-import { TEST_LEAF_1 } from '../../../persistence-session-fixtures'
+import { TEST_LEAF_1 } from '../../../persistence/persistence-session-fixtures'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import {
   makePaneSpawnReservationKey,
@@ -8,7 +8,7 @@ import {
   rejectPaneSpawnReservation
 } from '../pane/spawn-reservation'
 import { ptyPaneKey } from '../pane/key-state'
-import type { ReplacedPaneOwner } from '../pane/pane-owner-replacement'
+import type { ReplacedPaneOwner } from '../pane/replaced-pane-owner'
 import {
   beginRuntimePaneReplacement,
   isRuntimePaneBindRefusal,

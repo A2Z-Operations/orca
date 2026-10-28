@@ -3,6 +3,7 @@ import { codexStructuredLaunchPart } from '../codex/codex-structured-launch-reso
 import { claudeStructuredLaunchPart } from '../claude/claude-structured-launch-resolution'
 import { createClaudeCommandCatalogProbe } from '../claude/claude-command-catalog-probe'
 import { CodexStructuredSessionAdapter } from '../codex/codex-structured-session-adapter'
+import { createCodexAtRestSkillCatalog } from '../codex/codex-at-rest-skills-probe'
 import { CODEX_STRUCTURED_AGENT } from '../codex/codex-structured-agent-definition'
 import { CLAUDE_STRUCTURED_AGENT } from '../claude/claude-structured-agent-definition'
 import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
@@ -48,6 +49,16 @@ function createCodexAdapter(context: StructuredAgentAdapterContext): StructuredA
   const { deps, followUps, host } = context
   return new CodexStructuredSessionAdapter({
     resolveAccountKind: deps.resolveCodexAccountKind,
+    atRestCommands: createCodexAtRestSkillCatalog({
+      resolveLaunchArgs: () => deps.resolveLaunchArgs('codex'),
+      resolveWorkspacePath: deps.resolveWorkspacePath,
+      resolveEnvironment: () => context.environment.resolveAgentEnvironment('codex'),
+      refreshEnvironmentAfterMiss: context.environment.refreshAfterMissingProgram,
+      ...(deps.prepareCodexCatalogProbeHome
+        ? { prepareHome: deps.prepareCodexCatalogProbeHome }
+        : {}),
+      ...(deps.resolveCodexCommand ? { resolveCommand: deps.resolveCodexCommand } : {})
+    }),
     resolveLaunch: withSupportedCodexCli(
       composeStructuredLaunch(
         CODEX_STRUCTURED_AGENT,
@@ -62,6 +73,14 @@ function createCodexAdapter(context: StructuredAgentAdapterContext): StructuredA
     ...(deps.openCodexConnection ? { openConnection: deps.openCodexConnection } : {}),
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
     modelCatalog: agentModelCatalogStore,
+    readModelCatalog: (sessionId, verifiedOnly) =>
+      host()?.deps.modelCatalog?.peek(sessionId, verifiedOnly) ?? null,
+    demandModelCatalog: async (sessionId, legacy) =>
+      host()?.deps.modelCatalog?.read({
+        agent: 'codex',
+        sessionId,
+        ...(legacy ? { legacy: true } : {})
+      }),
     onChildWorkEvidence: (sessionId, evidence, producer) =>
       host()?.publishChildWorkEvidence(sessionId, evidence, producer),
     onDispatchSettledLate: followUps.onDispatchSettledLate,
@@ -71,7 +90,7 @@ function createCodexAdapter(context: StructuredAgentAdapterContext): StructuredA
     logger: deps.logger,
     onEvent: (event) => {
       // Every exit, expected or not: the host ends that child's record.
-      if (event.type === 'ended' && 'cause' in event) {
+      if (event.type === 'options-reported' || (event.type === 'ended' && 'cause' in event)) {
         context.deliverLifecycle(event)
       }
     }
@@ -83,9 +102,11 @@ function createClaudeAdapter(
 ): StructuredAgentRuntimeAdapter {
   const { deps, store, followUps, host } = context
   const overlay = claudeLaunchEnvOverlay(deps).resolveEnv
+  const resolveAccountHome = deps.resolveAgentAccountHome
   return createStructuredClaudeRuntimeAdapter({
     store,
     resolveWorkspacePath: deps.resolveWorkspacePath,
+    ...(resolveAccountHome ? { resolveAccountHome: () => resolveAccountHome('claude') } : {}),
     resolveLaunch: composeStructuredLaunch(
       CLAUDE_STRUCTURED_AGENT,
       structuredAgentLaunchSources(context),
@@ -107,7 +128,6 @@ function createClaudeAdapter(
     onChildWorkEvidence: (sessionId, evidence, producer) =>
       host()?.publishChildWorkEvidence(sessionId, evidence, producer),
     onDispatchSettledLate: followUps.onDispatchSettledLate,
-    onSessionIdle: followUps.releaseUnansweredDispatches,
     ...(deps.openClaudeConnection ? { openClaudeConnection: deps.openClaudeConnection } : {}),
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {})
   })
@@ -129,7 +149,6 @@ function createAcpAdapter(
     })
     return new AcpStructuredSessionAdapter({
       spec,
-      readJournal,
       resolveLaunch: composeStructuredLaunch(definition, sources, part),
       readLaunch: composeStructuredLaunchRead(definition, sources, part),
       dataDirectory: deps.stateDirectory,

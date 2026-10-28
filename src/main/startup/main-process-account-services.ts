@@ -61,10 +61,10 @@ export function initializeMainProcessAccountServices(): void {
     codexAccountLifecycle: { onHostSystemDefaultSelected: state.codexSessionMigration.requestRun },
     setClaudeStatusLineListener: (listener) =>
       agentHookServer.setClaudeStatusLineListener(listener),
-    onClaudeAutoSwitched: ({ accounts, from, to, target }) => {
+    onClaudeAutoSwitched: ({ from, to, target, ...accountSnapshot }) => {
       // Why: running sessions follow the running-session setting, as after a switch by hand.
       const switched: ClaudeAutoSwitchedEvent = {
-        accounts,
+        ...accountSnapshot,
         fromAccountId: from.id,
         toAccountId: to.id,
         target
@@ -89,8 +89,7 @@ export function initializeMainProcessAccountServices(): void {
   state.claudeRuntimeAuth = services.claudeRuntimeAuth
   state.claudeAccounts = services.claudeAccounts
   void startCodexStateDbBackfillRecoveryInBackground(getOrcaManagedCodexHomePath())
-  // Why: migrate historical shared-home sessions after startup; compatibility
-  // launches re-arm the non-destructive pass for new rollouts (#4444, #8612, #12480).
+  // Defer shared-home migration; compatibility launches re-arm non-destructive scans for new rollouts (#4444, #8612, #12480).
   state.codexSessionMigration.scheduleInitialRun()
   const expireModelCatalogs = createAgentModelCatalogSettingsExpiry(
     agentModelCatalogStore,

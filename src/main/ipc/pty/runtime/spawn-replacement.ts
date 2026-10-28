@@ -3,12 +3,8 @@ import type { PersistPtyBindingArgs } from '../../../persistence/loading-store/p
 import type { PtyRuntimeControllerDeps } from './controller-deps'
 import type { RuntimePtySpawnArgs } from './spawn-state'
 import { stopReplacedPanePty } from '../ipc/renderer-kill'
-import {
-  excludeReplacedPaneOwner,
-  stopReplacedPaneOwner,
-  swapReplacedPaneBinding,
-  type ReplacedPaneOwner
-} from '../pane/pane-owner-replacement'
+import { stopReplacedPaneOwner, swapReplacedPaneBinding } from '../pane/pane-owner-replacement'
+import { excludeReplacedPaneOwner, type ReplacedPaneOwner } from '../pane/replaced-pane-owner'
 import { resolveStablePaneOwner, type StablePaneOwner } from '../pane/stable-owner'
 import { ptyPaneKey } from '../pane/key-state'
 import {
@@ -46,6 +42,7 @@ export async function beginRuntimePaneReplacement(
     paneKey: string | null
     worktreeId: string | undefined
     connectionId: string | null | undefined
+    reservation?: PaneSpawnReservation
   },
   stopReplacedPty: (id: string) => Promise<void> = (id) => stopReplacedPanePty(deps, id)
 ): Promise<RuntimePaneReplacement> {
@@ -57,7 +54,7 @@ export async function beginRuntimePaneReplacement(
   if (!reservationKey) {
     throw new Error('terminal_pane_owner_unknown')
   }
-  const reservation = await reserveIdlePaneSpawn(reservationKey)
+  const reservation = args.reservation ?? (await reserveIdlePaneSpawn(reservationKey))
   try {
     // Why: upstream's stop proves the id only against a bound owner and stops an unproven id when the
     // pane is unbound; a move must never stop a stranger's PTY, so an unbound pane needs the id's

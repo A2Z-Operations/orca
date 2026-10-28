@@ -6,7 +6,7 @@ import {
   claudeAccountWslUnsupported,
   claudeProfileMissing
 } from './claude-profile-launch-errors'
-import { isDirectory } from './claude-profile-installed-router'
+import { isDirectory } from './claude-profile-homes'
 import { readUserClaudeConfigDirAsSet } from './claude-profile-paths'
 import type { ClaudeEnvPatch } from './environment'
 import type { ClaudeRuntimeAuthPreparation } from './runtime-auth/runtime-auth-types'

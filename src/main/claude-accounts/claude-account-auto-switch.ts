@@ -1,5 +1,8 @@
 import type { GlobalSettings } from '../../shared/global-settings-types'
-import type { ClaudeManagedAccountSummary } from '../../shared/managed-account-types'
+import type {
+  ClaudeAutoSwitchedEvent,
+  ClaudeManagedAccountSummary
+} from '../../shared/managed-account-types'
 import type {
   ProviderRateLimits,
   RateLimitRuntimeTarget,
@@ -36,7 +39,10 @@ export type ClaudeAutoSwitched = {
   from: ClaudeManagedAccountSummary
   to: ClaudeManagedAccountSummary
   target: RateLimitRuntimeTarget
-}
+} & Pick<
+  ClaudeAutoSwitchedEvent,
+  'systemDefaultHome' | 'systemDefaultEmail' | 'systemDefaultOrganizationUuid'
+>
 
 type ClaudeAutoSwitchDecision =
   | { kind: 'stay' }
@@ -122,8 +128,13 @@ export function createClaudeAccountAutoSwitch(
         if (switched) {
           // Why the account's own runtime: with the default WSL distro the usage target names no
           // distro, but the panes on those accounts sit in the account's distro's lane.
+          const { accounts, systemDefaultHome, systemDefaultEmail, systemDefaultOrganizationUuid } =
+            deps.accounts.listAccounts()
           deps.onSwitched({
-            accounts: deps.accounts.listAccounts().accounts,
+            accounts,
+            systemDefaultHome,
+            systemDefaultEmail,
+            systemDefaultOrganizationUuid,
             from,
             to,
             target: runtimeOf(to)

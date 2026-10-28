@@ -10,7 +10,7 @@ import { clearNativeWindowsConptyPty } from '../../../runtime/terminal-model-que
 import {
   clearHiddenRendererPtyDeliveryState,
   isHiddenRendererPty
-} from '../../pty-hidden-delivery-gate'
+} from '../delivery/pty-hidden-delivery-gate'
 import { agentSessionOwners } from '../pane/agent-session-owners'
 import { paneKeyPtyId, paneKeyTeardownListeners, ptyPaneKey } from '../pane/key-state'
 import { getPtyIdsForConnection, ptyIncarnationById, ptyOwnership } from './ownership-state'
@@ -27,28 +27,18 @@ import {
   visibleRendererPtys
 } from '../delivery/visibility-state'
 
-/**
- * Tear down per-PTY provider-scoped state.
- *
- * Claimed agent owners remain fenced because the relay process may survive and
- * prove the exact same generation after reconnect.
- */
+/** Clear provider-scoped state while preserving requested claim fences across reconnect. */
 export function clearProviderPtyState(
   id: string,
   opts: { preserveAgentSessionOwners?: boolean } = {}
 ): void {
   if (!opts.preserveAgentSessionOwners) {
     agentSessionOwners.release(id)
-    // Why: only a real teardown may drop a pane's launch-account record — a
-    // disconnect that can reconnect is not a death, and a reused id must never
-    // inherit a dead pane's account. (Codex's record outlives the app; Claude's
-    // is in memory and re-learned from the transcript after a restart.)
+    // Persisted launch-account identity survives reconnectable disconnects, but real teardown must prevent reuse.
     forgetCodexPaneAccount(id)
     forgetClaudePaneAccount(id)
   }
-  // Why: OpenCode and Pi both allocate PTY-scoped runtime state outside the
-  // node-pty process table. Centralizing provider cleanup avoids drift where a
-  // new teardown path forgets to remove one provider's overlay/hook state.
+  // Release agent overlay/hook state even on teardown paths outside the local process table.
   openCodeHookService.clearPty(id)
   piTitlebarExtensionService.clearPty(id)
   ptySizes.delete(id)
@@ -58,7 +48,7 @@ export function clearProviderPtyState(
   const activeChanged = activeRendererPtys.delete(id)
   visibleRendererPtys.delete(id)
   rendererVisibilityKnownPtys.delete(id)
-  // Why: every teardown path funnels through here — hidden/interest gate bits must not outlive the PTY or a reused map entry could silently gate a new one.
+  // Hidden/interest state must not gate a later PTY reusing this ID.
   const deliveryPolicyChanged = isHiddenRendererPty(id)
   clearHiddenRendererPtyDeliveryState(id)
   if (activeChanged) {
@@ -69,18 +59,18 @@ export function clearProviderPtyState(
   }
   clearBackgroundedDeliverySyncForPty(id)
   providerSnapshotRequiredPtys.delete(id)
-  // Why: the Phase-5 ConPTY DA1 spawn record must not leak onto a reused id.
+  // Reused IDs must not inherit ConPTY startup-query state.
   clearNativeWindowsConptyPty(id)
   const paneKey = ptyPaneKey.get(id)
   const stillOwnsPaneKey = paneKey ? paneKeyPtyId.get(paneKey) === id : false
-  // Why: drop the memory-collector registration so a dead PTY doesn't resolve its dead pid on every snapshot; no-op for never-registered (SSH-owned) PTYs.
+  // Stop memory snapshots from resolving dead PIDs; SSH PTYs may never have registered.
   unregisterPty(id)
-  // Why: cover paths that bypass runtime.onPtyExit (SSH reattach/shutdown, daemon spawn-failure) — else the watcher's per-PTY buffer and worktree binding outlive the PTY.
+  // SSH reattach/shutdown and spawn failure can bypass runtime exit cleanup; unbind their URL watcher too.
   advertisedUrlWatcher.unbindPty(id)
   clearMigrationUnsupportedPty(id)
   agentHookServer.clearPaneKeyAliasesForPty(id, {
     shouldClearStablePaneKey: (stablePaneKey) => {
-      // Why: when this PTY never rebuilt ptyPaneKey after restart, alias ownership is our only proof — don't erase a newer PTY that now owns the same stable paneKey.
+      // Without rebuilt spawn mapping, alias ownership must protect a newer PTY on the same stable pane.
       const stablePaneOwner = paneKeyPtyId.get(stablePaneKey)
       if (stablePaneOwner && stablePaneOwner !== id) {
         return false
@@ -88,11 +78,10 @@ export function clearProviderPtyState(
       return !paneKey || (stillOwnsPaneKey && stablePaneKey === paneKey)
     }
   })
-  // Why: clear the hook server's per-paneKey caches (via the spawn-time paneKey mapping, its only ptyId→paneKey correlation) so dead panes don't accumulate over process lifetime.
+  // Spawn-time mapping is the hook server's only PTY-to-pane correlation; release its caches.
   if (paneKey) {
     if (stillOwnsPaneKey) {
-      // Why: a proven exit describes this PTY's agent, so only a real teardown (not a
-      // disconnect that can reconnect) may drop it.
+      // Preserve proven agent-exit evidence across reconnectable disconnects.
       if (opts.preserveAgentSessionOwners) {
         agentHookServer.clearPaneState(paneKey)
       } else {
@@ -102,7 +91,7 @@ export function clearProviderPtyState(
     }
     ptyPaneKey.delete(id)
     if (stillOwnsPaneKey) {
-      // Why: notify AFTER dropping the paneKey↔ptyId entries so a listener re-reading the map sees post-teardown state; wrap each so one throw can't block the rest.
+      // Notify after removing mappings; isolate listener failures so all consumers can clean up.
       for (const listener of paneKeyTeardownListeners) {
         try {
           listener(paneKey)
@@ -116,8 +105,7 @@ export function clearProviderPtyState(
 
 export function clearPtyOwnershipForConnection(connectionId: string): void {
   for (const ptyId of getPtyIdsForConnection(connectionId)) {
-    // Why: pane-scoped caches cannot route while disconnected, but claimed
-    // ownership must survive until reconnect makes absence authoritative.
+    // Disconnect clears unroutable pane caches while claim fences survive until authoritative reconnect.
     clearProviderPtyState(ptyId, { preserveAgentSessionOwners: true })
     ptyOwnership.delete(ptyId)
   }

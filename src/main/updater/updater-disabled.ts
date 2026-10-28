@@ -35,7 +35,7 @@ export function updaterDisabledReason(): string | null {
   if (cached === undefined) {
     cached = resolveUpdaterDisabledReason({
       env: process.env,
-      isPackaged: app.isPackaged,
+      isPackaged: app?.isPackaged === true,
       resourcesPath: process.resourcesPath,
       exists: existsSync
     })

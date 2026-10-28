@@ -28,6 +28,7 @@ import type {
   FolderWorkspacePathStatusRequest
 } from '../../../../shared/folder-workspace-path-status'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ConfirmedUnsavedDiscards } from '../slices/worktrees/teardown/removed-workspace-unsaved-files'
 
 export const ERROR_TOAST_DURATION = 60_000
 
@@ -109,10 +110,16 @@ export type DeleteProjectGroupWithContainedProjectsOptions = {
   removeContainedProjects: boolean
   // hostId disambiguates which host's group row to delete when the id exists on multiple hosts.
   hostId?: ExecutionHostId
+  /** The text a dialog listed when the user confirmed discarding it; other edits are offered back. */
+  confirmedDiscards?: ConfirmedUnsavedDiscards
 }
 
 export type AllHostCatalogFetchOptions = {
   remoteHosts?: 'include' | 'skip'
+}
+
+export type AllHostRepoCatalogFetchOptions = AllHostCatalogFetchOptions & {
+  onHostLoaded?: (hostId: ExecutionHostId) => Promise<void>
 }
 
 export type ProjectRemovalFailure = {
@@ -168,7 +175,7 @@ export type RepoSlice = {
   pendingSshRepoReadoptions: readonly SshRepoReadoption[]
   recordSshRepoReadoptions: (readoptions: readonly SshRepoReadoption[]) => void
   fetchRepos: (options: RuntimeCatalogFetchOptions) => Promise<void>
-  fetchReposForAllHosts: (options?: AllHostCatalogFetchOptions) => Promise<void>
+  fetchReposForAllHosts: (options?: AllHostRepoCatalogFetchOptions) => Promise<void>
   awaitLocalRepoCatalogSettlement: () => Promise<void>
   fetchRuntimeEnvironmentRepos: (environmentId: string) => Promise<Repo[]>
   fetchProjectGroups: (options: RuntimeCatalogFetchOptions) => Promise<void>
@@ -272,6 +279,9 @@ export type RepoSlice = {
       hostId: ExecutionHostId
       errorFeedback?: 'toast' | 'silent'
       automaticCleanup?: boolean
+      confirmedDiscards?: ConfirmedUnsavedDiscards
+      /** Paired servers only: skip the unreachable server now and replay its repo.rm on reconnect. */
+      localOnly?: boolean
     }
   ) => Promise<void>
   updateProject: (

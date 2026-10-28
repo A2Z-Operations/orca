@@ -26,6 +26,7 @@ export function resolveRuntimeHostSessionBinding(
     typeof args.worktreeId !== 'string' ||
     typeof args.tabId !== 'string' ||
     !isValidTerminalTabId(args.tabId) ||
+    args.tabId.length > 512 ||
     typeof args.leafId !== 'string' ||
     !isTerminalLeafId(args.leafId)
   ) {

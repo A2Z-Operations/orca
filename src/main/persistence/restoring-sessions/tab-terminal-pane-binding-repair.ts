@@ -8,16 +8,12 @@ import {
   readCanonicalPtyOwners,
   resolveCanonicalPtyClaim
 } from '../../../shared/workspace-layout/legacy-terminal-row-claims'
+import {
+  liveAtShutdown,
+  sweepUnattachedTerminalRows
+} from '../../../shared/workspace-layout/unattached-terminal-row-sweep'
 
-/** The reconnect plan's rule (workspace-terminal-reconnect-plan.ts): the shutdown list, else any row with a terminal. */
-function liveAtShutdown(session: WorkspaceSessionState): (key: string) => boolean {
-  const listed = session.activeWorktreeIdsOnShutdown
-  return listed
-    ? (key) => listed.includes(key)
-    : (key) => (session.tabsByWorktree[key] ?? []).some((row) => row.ptyId)
-}
-
-/** Terminals a pane in the layout's tree binds; a binding a removed pane left behind holds nothing. */
+/** Removed leaves cannot claim terminal ownership. */
 function mountedPtyIds(layout: TerminalLayoutSnapshot): string[] {
   const bindings = layout.ptyIdsByLeafId ?? {}
   const leafIds = layout.root ? collectLayoutLeafIdsInOrder(layout.root) : Object.keys(bindings)
@@ -29,12 +25,7 @@ function soleUnboundLeafId(layout: TerminalLayoutSnapshot | undefined): string |
   return leafId && !layout?.ptyIdsByLeafId?.[leafId] ? leafId : undefined
 }
 
-/**
- * Binds each one-pane tab whose layout binds no terminal to the one named on the tab (an older
- * session, or an unvisited SSH tab's relay session), as the window's reconnect rebinds it: only
- * in a workspace live at shutdown, and never to a terminal another pane or a tab-bar tab holds.
- * An SSH workspace's tab takes only its relay session id; its row's id is a wake hint there.
- */
+/** Recover unbound single-pane tabs only in live-at-shutdown workspaces; SSH rows require relay session IDs. */
 export function bindTabTerminalPanesInSession(
   session: WorkspaceSessionState,
   isSshWorkspace: (key: string) => boolean
@@ -50,7 +41,6 @@ export function bindTabTerminalPanesInSession(
     for (const row of rows) {
       const layout = (layouts ?? session.terminalLayoutsByTabId)?.[row.id]
       const leafId = soleUnboundLeafId(layout)
-      // Reconnect takes the relay session id over the row's.
       const relayId = session.remoteSessionIdsByTabId?.[row.id]
       const named = [relayId, isSshWorkspace(key) ? undefined : row.ptyId].filter(
         (ptyId): ptyId is string => typeof ptyId === 'string' && ptyId !== '' && !bound.has(ptyId)
@@ -74,15 +64,16 @@ export function bindTabTerminalPanesInSession(
   return layouts ? { ...session, terminalLayoutsByTabId: layouts } : session
 }
 
-/**
- * Load-only repair for layout-owner builds: main's layout holds these terminals from the start, so
- * its frames and saves keep them before the pane mounts. A paired server's partition is the
- * server's and passes through.
- */
-export function bindPersistedTabTerminalPanes(state: PersistedState): PersistedState {
+type SessionRepair = (
+  session: WorkspaceSessionState,
+  isSshWorkspace: (key: string) => boolean
+) => WorkspaceSessionState
+
+/** Repair desktop-restored partitions; paired servers own their layout repairs. */
+function repairRestoredSessions(state: PersistedState, repair: SessionRepair): PersistedState {
   const sshRepoIds = new Set(state.repos.filter((repo) => repo.connectionId).map((repo) => repo.id))
   const sshRepoWorkspace = (key: string): boolean => sshRepoIds.has(getRepoIdFromWorktreeId(key))
-  const workspaceSession = bindTabTerminalPanesInSession(state.workspaceSession, sshRepoWorkspace)
+  const workspaceSession = repair(state.workspaceSession, sshRepoWorkspace)
   let hostSessionsChanged = false
   const workspaceSessionsByHostId = state.workspaceSessionsByHostId
     ? Object.fromEntries(
@@ -90,10 +81,7 @@ export function bindPersistedTabTerminalPanes(state: PersistedState): PersistedS
           const kind = parseExecutionHostId(hostId)?.kind
           const repaired =
             session && kind !== 'runtime'
-              ? bindTabTerminalPanesInSession(
-                  session,
-                  kind === 'ssh' ? () => true : sshRepoWorkspace
-                )
+              ? repair(session, kind === 'ssh' ? () => true : sshRepoWorkspace)
               : session
           hostSessionsChanged ||= repaired !== session
           return [hostId, repaired]
@@ -108,4 +96,23 @@ export function bindPersistedTabTerminalPanes(state: PersistedState): PersistedS
     workspaceSession,
     ...(hostSessionsChanged ? { workspaceSessionsByHostId } : {})
   }
+}
+
+/** Load-time binding lets main retain terminals before panes mount. */
+export function bindPersistedTabTerminalPanes(state: PersistedState): PersistedState {
+  return repairRestoredSessions(state, bindTabTerminalPanesInSession)
+}
+
+/** Sweep before main draws empty tabs the renderer's startup would discard. */
+export function sweepPersistedUnattachedTerminalRows(state: PersistedState): PersistedState {
+  // Any partition can keep a workspace live in the renderer's merged reconnect plan.
+  const listedAnywhere = new Set(
+    [state.workspaceSession, ...Object.values(state.workspaceSessionsByHostId ?? {})].flatMap(
+      (session) => session?.activeWorktreeIdsOnShutdown ?? []
+    )
+  )
+  return repairRestoredSessions(state, (session) => {
+    const ownLive = liveAtShutdown(session)
+    return sweepUnattachedTerminalRows(session, (key) => ownLive(key) || listedAnywhere.has(key))
+  })
 }

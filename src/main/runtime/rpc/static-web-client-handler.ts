@@ -25,7 +25,14 @@ export const answerWithoutWebClient: RequestListener = (_request, response) => {
 
 export function createStaticWebClientHandler(staticRoot: string): RequestListener {
   const resolvedRoot = resolve(staticRoot)
-  const files = readBundledWebClientFiles(resolvedRoot)
+  let files: ReadonlySet<string> | undefined
+  try {
+    files = readBundledWebClientFiles(resolvedRoot)
+  } catch (error) {
+    // Damaged web installs must not disable the runtime server.
+    console.warn(`[ws-transport] browser client disabled: ${String(error)}`)
+    return answerWithoutWebClient
+  }
   if (basename(resolvedRoot) === 'renderer' && !files) {
     return answerWithoutWebClient
   }
@@ -152,8 +159,7 @@ function mapProxyPrefixedStaticPathname(pathname: string): string {
     -1
   )
   if (prefixIndex !== -1) {
-    // Why: reverse proxies may forward the external path prefix through to
-    // Orca. Only the bundled /assets subtree is served after the prefix.
+    // Proxies may forward an external prefix; serve only the bundled assets subtree after it.
     return pathname.slice(prefixIndex)
   }
   return pathname

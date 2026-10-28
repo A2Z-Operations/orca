@@ -1,3 +1,4 @@
+import { getClaudeAgentViewService } from '../claude/agent-view-service'
 // Runs a host Claude account folder's setup in the worker: one at a time per account, and the
 // capped wait a launch puts on it. The router decides which folder; this decides how it is set up.
 import { existsSync } from 'node:fs'
@@ -85,6 +86,9 @@ export class ClaudeProfileSetupQueue {
       hooks,
       claudeVersion: claudeVersion ?? undefined
     })
+    if (report.outcome === 'prepared') {
+      await getClaudeAgentViewService(this.args.dataRoot).prepareProfile(profile.home)
+    }
     if (report.outcome === 'refused' || report.warnings.length > 0) {
       console.warn('[claude-profile] Account setup was incomplete:', report)
     }

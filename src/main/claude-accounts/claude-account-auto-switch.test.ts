@@ -7,6 +7,11 @@ import { createClaudeAccountAutoSwitch } from './claude-account-auto-switch'
 import { CLAUDE_AUTO_SWITCH_COOLDOWN_MS } from './claude-account-auto-switch-policy'
 
 const HOST = { runtime: 'host' as const, wslDistro: null }
+const SYSTEM_DEFAULT = {
+  systemDefaultHome: '/home/user/.claude',
+  systemDefaultEmail: 'personal@example.com',
+  systemDefaultOrganizationUuid: 'personal-org'
+}
 
 function account(
   id: string,
@@ -85,7 +90,11 @@ function setup(accounts = [account('a'), account('b'), account('c')]) {
     getSettings: () => settings,
     rateLimits: { fetchInactiveClaudeAccountsOnOpen: fetchInactiveUsage },
     accounts: {
-      listAccounts: () => ({ accounts, activeAccountId: settings.activeClaudeManagedAccountId }),
+      listAccounts: () => ({
+        accounts,
+        activeAccountId: settings.activeClaudeManagedAccountId,
+        ...SYSTEM_DEFAULT
+      }),
       autoSelectAccountForTarget: selectAccount
     },
     onSwitched
@@ -126,6 +135,7 @@ describe('createClaudeAccountAutoSwitch', () => {
 
     expect(selectAccount).toHaveBeenCalledWith('c', HOST, expect.any(Function))
     expect(onSwitched).toHaveBeenCalledWith({
+      ...SYSTEM_DEFAULT,
       accounts: [
         expect.objectContaining({ id: 'a' }),
         expect.objectContaining({ id: 'b' }),
