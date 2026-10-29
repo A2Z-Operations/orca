@@ -20,7 +20,6 @@ import { recordUpdaterLifecycle } from '../updater-lifecycle-diagnostics'
 import { AUTO_UPDATE_CHECK_INTERVAL_MS } from './updater-state'
 import { UpdaterDownloadInstall } from './updater-download-install'
 import { configureMacShipItScheduling } from './macos-shipit-scheduling'
-import { updaterDisabledReason } from './updater-disabled'
 import { handleElectronUpdaterProxyLogin } from './electron-updater-proxy-session'
 import type { PreQuitCleanupFailureMode, UpdateInstallMode } from './updater-state'
 
@@ -39,17 +38,10 @@ export type UpdaterSetupOptions = {
 
 export class UpdaterSetup extends UpdaterDownloadInstall {
   checkForUpdates(): void {
-    // BLOWZER: a self-built app never checks the stock release feed.
-    if (updaterDisabledReason()) {
-      return
-    }
     this.checkForUpdatesInBackground()
   }
 
   checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
-    if (updaterDisabledReason()) {
-      return
-    }
     super.checkForUpdatesFromMenu(options)
   }
 
@@ -145,13 +137,6 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
     }
 
     if (!app.isPackaged) {
-      return
-    }
-    // BLOWZER: a self-built app (no app-update.yml / ORCA_UPDATER_DISABLED=1) sets no feed and schedules no checks,
-    // so a stock release can never replace our patched build.
-    const disabledReason = updaterDisabledReason()
-    if (disabledReason) {
-      console.log(`[updater] disabled for this build: ${disabledReason}`)
       return
     }
 

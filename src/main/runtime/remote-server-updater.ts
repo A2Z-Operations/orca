@@ -3,7 +3,6 @@ import type {
   RemoteServerUpdaterSnapshot
 } from '../../shared/remote-server-update'
 import type { UpdateCheckOptions } from '../../shared/update-status-types'
-import { updaterDisabledReason } from '../updater/updater-disabled'
 
 type RemoteServerUpdaterAdapter = {
   getSnapshot: (runtimeId: string) => RemoteServerUpdaterSnapshot
@@ -37,10 +36,6 @@ let adapter: RemoteServerUpdaterAdapter = {
 }
 
 export function configureRemoteServerUpdater(next: RemoteServerUpdaterAdapter): void {
-  // BLOWZER: a self-built serve keeps the unavailable adapter, so a paired client cannot install a stock release over it.
-  if (updaterDisabledReason()) {
-    return
-  }
   adapter = next
 }
 
