@@ -258,4 +258,44 @@ describe('applyRuntimeClaudeAuthEnv', () => {
     info.mockRestore()
     resetUserAnthropicBaseUrlNote()
   })
+
+  it('keeps a loopback user URL that is not a proxy slot', () => {
+    resetUserAnthropicBaseUrlNote()
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const env = applyRuntimeClaudeAuthEnv(
+      { ...terminalEnv, ANTHROPIC_BASE_URL: 'http://127.0.0.1:8080/v1' },
+      {
+        ...selected,
+        envPatch: {
+          CLAUDE_CONFIG_DIR: '/a',
+          ANTHROPIC_BASE_URL: 'http://127.0.0.1:9/p/slot/'
+        }
+      },
+      false
+    )
+    expect(env?.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:8080/v1')
+    expect(info).toHaveBeenCalled()
+    info.mockRestore()
+    resetUserAnthropicBaseUrlNote()
+  })
+
+  it("replaces another machine's loopback slot with this host's slot", () => {
+    resetUserAnthropicBaseUrlNote()
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const env = applyRuntimeClaudeAuthEnv(
+      { ...terminalEnv, ANTHROPIC_BASE_URL: 'http://127.0.0.1:9/p/desktop-slot/' },
+      {
+        ...selected,
+        envPatch: {
+          CLAUDE_CONFIG_DIR: '/a',
+          ANTHROPIC_BASE_URL: 'http://127.0.0.1:4010/p/host-slot/'
+        }
+      },
+      false
+    )
+    expect(env?.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:4010/p/host-slot/')
+    expect(info).not.toHaveBeenCalled()
+    info.mockRestore()
+    resetUserAnthropicBaseUrlNote()
+  })
 })

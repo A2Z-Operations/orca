@@ -11,6 +11,7 @@ import { ACCOUNT_METHODS } from '../runtime/rpc/methods/accounts'
 import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import { getClaudeAgentViewService } from '../claude/agent-view-service'
 import { createOrcadAccountServices } from './orcad-account-services'
+import { getClaudeAuthProxy } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { RateLimitService } from '../rate-limits/service'
 import { USAGE_CREDENTIALS_RUNTIME_CAPABILITY } from '../../shared/account-runtime-capabilities'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
@@ -198,6 +199,9 @@ describe('orcad account services', () => {
   it('leaves a WSL host to the desktop that owns its accounts', async () => {
     const { runtime, store } = createRuntime()
     expect(install(runtime, store, true)).toBeNull()
+    await vi.waitFor(() => {
+      expect(getClaudeAuthProxy()?.port()).toEqual(expect.any(Number))
+    })
     expect(runtime.getUsageRateLimits()).toBeNull()
     expect(runtime.getStatus().capabilities).not.toContain(USAGE_CREDENTIALS_RUNTIME_CAPABILITY)
 

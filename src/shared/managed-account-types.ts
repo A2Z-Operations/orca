@@ -142,6 +142,11 @@ export type ClaudeRateLimitAccountsState = {
   assignedSessions?: { accountId: string; count: number }[]
   /** Every live pane and the account it bills. The tab badge reads this snapshot. */
   paneAccounts?: ClaudePaneAccountSnapshot[]
+  /**
+   * Windows desktop view of WSL guest billing. `unsupported:wsl` means the guest credential file
+   * is unreadable, so the guest listener does not replace the API host. Absent when this host has no WSL accounts.
+   */
+  wslAuthProxy?: 'on' | 'unsupported:wsl'
   /** Panes whose billed account differs from the folder they were spawned in. */
   paneAssignments?: { ptyId: string; accountId: string }[]
   /** The mover's last decision per live session, newest first. */
