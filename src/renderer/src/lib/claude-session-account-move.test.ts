@@ -64,6 +64,8 @@ type SeededPane = {
   n: number
   agentType?: 'claude' | 'codex'
   state?: AgentStatusEntry['state']
+  workingMode?: AgentStatusEntry['workingMode']
+  mainAgent?: AgentStatusEntry['mainAgent']
   sessionId?: string | null
   /** Folder Claude writes this session's transcript under; null leaves it unreported. */
   configDir?: string | null
@@ -110,6 +112,8 @@ function seedPanes(panes: SeededPane[]): void {
       stateStartedAt: 1,
       stateHistory: [],
       agentType: pane.agentType,
+      ...(pane.workingMode ? { workingMode: pane.workingMode } : {}),
+      ...(pane.mainAgent ? { mainAgent: pane.mainAgent } : {}),
       ...(pane.sessionId === null ? {} : { providerSession: providerSession(pane) })
     }
   }
@@ -366,6 +370,28 @@ describe('isClaudePaneMidTurn', () => {
     )
 
     expect(midTurn).toEqual([true, true, true, false])
+  })
+
+  it('restarts a monitoring pane whose main agent is done, and waits while the main agent works', () => {
+    seedPanes([
+      {
+        n: 1,
+        agentType: 'claude',
+        state: 'working',
+        workingMode: 'monitoring',
+        mainAgent: { state: 'done', stateStartedAt: 1 }
+      },
+      {
+        n: 2,
+        agentType: 'claude',
+        state: 'working',
+        mainAgent: { state: 'working', stateStartedAt: 1 }
+      }
+    ])
+    const state = useAppStore.getState()
+
+    expect(isClaudePaneMidTurn(state, makePaneKey(tabId(1), leafId(1)))).toBe(false)
+    expect(isClaudePaneMidTurn(state, makePaneKey(tabId(2), leafId(2)))).toBe(true)
   })
 })
 

@@ -68,6 +68,8 @@ export type PersistedAgentHookAuthorityCommitment = {
 export type AgentHookStatusChangeEntry = {
   paneKey: string
   state: AgentStatusState
+  /** Main agent's own state when the hook published one. Absent on older rows; readers then use `state`. */
+  mainAgentState?: AgentStatusState
   receivedAt: number
   observedInCurrentRuntime: boolean
 }
