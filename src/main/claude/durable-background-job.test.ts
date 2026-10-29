@@ -14,8 +14,12 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-const runnerPath = fileURLToPath(new URL('./durable-background-job.mjs', import.meta.url))
-const hookPath = fileURLToPath(new URL('./durable-background-job-hook.mjs', import.meta.url))
+const runnerPath = fileURLToPath(
+  new URL('../../../resources/durable-jobs/durable-background-job.mjs', import.meta.url)
+)
+const hookPath = fileURLToPath(
+  new URL('../../../resources/durable-jobs/durable-background-job-hook.mjs', import.meta.url)
+)
 
 type Plan = {
   request: { id: string; command: string; cwd?: string; sessionId?: string }

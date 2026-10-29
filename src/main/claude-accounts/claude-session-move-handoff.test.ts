@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createJobRequest } from '../claude/durable-background-job.mjs'
+import { createJobRequest } from '../../../resources/durable-jobs/durable-background-job.mjs'
 import { deliverClaudeSessionMoveHandoff } from './claude-session-move-handoff'
 
 const roots: string[] = []

@@ -143,7 +143,7 @@ const durableJobScriptResources = [
   'durable-background-job-hook.mjs',
   'durable-background-job-plan.mjs'
 ].map((name) => ({
-  from: `src/main/claude/${name}`,
+  from: `resources/durable-jobs/${name}`,
   to: `durable-jobs/${name}`
 }))
 const commonExtraResources = [

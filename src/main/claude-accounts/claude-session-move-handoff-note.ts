@@ -1,6 +1,6 @@
 import type { AgentSubagentSnapshot } from '../../shared/agent-status-subagent-snapshot'
 import type { AgentWorkingMode } from '../../shared/agent-status-types'
-import { formatSurvivingJobNote } from '../claude/durable-background-job.mjs'
+import { formatSurvivingJobNote } from '../../../resources/durable-jobs/durable-background-job.mjs'
 import { createDraftPasteReadyScanner } from '../../shared/draft-paste-ready-scanner'
 import { stripTerminalControl } from '../../shared/terminal-control-stripping'
 

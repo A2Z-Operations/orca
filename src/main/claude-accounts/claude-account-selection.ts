@@ -1,4 +1,7 @@
-import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
+import {
+  claudeAuthProxyEnabled,
+  type ClaudeSessionMoverSetting
+} from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeManagedAccount,
   ClaudeManagedAccountSummary,
@@ -130,7 +133,7 @@ export class ClaudeAccountSelection {
       activeAccountIdsByRuntime: selection,
       autoSwitchEnabled: settings.claudeAutoSwitchEnabled === true,
       sessionMover: settings.claudeSessionMover ?? 'ask',
-      authProxy: settings.claudeAuthProxy === false ? 'off' : 'on',
+      authProxy: claudeAuthProxyEnabled(settings) ? 'on' : 'off',
       accountPool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       pool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       assignedSessions,

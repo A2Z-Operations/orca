@@ -19910,7 +19910,9 @@
         "thenSendAgain": "Depois, envie sua mensagem novamente.",
         "runCommandWhenDone": "Execute /{{command}} quando terminar.",
         "commandAfterAnswer": "Responda à pergunta ou ao pedido de aprovação do agente e execute /{{command}}.",
-        "cliTooOld": "A versão {{installedVersion}} de {{agent}} é antiga demais para chats. Atualize para a versão {{minimumVersion}} ou mais recente."
+        "cliTooOld": "A versão {{installedVersion}} de {{agent}} é antiga demais para chats. Atualize para a versão {{minimumVersion}} ou mais recente.",
+        "claudeAccountUnknown": "Essa conta do Claude não está mais salva. Escolha outra conta.",
+        "claudeAccountWslUnsupported": "Essa conta do Claude está no WSL e não pode ser executada aqui. Escolha outra conta."
       },
       "writeNotice": {
         "notDoneReadHistory": "Não foi possível carregar o histórico deste chat.",
@@ -20960,7 +20962,29 @@
           "session": "sessão",
           "strategy": "estratégia",
           "rebalance": "reequilíbrio"
-        }
+        },
+        "settingTitle": "Mover sessões em execução antes de um limite de uso",
+        "settingDescription": "Uma sessão do Claude em execução cuja conta se aproxima do limite continua na conta com mais margem, entre turnos, no mesmo painel.",
+        "settingOff": "Desativado",
+        "settingAsk": "Perguntar",
+        "settingMove": "Mover",
+        "noticeTitle": "Movimentação de sessões do Claude",
+        "movedBody": "{{from}} está perto do limite de uso. A sessão continua em {{to}}.",
+        "askBody": "Uma sessão em {{from}} está perto do limite de uso. Defina \"Mover sessões em execução antes de um limite de uso\" como Mover para movê-la automaticamente.",
+        "failedBody": "Não foi possível mover uma sessão em {{from}}: {{detail}}",
+        "handoff": {
+          "moved": "O Orca moveu esta sessão de {{from}} para {{to}} porque {{detail}}.",
+          "ended": "A reinicialização encerrou os subagentes do processo anterior ({{known}}).",
+          "continue": "Execute de novo o que ainda for necessário e siga em frente.",
+          "monitoring": "monitoramento",
+          "backgroundTask": "uma tarefa em segundo plano ainda estava em execução",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "e mais {{count}}",
+          "none": "nenhum informado",
+          "detailFallback": "seu limite de uso"
+        },
+        "movedRestartlessBody": "{{from}} está perto do limite de uso. A sessão continua em {{to}} sem reiniciar."
       },
       "unnamedAccount": "Conta do Claude",
       "systemDefaultNamed": "Padrão do sistema: {{value0}}",
@@ -21012,6 +21036,17 @@
         "notMovedOne": "1 outra sessão não foi movida.",
         "notMovedOther": "{{count}} outras sessões não foram movidas.",
         "review": "Revisar"
+      },
+      "autoSwitch": "Trocar de conta antes de um limite de uso",
+      "autoSwitchDescription": "Quando a conta selecionada passa de 90% do limite de 5 horas ou semanal, o Orca muda para a conta com mais margem, como se você tivesse trocado à mão.",
+      "autoSwitchedTitle": "Conta do Claude alterada",
+      "autoSwitchedBody": "{{from}} está perto do limite de uso. Novas sessões do Claude começam em {{to}}.",
+      "keyword": {
+        "auto": "automático"
+      },
+      "authProxy": {
+        "settingTitle": "Usar um proxy de autenticação local para o Claude",
+        "settingDescription": "Uma sessão do Claude em execução pode trocar de conta sem reiniciar. A próxima solicitação usa a conta nova."
       }
     },
     "managedData": {

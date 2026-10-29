@@ -20854,7 +20854,29 @@
           "session": "会话",
           "strategy": "策略",
           "rebalance": "再平衡"
-        }
+        },
+        "settingTitle": "在用量上限之前移动正在运行的会话",
+        "settingDescription": "正在运行的 Claude 会话若自身账户接近上限，会在回合之间、同一窗格内，改到剩余额度最多的账户上继续。",
+        "settingOff": "关闭",
+        "settingAsk": "询问",
+        "settingMove": "移动",
+        "noticeTitle": "Claude 会话移动",
+        "movedBody": "{{from}} 已接近用量上限。会话在 {{to}} 上继续。",
+        "askBody": "{{from}} 上的会话已接近用量上限。将「在用量上限之前移动正在运行的会话」设为「移动」即可自动移动。",
+        "failedBody": "无法移动 {{from}} 上的会话：{{detail}}",
+        "handoff": {
+          "moved": "Orca 将此会话从 {{from}} 移到 {{to}}，因为{{detail}}。",
+          "ended": "重启结束了上一个进程的子任务（{{known}}）。",
+          "continue": "重新运行仍然需要的部分，然后继续。",
+          "monitoring": "监控",
+          "backgroundTask": "一个后台任务仍在运行",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "以及另外 {{count}} 个",
+          "none": "没有报告",
+          "detailFallback": "用量上限"
+        },
+        "movedRestartlessBody": "{{from}} 已接近用量上限。会话在 {{to}} 上继续，无需重启。"
       },
       "unnamedAccount": "Claude 账户",
       "systemDefaultNamed": "系统默认：{{value0}}",
@@ -20906,6 +20928,17 @@
         "notMovedOne": "另有 1 个会话未移动。",
         "notMovedOther": "另有 {{count}} 个会话未移动。",
         "review": "查看"
+      },
+      "autoSwitch": "在用量上限之前切换账户",
+      "autoSwitchDescription": "当所选账户超过 5 小时或每周上限的 90% 时，Orca 会切换到剩余额度最多的账户，就像你手动切换一样。",
+      "autoSwitchedTitle": "已切换 Claude 账户",
+      "autoSwitchedBody": "{{from}} 已接近用量上限。新的 Claude 会话从 {{to}} 开始。",
+      "keyword": {
+        "auto": "自动"
+      },
+      "authProxy": {
+        "settingTitle": "通过本地身份验证代理为 Claude 计费",
+        "settingDescription": "正在运行的 Claude 会话可以不重启就更换账户。下一个请求使用新账户。"
       }
     },
     "hostSignIn": {

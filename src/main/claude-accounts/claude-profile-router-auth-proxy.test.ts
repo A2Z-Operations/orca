@@ -68,6 +68,13 @@ describe('ClaudeProfileRouter auth proxy launch env', () => {
     expect(new Set([selected, named, prepared, launched]).size).toBe(4)
   })
 
+  it('leaves the launch env alone when the setting is absent', async () => {
+    await startClaudeAuthProxy()
+    const { router, settings } = routerFor()
+    delete settings.claudeAuthProxy
+    expect(router.launchEnv().ANTHROPIC_BASE_URL).toBeUndefined()
+  })
+
   it('leaves the launch env alone when the setting is off', async () => {
     await startClaudeAuthProxy()
     const { router, settings } = routerFor()

@@ -129,7 +129,7 @@ describe('pickClaudeAutoSwitchTarget', () => {
   })
 })
 
-// BLOWZER (owner, 2026-10-19): each window has its own line — 5-hour 95 %, weekly 90 %, Fable weekly 90 %.
+// Each window has its own line — 5-hour 95 %, weekly 90 %, Fable weekly 90 %.
 const now = 1_800_000_000_000
 const win = (usedPercent: number) =>
   ({ usedPercent, resetsAt: now + 3_600_000 }) as NonNullable<ProviderRateLimits['session']>
@@ -143,7 +143,7 @@ const lines = (session: number, weekly: number, fable?: number): ProviderRateLim
 const cand = (accountId: string, l: ProviderRateLimits): InactiveAccountUsage =>
   ({ accountId, rateLimits: l }) as InactiveAccountUsage
 
-describe('per-window lines (BLOWZER)', () => {
+describe('per-window lines', () => {
   it('5-hour window switches at 95, not 90', () => {
     expect(isClaudeOverAutoSwitchLine(lines(94.9, 10), now)).toBe(false)
     expect(isClaudeOverAutoSwitchLine(lines(95, 10), now)).toBe(true)

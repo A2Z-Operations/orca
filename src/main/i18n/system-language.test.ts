@@ -1,50 +1,51 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SystemLanguageReader } from './system-language'
 
-const { getPreferredSystemLanguages, isReady } = vi.hoisted(() => ({
-  getPreferredSystemLanguages: vi.fn(),
-  isReady: vi.fn()
-}))
-vi.mock('electron', () => ({ app: { getPreferredSystemLanguages, isReady } }))
+let readPreferences: SystemLanguageReader = () => ['fr-FR', 'en-US']
 
 beforeEach(() => {
   vi.resetModules()
-  isReady.mockReturnValue(true)
-  getPreferredSystemLanguages.mockReturnValue(['fr-FR', 'en-US'])
+  readPreferences = () => ['fr-FR', 'en-US']
 })
+
+async function loadSystemLanguage() {
+  const language = await import('./system-language')
+  language.configureSystemLanguageReader(() => readPreferences())
+  return language
+}
 
 describe('native language snapshot', () => {
   it('reads preferences once after app readiness and shares the ordered result', async () => {
-    const { getSystemLanguageDetection } = await import('./system-language')
-    isReady.mockReturnValue(false)
+    let ready = false
+    readPreferences = () => (ready ? ['fr-FR', 'en-US'] : null)
+    const { getSystemLanguageDetection } = await loadSystemLanguage()
     expect(getSystemLanguageDetection()).toBeNull()
-    expect(getPreferredSystemLanguages).not.toHaveBeenCalled()
-    isReady.mockReturnValue(true)
+    ready = true
     expect(getSystemLanguageDetection()).toMatchObject({
       detectedTag: 'fr-FR',
       locale: 'fr',
       source: 'native'
     })
-    getPreferredSystemLanguages.mockReturnValue(['en-US'])
+    readPreferences = () => ['en-US']
     expect(getSystemLanguageDetection()?.locale).toBe('fr')
-    expect(getPreferredSystemLanguages).toHaveBeenCalledTimes(1)
   })
 
   it('keeps a C-only native result unknown so Chromium cannot override it', async () => {
-    getPreferredSystemLanguages.mockReturnValue(['C.UTF-8', 'POSIX'])
-    const { getSystemLanguageDetection } = await import('./system-language')
+    readPreferences = () => ['C.UTF-8', 'POSIX']
+    const { getSystemLanguageDetection } = await loadSystemLanguage()
     expect(getSystemLanguageDetection()).toMatchObject({ status: 'unknown', source: 'native' })
   })
 
   it.each(['empty', 'failed'])(
     'permits uncertain browser fallback for %s native lookup',
     async (kind) => {
-      getPreferredSystemLanguages.mockImplementation(() => {
+      readPreferences = () => {
         if (kind === 'failed') {
           throw new Error('Unavailable')
         }
         return []
-      })
-      const { getSystemLanguageDetection } = await import('./system-language')
+      }
+      const { getSystemLanguageDetection } = await loadSystemLanguage()
       expect(getSystemLanguageDetection()).toBeNull()
       const fallback = getSystemLanguageDetection(['fr-FR'])
       expect(fallback).toMatchObject({ locale: 'fr', source: 'browser-fallback' })
@@ -59,10 +60,19 @@ describe('native language snapshot', () => {
   )
 
   it('never replaces a successful native snapshot with browser fallback hints', async () => {
-    const { getSystemLanguageDetection } = await import('./system-language')
+    const { getSystemLanguageDetection } = await loadSystemLanguage()
     const native = getSystemLanguageDetection()
     expect(getSystemLanguageDetection(['ja-JP'])).toBe(native)
     expect(native).toMatchObject({ locale: 'fr', source: 'native' })
+  })
+
+  it('caches a missing reader as an unknown native lookup so browser hints can apply', async () => {
+    const { getSystemLanguageDetection } = await import('./system-language')
+    expect(getSystemLanguageDetection()).toBeNull()
+    expect(getSystemLanguageDetection(['fr-FR'])).toMatchObject({
+      locale: 'fr',
+      source: 'browser-fallback'
+    })
   })
 })
 
@@ -78,7 +88,7 @@ it.each([
   { platform: 'Linux C-only', preferences: ['C.UTF-8', 'C'], locale: 'en', status: 'unknown' },
   { platform: 'unsupported', preferences: ['de-DE', 'fr-FR'], locale: 'en', status: 'unsupported' }
 ])('handles $platform preference lists', async ({ preferences, locale, status }) => {
-  getPreferredSystemLanguages.mockReturnValue(preferences)
-  const { getSystemLanguageDetection } = await import('./system-language')
+  readPreferences = () => preferences
+  const { getSystemLanguageDetection } = await loadSystemLanguage()
   expect(getSystemLanguageDetection()).toMatchObject({ locale, status })
 })

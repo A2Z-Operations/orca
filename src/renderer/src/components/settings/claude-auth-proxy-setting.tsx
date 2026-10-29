@@ -1,3 +1,4 @@
+import { claudeAuthProxyEnabled } from '../../../../shared/claude-account-switch-settings'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { translate } from '@/i18n/i18n'
 import { Label } from '../ui/label'
@@ -32,7 +33,7 @@ export function ClaudeAuthProxySetting({
       </div>
       <Switch
         aria-label={title}
-        checked={settings.claudeAuthProxy !== false}
+        checked={claudeAuthProxyEnabled(settings)}
         onCheckedChange={(enabled) => updateSettings({ claudeAuthProxy: enabled })}
       />
     </SearchableSetting>

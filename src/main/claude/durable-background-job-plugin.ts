@@ -12,7 +12,7 @@ import {
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { toLinuxPath } from '../../shared/wsl-paths'
-import { sweepDurableJobs } from './durable-background-job.mjs'
+import { sweepDurableJobs } from '../../../resources/durable-jobs/durable-background-job.mjs'
 
 const PLUGIN_NAME = 'orca-durable-jobs'
 const WAITER_NAME = 'orca-durable-job'
@@ -40,10 +40,10 @@ export function durableJobScriptPaths(
   const candidates = [
     resourcesPath ? join(resourcesPath, 'durable-jobs') : undefined,
     join(here, 'durable-jobs'),
-    here,
-    join(here, '../../../src/main/claude'),
-    join(here, '../../src/main/claude'),
-    join(process.cwd(), 'src/main/claude')
+    join(here, '../../../resources/durable-jobs'),
+    join(here, '../../resources/durable-jobs'),
+    join(here, '../../../../resources/durable-jobs'),
+    join(process.cwd(), 'resources/durable-jobs')
   ]
   for (const dir of candidates) {
     if (!dir) {

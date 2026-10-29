@@ -4,7 +4,7 @@ import type {
   RateLimitWindow
 } from '../../shared/rate-limit-types'
 
-// BLOWZER lines (owner, 2026-10-19): the 5-hour window at 95 %, the weekly and the Fable-weekly windows at 90 %.
+// Lines: the 5-hour window at 95 %, the weekly and the Fable-weekly windows at 90 %.
 export const CLAUDE_AUTO_SWITCH_LINES = { session: 95, weekly: 90, fableWeekly: 90 } as const
 // Why: a switch only reaches the next Claude started, so a fresh pick needs time to be used.
 export const CLAUDE_AUTO_SWITCH_COOLDOWN_MS = 5 * 60_000

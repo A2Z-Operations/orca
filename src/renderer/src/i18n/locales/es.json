@@ -20673,7 +20673,29 @@
           "session": "sesión",
           "strategy": "estrategia",
           "rebalance": "reequilibrio"
-        }
+        },
+        "settingTitle": "Mover las sesiones en ejecución antes de un límite de uso",
+        "settingDescription": "Una sesión de Claude en ejecución cuya cuenta se acerca a su límite continúa en la cuenta con más margen, entre turnos, en el mismo panel.",
+        "settingOff": "Desactivado",
+        "settingAsk": "Preguntar",
+        "settingMove": "Mover",
+        "noticeTitle": "Movimiento de sesiones de Claude",
+        "movedBody": "{{from}} está cerca de su límite de uso. La sesión continúa en {{to}}.",
+        "askBody": "Una sesión en {{from}} está cerca de su límite de uso. Pon \"Mover las sesiones en ejecución antes de un límite de uso\" en Mover para moverla automáticamente.",
+        "failedBody": "No se pudo mover una sesión en {{from}}: {{detail}}",
+        "handoff": {
+          "moved": "Orca movió esta sesión de {{from}} a {{to}} porque {{detail}}.",
+          "ended": "El reinicio terminó los subagentes del proceso anterior ({{known}}).",
+          "continue": "Vuelve a ejecutar lo que aún haga falta y sigue.",
+          "monitoring": "supervisión",
+          "backgroundTask": "una tarea en segundo plano seguía en ejecución",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "y {{count}} más",
+          "none": "ninguno informado",
+          "detailFallback": "su límite de uso"
+        },
+        "movedRestartlessBody": "{{from}} está cerca de su límite de uso. La sesión continúa en {{to}} sin reiniciar."
       },
       "unnamedAccount": "Cuenta de Claude",
       "systemDefaultNamed": "Predeterminado del sistema: {{value0}}",
@@ -20725,6 +20747,17 @@
         "notMovedOne": "Otra sesión no se movió.",
         "notMovedOther": "Otras {{count}} sesiones no se movieron.",
         "review": "Revisar"
+      },
+      "autoSwitch": "Cambiar de cuenta antes de un límite de uso",
+      "autoSwitchDescription": "Cuando la cuenta seleccionada supera el 90 % de su límite de 5 horas o semanal, Orca cambia a la cuenta con más margen, como si hubieras cambiado a mano.",
+      "autoSwitchedTitle": "Cuenta de Claude cambiada",
+      "autoSwitchedBody": "{{from}} está cerca de su límite de uso. Las nuevas sesiones de Claude empiezan en {{to}}.",
+      "keyword": {
+        "auto": "automático"
+      },
+      "authProxy": {
+        "settingTitle": "Pasar Claude por un proxy de autenticación local",
+        "settingDescription": "Una sesión de Claude en ejecución puede cambiar de cuenta sin reiniciarse. La siguiente petición usa la cuenta nueva."
       }
     },
     "hostSignIn": {

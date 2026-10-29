@@ -67,8 +67,12 @@ describe('durableJobScriptPaths', () => {
     const resources = tempDir('orca-durable-resources-')
     mkdirSync(join(resources, 'durable-jobs'))
     expect(durableJobScriptPaths(resources)).toEqual({
-      runner: fileURLToPath(new URL('./durable-background-job.mjs', import.meta.url)),
-      hook: fileURLToPath(new URL('./durable-background-job-hook.mjs', import.meta.url))
+      runner: fileURLToPath(
+        new URL('../../../resources/durable-jobs/durable-background-job.mjs', import.meta.url)
+      ),
+      hook: fileURLToPath(
+        new URL('../../../resources/durable-jobs/durable-background-job-hook.mjs', import.meta.url)
+      )
     })
   })
 })

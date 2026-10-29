@@ -20853,7 +20853,29 @@
           "session": "세션",
           "strategy": "전략",
           "rebalance": "재조정"
-        }
+        },
+        "settingTitle": "사용량 한도에 도달하기 전에 실행 중인 세션 이동",
+        "settingDescription": "자신의 계정이 한도에 가까운 실행 중인 Claude 세션은 턴 사이에, 같은 창에서, 여유가 가장 많은 계정으로 이어집니다.",
+        "settingOff": "끄기",
+        "settingAsk": "묻기",
+        "settingMove": "이동",
+        "noticeTitle": "Claude 세션 이동",
+        "movedBody": "{{from}}이(가) 사용량 한도에 가깝습니다. 세션은 {{to}}에서 계속됩니다.",
+        "askBody": "{{from}}의 세션이 사용량 한도에 가깝습니다. 자동으로 이동하려면 \"사용량 한도에 도달하기 전에 실행 중인 세션 이동\"을 이동으로 설정하세요.",
+        "failedBody": "{{from}}의 세션을 이동하지 못했습니다: {{detail}}",
+        "handoff": {
+          "moved": "Orca가 {{detail}} 때문에 이 세션을 {{from}}에서 {{to}}(으)로 옮겼습니다.",
+          "ended": "다시 시작하면서 이전 프로세스의 하위 작업이 종료되었습니다 ({{known}}).",
+          "continue": "아직 필요한 작업을 다시 실행한 다음 계속하세요.",
+          "monitoring": "모니터링",
+          "backgroundTask": "백그라운드 작업이 아직 실행 중이었습니다",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "외 {{count}}개",
+          "none": "보고된 항목 없음",
+          "detailFallback": "사용량 한도"
+        },
+        "movedRestartlessBody": "{{from}}이(가) 사용량 한도에 가깝습니다. 세션은 다시 시작하지 않고 {{to}}에서 계속됩니다."
       },
       "unnamedAccount": "Claude 계정",
       "systemDefaultNamed": "시스템 기본값: {{value0}}",
@@ -20905,6 +20927,17 @@
         "notMovedOne": "다른 세션 1개는 옮겨지지 않았습니다.",
         "notMovedOther": "다른 세션 {{count}}개는 옮겨지지 않았습니다.",
         "review": "검토"
+      },
+      "autoSwitch": "사용량 한도에 도달하기 전에 계정 전환",
+      "autoSwitchDescription": "선택한 계정이 5시간 또는 주간 한도의 90%를 넘으면 Orca가 여유가 가장 많은 계정으로 전환합니다. 직접 전환한 것과 같습니다.",
+      "autoSwitchedTitle": "Claude 계정을 전환함",
+      "autoSwitchedBody": "{{from}}이(가) 사용량 한도에 가깝습니다. 새 Claude 세션은 {{to}}에서 시작합니다.",
+      "keyword": {
+        "auto": "자동"
+      },
+      "authProxy": {
+        "settingTitle": "로컬 인증 프록시로 Claude 사용량 청구",
+        "settingDescription": "실행 중인 Claude 세션은 다시 시작하지 않고 계정을 바꿀 수 있습니다. 다음 요청은 새 계정을 사용합니다."
       }
     },
     "hostSignIn": {

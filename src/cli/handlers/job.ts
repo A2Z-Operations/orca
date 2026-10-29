@@ -23,14 +23,30 @@ type DurableJobApi = {
   startJob: (input: { command: string; cwd?: string }) => Promise<DurableJob>
 }
 
+/** Electron sets this on a packaged process. Plain Node leaves it absent. */
+type PackagedProcess = NodeJS.Process & { readonly resourcesPath?: string }
+
+function packagedResourcesPath(proc: PackagedProcess): string | undefined {
+  return proc.resourcesPath
+}
+
+function packagedDurableJobRunner(): string | undefined {
+  const resourcesPath = packagedResourcesPath(process)
+  return typeof resourcesPath === 'string'
+    ? join(resourcesPath, 'durable-jobs', 'durable-background-job.mjs')
+    : undefined
+}
+
 function runnerModuleUrl(): string {
   // build:cli emits CommonJS, where import.meta.dirname is absent.
   const here = __dirname
   const candidates = [
-    join(here, '../../main/claude/durable-background-job.mjs'),
-    join(here, '../../../src/main/claude/durable-background-job.mjs'),
-    join(process.cwd(), 'src/main/claude/durable-background-job.mjs')
-  ]
+    packagedDurableJobRunner(),
+    join(here, '../../resources/durable-jobs/durable-background-job.mjs'),
+    join(here, '../../../resources/durable-jobs/durable-background-job.mjs'),
+    join(here, '../../../../resources/durable-jobs/durable-background-job.mjs'),
+    join(process.cwd(), 'resources/durable-jobs/durable-background-job.mjs')
+  ].filter((path): path is string => typeof path === 'string')
   const found = candidates.find((path) => existsSync(path))
   if (!found) {
     throw new RuntimeClientError(

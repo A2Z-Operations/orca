@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// System node runs the userData copy of this program, which has no workspace packages.
+// It stays outside src/ so the process-host boundary does not pretend child_process is app code.
 import { spawn } from 'node:child_process'
 import {
   closeSync,

@@ -24,6 +24,7 @@ import { resolveRuntimeHostSessionBinding } from './spawn-host-binding'
 import { resolvePtySpawnStartupTarget } from '../spawn-startup-target'
 import { resolvePtySpawnHostEnv } from '../spawn-host-env'
 import { ptySpawnPaneFromIds, stampPtySpawnPaneEnv } from '../spawn-pane-env'
+import { claudeAuthProxyEnabled } from '../../../../shared/claude-account-switch-settings'
 import { getConnectionExecutionHostId } from '../../../../shared/execution-host'
 import {
   ensureJcodeRuntimeDir,
@@ -107,7 +108,7 @@ export async function prepareRuntimePtySpawn(
   ) {
     const guestProxy = await applyWslGuestAuthProxyEnv(
       ctx.env,
-      ctx.deps.getSettings?.()?.claudeAuthProxy !== false
+      claudeAuthProxyEnabled(ctx.deps.getSettings?.())
     )
     ctx.env = guestProxy.env
     if (guestProxy.auth) {

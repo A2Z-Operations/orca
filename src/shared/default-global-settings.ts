@@ -185,7 +185,7 @@ export function buildDefaultSettings(args: {
     activeClaudeManagedAccountId: null,
     claudeAutoSwitchEnabled: false,
     claudeSessionMover: 'ask',
-    claudeAuthProxy: true,
+    claudeAuthProxy: false,
     claudeAccountPool: 'off',
     terminalScopeHistoryByWorktree: true,
     terminalHiddenViewParking: true,

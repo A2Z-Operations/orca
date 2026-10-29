@@ -7,12 +7,19 @@ export type ClaudeSessionMoverSetting = 'off' | 'ask' | 'move'
 /** Absent means off. When on, Orca-made Claude launches pick the account with the most headroom. */
 export type ClaudeAccountPoolSetting = 'off' | 'on'
 
+/** Absent or any value other than true leaves the auth proxy off. */
+export function claudeAuthProxyEnabled(
+  settings: { claudeAuthProxy?: boolean } | null | undefined
+): boolean {
+  return settings?.claudeAuthProxy === true
+}
+
 export type ClaudeAccountSwitchSettings = {
   /** Absent means 'ask'. */
   claudeAccountSwitchRunningSessions?: ClaudeAccountSwitchRunningSessions
   /** Absent means 'ask'; a headless host treats 'ask' as 'move' because nobody can answer there. */
   claudeSessionMover?: ClaudeSessionMoverSetting
-  /** Absent means on. `!== false` keeps older persisted settings on the proxy. */
+  /** Absent means off. Only an explicit true turns the proxy on. */
   claudeAuthProxy?: boolean
   /** Absent means off. The selected account stays what non-pooled launches and the status bar show. */
   claudeAccountPool?: ClaudeAccountPoolSetting

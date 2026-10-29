@@ -17,7 +17,7 @@ export function createDurableJobScriptPlugin(): Plugin {
         this.emitFile({
           type: 'asset',
           fileName: `durable-jobs/${name}`,
-          source: readFileSync(resolve('src/main/claude', name))
+          source: readFileSync(resolve('resources/durable-jobs', name))
         })
       }
     }

@@ -23,7 +23,7 @@ describe('electron-builder config', () => {
         'durable-background-job-plan.mjs'
       ]) {
         expect(electronBuilderConfig[platform].extraResources).toContainEqual({
-          from: `src/main/claude/${name}`,
+          from: `resources/durable-jobs/${name}`,
           to: `durable-jobs/${name}`
         })
       }

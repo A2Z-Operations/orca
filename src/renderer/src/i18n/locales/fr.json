@@ -20854,7 +20854,29 @@
           "session": "session",
           "strategy": "stratégie",
           "rebalance": "rééquilibrage"
-        }
+        },
+        "settingTitle": "Déplacer les sessions en cours avant une limite d'utilisation",
+        "settingDescription": "Une session Claude en cours dont le compte approche de sa limite continue sur le compte qui a le plus de marge, entre les tours, dans le même volet.",
+        "settingOff": "Désactivé",
+        "settingAsk": "Demander",
+        "settingMove": "Déplacer",
+        "noticeTitle": "Déplacement des sessions Claude",
+        "movedBody": "{{from}} approche de sa limite d'utilisation. La session continue sur {{to}}.",
+        "askBody": "Une session sur {{from}} approche de sa limite d'utilisation. Réglez « Déplacer les sessions en cours avant une limite d'utilisation » sur Déplacer pour la déplacer automatiquement.",
+        "failedBody": "Impossible de déplacer une session sur {{from}} : {{detail}}",
+        "handoff": {
+          "moved": "Orca a déplacé cette session de {{from}} vers {{to}} parce que {{detail}}.",
+          "ended": "Le redémarrage a arrêté les sous-agents du processus précédent ({{known}}).",
+          "continue": "Relancez ce qui est encore nécessaire, puis poursuivez.",
+          "monitoring": "surveillance",
+          "backgroundTask": "une tâche en arrière-plan était encore en cours",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "et {{count}} de plus",
+          "none": "aucun signalé",
+          "detailFallback": "sa limite d'utilisation"
+        },
+        "movedRestartlessBody": "{{from}} approche de sa limite d'utilisation. La session continue sur {{to}} sans redémarrage."
       },
       "unnamedAccount": "Compte Claude",
       "systemDefaultNamed": "Système par défaut : {{value0}}",
@@ -20906,6 +20928,17 @@
         "notMovedOne": "1 autre session n'a pas été déplacée.",
         "notMovedOther": "{{count}} autres sessions n'ont pas été déplacées.",
         "review": "Vérifier"
+      },
+      "autoSwitch": "Changer de compte avant une limite d'utilisation",
+      "autoSwitchDescription": "Lorsque le compte sélectionné dépasse 90 % de sa limite de 5 heures ou hebdomadaire, Orca passe au compte qui a le plus de marge, comme si vous aviez changé à la main.",
+      "autoSwitchedTitle": "Compte Claude changé",
+      "autoSwitchedBody": "{{from}} approche de sa limite d'utilisation. Les nouvelles sessions Claude démarrent sur {{to}}.",
+      "keyword": {
+        "auto": "auto"
+      },
+      "authProxy": {
+        "settingTitle": "Faire passer Claude par un proxy d'authentification local",
+        "settingDescription": "Une session Claude en cours peut changer de compte sans redémarrer. La requête suivante utilise le nouveau compte."
       }
     },
     "hostSignIn": {

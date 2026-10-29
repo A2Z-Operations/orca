@@ -19,6 +19,7 @@ import {
   claudeAccountUsagePreparation,
   systemDefaultRunsAnotherAccount
 } from './claude-profile-system-default-comparison'
+import { claudeAuthProxyEnabled } from '../../shared/claude-account-switch-settings'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
 import {
@@ -241,7 +242,7 @@ export class ClaudeProfileRouter {
     const url = claudeAuthProxyBaseUrl(
       accountId,
       this.env,
-      this.args.getSettings().claudeAuthProxy !== false
+      claudeAuthProxyEnabled(this.args.getSettings())
     )
     return url ? { ...patch, ANTHROPIC_BASE_URL: url } : patch
   }

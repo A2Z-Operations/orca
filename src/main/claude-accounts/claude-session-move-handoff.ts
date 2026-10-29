@@ -3,7 +3,7 @@ import {
   buildAgentPromptPasteBytes
 } from '../../shared/agent-prompt-injection'
 import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
-import { listJobs } from '../claude/durable-background-job.mjs'
+import { listJobs } from '../../../resources/durable-jobs/durable-background-job.mjs'
 import {
   buildClaudeSessionMoveHandoffNote,
   claudeResumeHookBaseline,
