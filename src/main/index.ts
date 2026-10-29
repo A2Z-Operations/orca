@@ -32,6 +32,7 @@ import {
 } from './persistence/profile-state/profile-state-startup-recovery-dialog'
 import { profileStateDesktopRecoveryArgs } from './startup/profile-state-recovery-preflight'
 import { prepareEarlyMainUiLanguage, translateMain } from './i18n/main-i18n'
+import { bindElectronSystemLanguage } from './host/electron-system-language'
 import { ProfileStateRecoveryRequiredError } from './persistence/profile-state/profile-state-recovery-required'
 import { getProfileUserDataPath } from './orca-profiles/profile-storage-paths'
 import { leaseAppImageGenerationForCurrentProcess } from './cli/appimage-generation-lease'
@@ -46,6 +47,7 @@ import { dropE2eSpawnLogOutsideE2e } from './startup/e2e-spawn-log-env'
 
 // Before anything spawns, so no daemon, PTY or agent inherits it outside e2e.
 dropE2eSpawnLogOutsideE2e()
+bindElectronSystemLanguage()
 
 function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): BrowserWindow {
   return openMainWindowController(options)
