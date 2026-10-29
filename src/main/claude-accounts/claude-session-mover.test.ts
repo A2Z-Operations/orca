@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setClaudeAccountPluginPublishListener } from './claude-account-plugin-publish'
 import { setup, state, limits, PANE_1, PANE_2 } from './claude-session-mover-test-fixture'
 import {
   CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS,
@@ -11,10 +12,15 @@ describe('createClaudeSessionMover', () => {
     vi.setSystemTime(new Date('2026-10-19T12:00:00Z'))
   })
   afterEach(() => {
+    setClaudeAccountPluginPublishListener(null)
     vi.useRealTimers()
   })
 
   it('moves an idle session whose own (non-selected) account is over the line to the account with the most room', async () => {
+    const moved: unknown[] = []
+    setClaudeAccountPluginPublishListener((payload) => {
+      moved.push(payload)
+    })
     const { mover, session, publish, move, notices } = setup()
     session('pty-1', PANE_1, 'b')
     mover.start()
@@ -38,6 +44,14 @@ describe('createClaudeSessionMover', () => {
         line: 95,
         reason: 'moved'
       })
+    ])
+    expect(moved).toEqual([
+      {
+        ptyId: 'pty-new',
+        fromAccountId: 'b',
+        toAccountId: 'c',
+        previousPtyId: 'pty-1'
+      }
     ])
   })
 
@@ -71,6 +85,10 @@ describe('createClaudeSessionMover', () => {
       kind: 'moved' as const,
       newPtyId: request.ptyId
     }))
+    const moved: unknown[] = []
+    setClaudeAccountPluginPublishListener((payload) => {
+      moved.push(payload)
+    })
     const { mover, session, publish, move, notices, records } = setup({
       proxyStrategy: { move: proxyMove }
     })
@@ -89,6 +107,7 @@ describe('createClaudeSessionMover', () => {
       toAccountId: 'c',
       reason: 'moved'
     })
+    expect(moved).toEqual([{ ptyId: 'pty-1', fromAccountId: 'b', toAccountId: 'c' }])
   })
 
   it('lets one target take one session at a time', async () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { pluginClaudeAccountListSchema } from './plugin-claude-account-contract'
 import { PLUGIN_EVENT_NAMES } from './plugin-manifest'
 import type { PluginCapabilityKind } from './plugin-capabilities'
 
@@ -87,7 +88,13 @@ export type PluginHostMethodSpec = {
   /** pluginApi minor the method appeared in (`1.0` for the v0 set). */
   since: string
   /** Machine-readable resource boundary enforced by the host binding. */
-  scope: 'active-worktree' | 'explicit-terminal' | 'plugin-private' | 'desktop' | 'host-events'
+  scope:
+    | 'active-worktree'
+    | 'explicit-terminal'
+    | 'plugin-private'
+    | 'desktop'
+    | 'host-events'
+    | 'host-accounts'
   stability: 'experimental'
   capability: PluginCapabilityKind
   /** Mutations are audit-logged with actor `plugin:<id>`. */
@@ -236,6 +243,16 @@ export const PLUGIN_HOST_API_V0: readonly PluginHostMethodSpec[] = [
     panel: false,
     params: eventsSubscribeParams,
     result: eventsSubscribeResult
+  }),
+  spec({
+    name: 'accounts.listClaudeAccounts',
+    since: '1.1',
+    scope: 'host-accounts',
+    capability: 'accounts.read',
+    mutation: false,
+    panel: false,
+    params: z.object({}).strict().optional(),
+    result: pluginClaudeAccountListSchema
   })
 ]
 

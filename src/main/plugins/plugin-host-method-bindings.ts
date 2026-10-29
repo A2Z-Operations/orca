@@ -6,6 +6,7 @@ import {
   PLUGIN_WORKSPACE_TERMINAL_LIMIT,
   type PluginHostMethodSpec
 } from '../../shared/plugins/plugin-host-api'
+import type { PluginClaudeAccountView } from '../../shared/plugins/plugin-claude-account-contract'
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 
 export type PluginWorktreeContext = {
@@ -45,6 +46,9 @@ export type PluginHostServices = {
     set(pluginId: string, key: string, value: unknown): { ok: true } | { ok: false; error: string }
   }
   subscribeEvents(pluginId: string, events: PluginEventName[]): PluginEventName[]
+  listClaudeAccounts():
+    | { accounts: PluginClaudeAccountView[] }
+    | Promise<{ accounts: PluginClaudeAccountView[] }>
 }
 
 export type BoundPluginHostMethod = {
@@ -163,6 +167,9 @@ const HANDLERS = new Map<string, BoundPluginHostMethod>([
   definePluginMethod('events.subscribe', async (params, { pluginId, services }) => {
     const { events } = params as { events: PluginEventName[] }
     return { subscribed: services.subscribeEvents(pluginId, events) }
+  }),
+  definePluginMethod('accounts.listClaudeAccounts', async (_params, { services }) => {
+    return services.listClaudeAccounts()
   })
 ])
 

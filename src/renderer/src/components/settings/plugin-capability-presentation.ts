@@ -1,4 +1,5 @@
 import { translate } from '@/i18n/i18n'
+import { PLUGIN_CAPABILITY_DESCRIPTIONS } from '../../../../shared/plugins/plugin-capabilities'
 
 export function pluginCapabilityDescription(kind: string, fallback: string): string {
   switch (kind) {
@@ -36,6 +37,11 @@ export function pluginCapabilityDescription(kind: string, fallback: string): str
       return translate(
         'auto.components.settings.PluginConsentDialog.capability.settingsOwn',
         "Read and change the plugin's own settings"
+      )
+    case 'accounts.read':
+      return translate(
+        'auto.components.settings.PluginConsentDialog.capability.accountsRead',
+        PLUGIN_CAPABILITY_DESCRIPTIONS['accounts.read']
       )
     default:
       return fallback

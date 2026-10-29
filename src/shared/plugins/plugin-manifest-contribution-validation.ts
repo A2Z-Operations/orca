@@ -1,4 +1,5 @@
 import type { RefinementCtx } from 'zod'
+import { isPluginAccountEventName } from './plugin-account-event-names'
 import { isPluginCommandAliasActionId } from './plugin-command-actions'
 import { getKeybindingConflictIdentity } from '../keybindings'
 
@@ -131,14 +132,30 @@ export function validatePluginManifestContributions(
       message: 'required when contributes.events is non-empty'
     })
   }
+  const accountEvents = manifest.contributes.events.filter((event) =>
+    isPluginAccountEventName(event.on)
+  )
+  const otherEvents = manifest.contributes.events.filter(
+    (event) => !isPluginAccountEventName(event.on)
+  )
   if (
-    manifest.contributes.events.length > 0 &&
+    otherEvents.length > 0 &&
     !manifest.capabilities.some((capability) => capability.kind === 'events:subscribe')
   ) {
     ctx.addIssue({
       code: 'custom',
       path: ['capabilities'],
-      message: 'events:subscribe capability required when contributes.events is non-empty'
+      message: 'events:subscribe capability required for worktree and agent events'
+    })
+  }
+  if (
+    accountEvents.length > 0 &&
+    !manifest.capabilities.some((capability) => capability.kind === 'accounts.read')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['capabilities'],
+      message: 'accounts.read capability required when contributes.events includes account events'
     })
   }
 }
