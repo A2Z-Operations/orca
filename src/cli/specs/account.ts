@@ -53,7 +53,7 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'orca account auto-switch --agent claude (--on | --off) [--environment <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off'],
     notes: [
-      'Writes the host setting behind Settings › Accounts › Claude › "Switch accounts before a usage limit" (accounts.setClaudeAutoSwitch). Default off.',
+      'Writes the host setting behind Settings › Accounts › Claude › "Switch accounts before a usage limit" (accounts.setClaudeAutoSwitch). Default on.',
       'With --environment the setting is written on that paired Orca server, whose accounts the switch then rotates.',
       'Lines: 5-hour window 95 %, weekly and Fable-weekly windows 90 %; the switch applies to the next Claude started.'
     ],
@@ -69,7 +69,7 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'orca account session-mover --agent claude (--off | --ask | --move) [--environment <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'agent', 'off', 'ask', 'move'],
     notes: [
-      'Writes the host setting behind Settings › Accounts › Claude › "Move running sessions before a usage limit" (accounts.setClaudeSessionMover). Default ask.',
+      'Writes the host setting behind Settings › Accounts › Claude › "Move running sessions before a usage limit" (accounts.setClaudeSessionMover). Default move.',
       'move: a running session whose own account passes a line (5-hour 95 %, weekly or Fable-weekly 90 %) resumes between turns, in the same pane, on the account with the most room. ask: the desktop shows a notice instead; a headless server treats ask as move. off: never.',
       'With --environment the setting is written on that paired Orca server, whose sessions it then governs. `orca account list --json` shows the last decision per live session under claude.sessionMoves.'
     ],
@@ -84,7 +84,7 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     usage: 'orca account pool --agent claude (--on | --off) [--environment <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off'],
     notes: [
-      'Writes the host setting behind Settings › Accounts › Claude › "Spread sessions across accounts" (accounts.setClaudeAccountPool). Default off.',
+      'Writes the host setting behind Settings › Accounts › Claude › "Spread sessions across accounts" (accounts.setClaudeAccountPool). Default on.',
       'On: a new Claude session starts on the signed-in account with the most room left. Off: launches use the selected account.',
       'With --environment the setting is written on that paired Orca server. `orca account list` shows pool: on|off and sessions: <count> on each account.'
     ],
@@ -113,7 +113,7 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'orca account auth-proxy --agent claude (--on | --off | --status) [--environment <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off', 'status'],
     notes: [
-      'Writes the host setting behind Settings › Accounts › Claude › "Bill Claude through a local auth proxy" (accounts.setClaudeAuthProxy). Default off.',
+      'Writes the host setting behind Settings › Accounts › Claude › "Bill Claude through a local auth proxy" (accounts.setClaudeAuthProxy). Default on.',
       "On: each Claude pane talks to a loopback proxy that sets the bearer for the account assigned to that pane. Off: today's behaviour, CLAUDE_CONFIG_DIR only.",
       '--status prints the live listener (accounts.claudeAuthProxyStatus): port, slot → account, requests in the last hour, and the last error. It does not change the setting.',
       'With --environment the setting is written on that paired Orca server. A user-set ANTHROPIC_BASE_URL is left unchanged.'
