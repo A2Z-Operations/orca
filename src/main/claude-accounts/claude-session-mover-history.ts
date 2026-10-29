@@ -87,7 +87,8 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         ptyId: view.record.ptyId,
         from,
         to: kind === 'moved' ? to : null,
-        detail: claudeSessionMoveNoticeDetail(detail, kind === 'moved' && view.paneBackgroundWork)
+        detail: claudeSessionMoveNoticeDetail(detail, kind === 'moved' && view.paneBackgroundWork),
+        ...(kind === 'moved' && detail === view.record.ptyId ? { restartless: true as const } : {})
       })
     }
 

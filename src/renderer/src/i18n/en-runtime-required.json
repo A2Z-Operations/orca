@@ -1,4 +1,22 @@
 {
+  "accounts": {
+    "claude": {
+      "sessionMover": {
+        "handoff": {
+          "backgroundTask": "a background task was still running",
+          "continue": "Re-run what is still needed, then continue.",
+          "detailFallback": "its usage limit",
+          "ended": "The restart ended any background jobs and subagents of the previous process ({{known}}).",
+          "monitoring": "monitoring",
+          "more": "and {{count}} more",
+          "moved": "Orca moved this session from {{from}} to {{to}} because {{detail}}.",
+          "none": "none reported",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})"
+        }
+      }
+    }
+  },
   "agentLaunch": {
     "opencode": {
       "invalidConfig": "OpenCode could not apply this model choice to the launch configuration. Check the OpenCode launch configuration and try again, or omit the model choice.",

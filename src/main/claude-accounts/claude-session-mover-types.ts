@@ -29,6 +29,8 @@ export type ClaudeSessionMoveNotice = {
   from: ClaudeManagedAccountSummary
   to: ClaudeManagedAccountSummary | null
   detail: string
+  /** Set when the PTY did not change: the session kept running and the next request uses the new account. */
+  restartless?: true
 }
 
 export type ClaudeSessionMoverDeps = {
@@ -61,6 +63,8 @@ export type ClaudeSessionMoverDeps = {
   resolveWorktreeId: (ptyId: string) => string | null
   accountHomes: (accountId: string) => string[]
   strategy: ClaudeSessionMoveStrategy
+  /** Used instead of `strategy` when the pane was launched through the auth proxy. */
+  proxyStrategy?: ClaudeSessionMoveStrategy
   /** No window can answer "ask" here, so it acts as "move" (said once in the log). */
   headless: boolean
   onNotice: (notice: ClaudeSessionMoveNotice) => void

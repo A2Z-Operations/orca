@@ -213,6 +213,10 @@ export class RuntimeAccountController {
     return this.requireServices().claudeAccounts.setAutoSwitch(enabled)
   }
 
+  setClaudeAuthProxy(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setAuthProxy(enabled)
+  }
+
   selectCodex(accountId: string | null): Promise<CodexRateLimitAccountsState> {
     return this.requireServices().codexAccounts.selectAccount(accountId)
   }

@@ -41,7 +41,7 @@ export type ClaudeAutoSwitched = {
   target: RateLimitRuntimeTarget
 } & Pick<
   ClaudeAutoSwitchedEvent,
-  'systemDefaultHome' | 'systemDefaultEmail' | 'systemDefaultOrganizationUuid'
+  'systemDefaultHome' | 'systemDefaultEmail' | 'systemDefaultOrganizationUuid' | 'paneAssignments'
 >
 
 type ClaudeAutoSwitchDecision =
@@ -128,13 +128,19 @@ export function createClaudeAccountAutoSwitch(
         if (switched) {
           // Why the account's own runtime: with the default WSL distro the usage target names no
           // distro, but the panes on those accounts sit in the account's distro's lane.
-          const { accounts, systemDefaultHome, systemDefaultEmail, systemDefaultOrganizationUuid } =
-            deps.accounts.listAccounts()
+          const {
+            accounts,
+            systemDefaultHome,
+            systemDefaultEmail,
+            systemDefaultOrganizationUuid,
+            paneAssignments
+          } = deps.accounts.listAccounts()
           deps.onSwitched({
             accounts,
             systemDefaultHome,
             systemDefaultEmail,
             systemDefaultOrganizationUuid,
+            ...(paneAssignments ? { paneAssignments } : {}),
             from,
             to,
             target: runtimeOf(to)

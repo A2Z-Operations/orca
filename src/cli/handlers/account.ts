@@ -39,6 +39,7 @@ import {
 import { getWslAccountTarget } from './account-wsl-location'
 import { addDataAccount, listDataAccounts, mutateDataAccount } from './data-account-commands'
 import { formatAccountsBlock, formatDataAccounts } from './account-list-format'
+import { setClaudeAuthProxy } from './account-auth-proxy'
 import { setClaudeAutoSwitch } from './account-auto-switch'
 import { setClaudeSessionMover } from './account-session-mover'
 
@@ -294,6 +295,7 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
     rejectAccountRemoteSelectionFlags(ctx, 'orca account rm')
     await mutateDataAccount(ctx, 'remove')
   },
+  'account auth-proxy': setClaudeAuthProxy,
   'account auto-switch': setClaudeAutoSwitch,
   'account session-mover': setClaudeSessionMover
 }

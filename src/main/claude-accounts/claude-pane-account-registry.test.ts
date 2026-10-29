@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   _internals,
+  assignClaudePaneAccount,
+  claudeAssignedAccountForProviderSession,
+  claudeBillingAccountForPaneKey,
   forgetClaudePaneAccount,
   getClaudePaneAccount,
   inferClaudeAccountIdFromTranscript,
   listClaudePaneAccounts,
   listClaudePaneAccountsByAccount,
   recordClaudePaneAccount,
+  rememberClaudeSessionAssignment,
+  setClaudePaneProxySlotReleaser,
   type ClaudePaneAccountRecord
 } from './claude-pane-account-registry'
 
@@ -93,5 +98,34 @@ describe('claude pane account registry', () => {
         accounts
       )
     ).toBeUndefined()
+  })
+
+  it('bills the assigned account in place and remembers it after the pane is forgotten', () => {
+    const entry = record('pty-1', 'a')
+    entry.proxySlot = 'slot-1'
+    recordClaudePaneAccount(entry)
+    const released: string[] = []
+    setClaudePaneProxySlotReleaser((slot) => released.push(slot))
+
+    expect(assignClaudePaneAccount('pty-1', 'b', 'sess-1')).toBe(true)
+    expect(assignClaudePaneAccount('missing', 'b')).toBe(false)
+    expect(entry.assignedAccountId).toBe('b')
+    expect(getClaudePaneAccount('pty-1')).toBe(entry)
+    expect(listClaudePaneAccountsByAccount('b').map((item) => item.ptyId)).toEqual(['pty-1'])
+    expect(listClaudePaneAccountsByAccount('a')).toEqual([])
+    expect(claudeBillingAccountForPaneKey(entry.paneKey ?? '')).toBe('b')
+
+    rememberClaudeSessionAssignment('sess-1', 'b')
+    forgetClaudePaneAccount('pty-1')
+    expect(released).toEqual(['slot-1'])
+    expect(getClaudePaneAccount('pty-1')).toBeNull()
+    expect(claudeAssignedAccountForProviderSession('sess-1')).toBe('b')
+  })
+
+  it('keeps folder routing when the assignment still matches the spawn account', () => {
+    const entry = record('pty-1', 'a')
+    entry.assignedAccountId = 'a'
+    recordClaudePaneAccount(entry)
+    expect(claudeBillingAccountForPaneKey(entry.paneKey ?? '')).toBeNull()
   })
 })

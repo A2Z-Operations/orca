@@ -1,9 +1,18 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../shared/constants'
 import { makePaneKey } from '../../shared/stable-pane-id'
 import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
 import { TEST_LEAF_1 } from '../persistence/persistence-session-fixtures'
 import {
+  _internals,
+  assignClaudePaneAccount,
+  claudeAssignedAccountForProviderSession,
+  getClaudePaneAccount,
+  recordClaudePaneAccount,
+  rememberClaudeSessionAssignment
+} from './claude-pane-account-registry'
+import {
+  createProxyMoveStrategy,
   createResumeMoveStrategy,
   type ClaudeSessionMoveRequest
 } from './claude-session-move-strategy'
@@ -142,5 +151,72 @@ describe('createResumeMoveStrategy', () => {
       kind: 'skipped',
       reason: 'no-pane'
     })
+  })
+})
+
+describe('createProxyMoveStrategy', () => {
+  afterEach(() => {
+    _internals.reset()
+  })
+
+  function strategy(assignSlot: (slot: string, accountId: string) => boolean = () => true) {
+    return createProxyMoveStrategy({
+      getPane: getClaudePaneAccount,
+      assignSlot,
+      assignAccount: assignClaudePaneAccount,
+      rememberSession: rememberClaudeSessionAssignment
+    })
+  }
+
+  it('skips a missing pane, a pane with no slot, and a slot the proxy will not take', async () => {
+    await expect(strategy().move(request())).resolves.toEqual({
+      kind: 'skipped',
+      reason: 'no-pane'
+    })
+    recordClaudePaneAccount({
+      ptyId: 'pty-old',
+      paneKey: null,
+      accountId: 'b',
+      configDir: null,
+      launchedAt: 0,
+      pinned: false,
+      source: 'spawn'
+    })
+    await expect(strategy().move(request())).resolves.toEqual({
+      kind: 'skipped',
+      reason: 'no-controller'
+    })
+    const pane = getClaudePaneAccount('pty-old')
+    if (pane) {
+      pane.proxySlot = 'slot-1'
+    }
+    await expect(strategy(() => false).move(request())).resolves.toEqual({
+      kind: 'skipped',
+      reason: 'no-controller'
+    })
+  })
+
+  it('flips the slot, updates the registry in place, and keeps the same pty', async () => {
+    recordClaudePaneAccount({
+      ptyId: 'pty-old',
+      paneKey: null,
+      accountId: 'b',
+      configDir: '/profiles/b/home',
+      launchedAt: 0,
+      pinned: false,
+      source: 'spawn',
+      proxySlot: 'slot-1',
+      assignedAccountId: 'b'
+    })
+    const assignSlot = vi.fn(() => true)
+    const pane = getClaudePaneAccount('pty-old')
+    await expect(strategy(assignSlot).move(request())).resolves.toEqual({
+      kind: 'moved',
+      newPtyId: 'pty-old'
+    })
+    expect(assignSlot).toHaveBeenCalledWith('slot-1', 'c')
+    expect(pane?.assignedAccountId).toBe('c')
+    expect(getClaudePaneAccount('pty-old')).toBe(pane)
+    expect(claudeAssignedAccountForProviderSession('sess-abc')).toBe('c')
   })
 })

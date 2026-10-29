@@ -4,10 +4,10 @@ import { normalizeClaudeConfigDir } from '../rate-limits/service/service-types'
 /**
  * Which managed Claude account each live PTY runs on.
  *
- * Why: `CLAUDE_CONFIG_DIR` is baked into a PTY's environment at spawn, so the account a session runs
- * on is fixed for its life; the session mover needs that account to read the right usage and to
- * know where a resume must NOT land. Kept in memory: a PTY that outlives the app is re-learned from
- * the hook server's transcript path (`inferClaudeAccountIdFromTranscript`).
+ * Why: `CLAUDE_CONFIG_DIR` is baked in at spawn, so `accountId` stays the spawn folder. After a
+ * proxy move, `assignedAccountId` is the account the next request bills. A hand restart looks up
+ * the provider session in `sessionAssignments`, which outlives the PTY. A PTY that outlives the app
+ * is re-learned from the transcript path (`inferClaudeAccountIdFromTranscript`).
  */
 
 export type ClaudePaneAccountSource = 'spawn' | 'transcript'
@@ -29,16 +29,77 @@ export type ClaudePaneAccountRecord = {
    */
   pinned: boolean
   source: ClaudePaneAccountSource
+  /** Account the auth proxy bills. Absent until a launch records it, then equal to `accountId`. */
+  assignedAccountId?: string
+  /** Path segment in this pane's ANTHROPIC_BASE_URL (`/p/<slot>/`). */
+  proxySlot?: string
+  /** Claude session id, remembered so a later `--resume` stays on the billed account. */
+  providerSessionId?: string
 }
 
 const records = new Map<string, ClaudePaneAccountRecord>()
+/** Survives `forgetClaudePaneAccount`: a hand restart may drop the PTY before the new spawn. */
+const sessionAssignments = new Map<string, string>()
+let releaseProxySlot: ((slot: string) => void) | null = null
+
+export function setClaudePaneProxySlotReleaser(release: ((slot: string) => void) | null): void {
+  releaseProxySlot = release
+}
+
+/** The account whose quota this pane consumes: the proxy assignment when one exists. */
+export function claudeBillingAccountId(record: ClaudePaneAccountRecord): string {
+  return record.assignedAccountId ?? record.accountId
+}
 
 export function recordClaudePaneAccount(record: ClaudePaneAccountRecord): void {
   records.set(record.ptyId, record)
 }
 
 export function forgetClaudePaneAccount(ptyId: string): void {
+  const record = records.get(ptyId)
+  if (record?.proxySlot) {
+    releaseProxySlot?.(record.proxySlot)
+  }
   records.delete(ptyId)
+}
+
+/** In-place so a mover view holding this record sees the account the proxy just flipped to. */
+export function assignClaudePaneAccount(
+  ptyId: string,
+  accountId: string,
+  providerSessionId?: string
+): boolean {
+  const record = records.get(ptyId)
+  if (!record) {
+    return false
+  }
+  record.assignedAccountId = accountId
+  if (providerSessionId) {
+    record.providerSessionId = providerSessionId
+  }
+  return true
+}
+
+export function rememberClaudeSessionAssignment(sessionId: string, accountId: string): void {
+  sessionAssignments.set(sessionId, accountId)
+}
+
+export function claudeAssignedAccountForProviderSession(sessionId: string): string | null {
+  return sessionAssignments.get(sessionId) ?? null
+}
+
+/** Assigned account only when it differs from the spawn account, so an unmoved pane stays on folder routing. */
+export function claudeBillingAccountForPaneKey(paneKey: string): string | null {
+  for (const record of records.values()) {
+    if (
+      record.paneKey === paneKey &&
+      record.assignedAccountId &&
+      record.assignedAccountId !== record.accountId
+    ) {
+      return record.assignedAccountId
+    }
+  }
+  return null
 }
 
 export function getClaudePaneAccount(ptyId: string): ClaudePaneAccountRecord | null {
@@ -50,7 +111,7 @@ export function listClaudePaneAccounts(): ClaudePaneAccountRecord[] {
 }
 
 export function listClaudePaneAccountsByAccount(accountId: string): ClaudePaneAccountRecord[] {
-  return listClaudePaneAccounts().filter((record) => record.accountId === accountId)
+  return listClaudePaneAccounts().filter((record) => claudeBillingAccountId(record) === accountId)
 }
 
 export type ClaudeAccountHomes = { id: string; homes: readonly (string | null | undefined)[] }
@@ -87,5 +148,7 @@ export function inferClaudeAccountIdFromTranscript(
 export const _internals = {
   reset: (): void => {
     records.clear()
+    sessionAssignments.clear()
+    releaseProxySlot = null
   }
 }

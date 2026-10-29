@@ -57,6 +57,7 @@ import {
   SelectAccountParams,
   SelectCodexAccountForTargetParams,
   SelectDataAccountParams,
+  SetClaudeAuthProxyParams,
   SetClaudeAutoSwitchParams,
   SetClaudeSessionMoverParams
 } from './accounts-params'
@@ -721,6 +722,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'accounts.selectCodex': SelectAccountParams,
   'accounts.selectCodexForTarget': SelectCodexAccountForTargetParams,
   'accounts.selectData': SelectDataAccountParams,
+  'accounts.setClaudeAuthProxy': SetClaudeAuthProxyParams,
   'accounts.setClaudeAutoSwitch': SetClaudeAutoSwitchParams,
   'accounts.setClaudeSessionMover': SetClaudeSessionMoverParams,
   'accounts.setHostLaunchEnv': HostAccountLaunchEnvParams,

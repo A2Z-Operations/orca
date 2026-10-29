@@ -40,7 +40,9 @@ export function evaluateClaudeMoverSessions(
   let readRequested = false
   for (const view of views) {
     const { ptyId } = view.record
-    const from = accounts.find((account) => account.id === view.record.accountId)
+    const from = accounts.find(
+      (account) => account.id === (view.record.assignedAccountId ?? view.record.accountId)
+    )
     if (
       !from ||
       inflight.has(ptyId) ||
@@ -57,6 +59,7 @@ export function evaluateClaudeMoverSessions(
     if (!view.paneBackgroundWork) {
       backgroundWaitAt.delete(ptyId)
     }
+    const proxyMove = Boolean(view.record.proxySlot && deps.proxyStrategy)
     const decision = decideClaudeSessionMove({
       now,
       setting: effective,
@@ -70,7 +73,8 @@ export function evaluateClaudeMoverSessions(
       lastUsageReadAt,
       lastMoveAt: lastMoveAt.get(ptyId) ?? 0,
       lastFailureAt: lastFailureAt.get(ptyId) ?? 0,
-      targetClaims
+      targetClaims,
+      allowMidTurn: proxyMove
     })
     if (
       decision.kind === 'wait' &&
@@ -136,7 +140,8 @@ export function evaluateClaudeMoverSessions(
     // Publication can expose the replacement PTY before this move settles.
     inflightPanes.add(paneKey)
     remember(view, from, to, 'moving', own?.rateLimits ?? null, now)
-    void deps.strategy
+    const strategy = proxyMove && deps.proxyStrategy ? deps.proxyStrategy : deps.strategy
+    void strategy
       .move({
         ptyId,
         paneKey: view.paneKey,

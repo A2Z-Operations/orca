@@ -11,6 +11,7 @@ import { CodexRuntimeHomeService } from './codex-accounts/runtime-home-service'
 import { CodexAccountService } from './codex-accounts/service'
 import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import { ClaudeAccountService } from './claude-accounts/service'
+import { claudeBillingAccountForPaneKey } from './claude-accounts/claude-pane-account-registry'
 import {
   createClaudeAccountAutoSwitch,
   type ClaudeAutoSwitched
@@ -127,7 +128,8 @@ export function createProviderAccountServices(
   )
   // Live statusLine usage avoids OAuth endpoint polling and its 429s.
   options.setClaudeStatusLineListener((event) => {
-    rateLimits.ingestLiveClaudeRateLimits(event)
+    const billingAccountId = event.paneKey ? claudeBillingAccountForPaneKey(event.paneKey) : null
+    rateLimits.ingestLiveClaudeRateLimits(billingAccountId ? { ...event, billingAccountId } : event)
   })
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()

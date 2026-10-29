@@ -20,6 +20,10 @@ import { createAgentModelCatalogSettingsExpiry } from '../native-chat/agent-mode
 import { getRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
 import { translateMain } from '../i18n/main-i18n'
 import type { ClaudeAutoSwitchedEvent } from '../../shared/managed-account-types'
+import {
+  startClaudeAuthProxy,
+  stopClaudeAuthProxy
+} from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { mainProcessState as state } from './main-process-state'
 
 // Settings that change which account or binary a new chat's agent runs under.
@@ -68,11 +72,17 @@ export function initializeMainProcessAccountServices(): void {
         }
         const body =
           notice.kind === 'moved'
-            ? translateMain(
-                'accounts.claude.sessionMover.movedBody',
-                '{{from}} is near its usage limit. The session continues on {{to}}.',
-                { from: notice.from.email, to: notice.to?.email ?? '' }
-              )
+            ? notice.restartless
+              ? translateMain(
+                  'accounts.claude.sessionMover.movedRestartlessBody',
+                  '{{from}} is near its usage limit. The session continues on {{to}} without a restart.',
+                  { from: notice.from.email, to: notice.to?.email ?? '' }
+                )
+              : translateMain(
+                  'accounts.claude.sessionMover.movedBody',
+                  '{{from}} is near its usage limit. The session continues on {{to}}.',
+                  { from: notice.from.email, to: notice.to?.email ?? '' }
+                )
             : notice.kind === 'ask'
               ? translateMain(
                   'accounts.claude.sessionMover.askBody',
@@ -115,7 +125,11 @@ export function initializeMainProcessAccountServices(): void {
       })
     }
   })
-  state.stopClaudeSessionMover = services.sessionMover?.stop ?? null
+  void startClaudeAuthProxy()
+  state.stopClaudeSessionMover = () => {
+    services.sessionMover?.stop()
+    void stopClaudeAuthProxy()
+  }
   state.rateLimits = services.rateLimits
   state.codexRuntimeHome = services.codexRuntimeHome
   state.codexAccounts = services.codexAccounts

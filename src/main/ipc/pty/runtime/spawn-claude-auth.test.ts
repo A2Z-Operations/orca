@@ -7,6 +7,7 @@ import {
   CLAUDE_PROFILE_POINTER_ENV,
   CLAUDE_USER_CONFIG_DIR_ENV
 } from '../../../../shared/claude-profile-routing'
+import { resetUserAnthropicBaseUrlNote } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-note'
 import { applyRuntimeClaudeAuthEnv, resolveRuntimeClaudeAuth } from './spawn-claude-auth'
 
 const selected: ClaudeRuntimeAuthPreparation = {
@@ -58,6 +59,31 @@ describe('resolveRuntimeClaudeAuth', () => {
     await expect(
       resolveRuntimeClaudeAuth({ args: {}, deps: {}, codexSelectionTarget: { runtime: 'host' } })
     ).resolves.toBeNull()
+  })
+
+  it('relaunches a remembered session on the assigned account, and leaves other resumes on the selection', async () => {
+    const prepareClaudeAuth = vi.fn(async () => selected)
+    const prepareLaunchFor = vi.fn(async () => target)
+    const assignedAccountForResume = vi.fn((sessionId: string) =>
+      sessionId === 'sess-moved' ? 'b' : null
+    )
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only these two methods are read here.
+    installClaudeProfileRouter({
+      prepareLaunchFor,
+      assignedAccountForResume
+    } as unknown as ClaudeProfileRouter)
+    const codexSelectionTarget = { runtime: 'host' as const }
+    const resume = (id: string) =>
+      resolveRuntimeClaudeAuth({
+        args: { resumeProviderSession: { key: 'session_id', id } },
+        deps: { prepareClaudeAuth },
+        codexSelectionTarget
+      })
+
+    await expect(resume('sess-moved')).resolves.toBe(target)
+    expect(prepareLaunchFor).toHaveBeenCalledWith('b')
+    await expect(resume('sess-other')).resolves.toBe(selected)
+    expect(prepareClaudeAuth).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -121,5 +147,26 @@ describe('applyRuntimeClaudeAuthEnv', () => {
     expect(unset).not.toHaveProperty('CLAUDE_CONFIG_DIR')
     expect(unset).not.toHaveProperty(CLAUDE_INJECTED_CONFIG_DIR_ENV)
     expect(unset).not.toHaveProperty(CLAUDE_PROFILE_POINTER_ENV)
+  })
+
+  it('keeps a user-set ANTHROPIC_BASE_URL instead of the proxy slot', () => {
+    resetUserAnthropicBaseUrlNote()
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const env = applyRuntimeClaudeAuthEnv(
+      { ...terminalEnv, ANTHROPIC_BASE_URL: 'https://gateway.example' },
+      {
+        ...selected,
+        envPatch: {
+          CLAUDE_CONFIG_DIR: '/a',
+          ANTHROPIC_BASE_URL: 'http://127.0.0.1:9/p/slot/'
+        }
+      },
+      false
+    )
+    expect(env?.ANTHROPIC_BASE_URL).toBe('https://gateway.example')
+    expect(env?.CLAUDE_CONFIG_DIR).toBe('/a')
+    expect(info).toHaveBeenCalled()
+    info.mockRestore()
+    resetUserAnthropicBaseUrlNote()
   })
 })

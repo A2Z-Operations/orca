@@ -240,4 +240,38 @@ describe('RateLimitService live Claude usage routing', () => {
     expect(state.claude).toBeNull()
     expect(state.inactiveClaudeAccounts).toEqual([])
   })
+
+  it('attributes a proxy-billed post to the assigned account, not the spawn folder', async () => {
+    const rateLimits = service()
+    rateLimits.ingestLiveClaudeRateLimits({
+      configDir: HOMES.a,
+      fiveHour: { used_percentage: 97 },
+      sevenDay: null,
+      billingAccountId: 'b'
+    })
+    const state = rateLimits.getState()
+    expect(state.claude).toBeNull()
+    expect(
+      state.inactiveClaudeAccounts.find((usage) => usage.accountId === 'b')?.rateLimits?.session
+        ?.usedPercent
+    ).toBe(97)
+
+    vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 18))
+    mockFreshBackgroundProviderFetches()
+    const selected = service()
+    selected.setClaudeAuthPreparationResolver(async () => ({
+      configDir: HOMES.a,
+      envPatch: { CLAUDE_CONFIG_DIR: HOMES.a },
+      provenance: 'profile:a'
+    }))
+    await selected.refresh()
+    selected.ingestLiveClaudeRateLimits({
+      configDir: HOMES.b,
+      fiveHour: { used_percentage: 44 },
+      sevenDay: null,
+      billingAccountId: 'a'
+    })
+    expect(selected.getState().claude?.session?.usedPercent).toBe(44)
+    expect(selected.getState().inactiveClaudeAccounts).toEqual([])
+  })
 })
