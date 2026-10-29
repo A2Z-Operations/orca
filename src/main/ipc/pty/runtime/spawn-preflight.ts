@@ -13,7 +13,11 @@ import {
 } from '../../../daemon/pty-session-id'
 import { resolvePathEnvKey } from '../../../pty/windows-environment-path'
 import type { RuntimePtySpawnState } from './spawn-state'
-import { applyRuntimeClaudeAuthEnv, resolveRuntimeClaudeAuth } from './spawn-claude-auth'
+import {
+  applyRuntimeClaudeAuthEnv,
+  claudeLaunchPinsAccount,
+  resolveRuntimeClaudeAuth
+} from './spawn-claude-auth'
 import { resolveRuntimeHostSessionBinding } from './spawn-host-binding'
 import { resolvePtySpawnStartupTarget } from '../spawn-startup-target'
 import { resolvePtySpawnHostEnv } from '../spawn-host-env'
@@ -89,7 +93,11 @@ export async function prepareRuntimePtySpawn(
   // Why `??=`: a replacing spawn validated its binding before the stop (spawn.ts); reuse it.
   ctx.hostSessionBinding ??= resolveRuntimeHostSessionBinding(ctx.deps, args)
   ctx.shouldPersistHostSessionBinding = ctx.hostSessionBinding !== undefined
-  ctx.env = applyRuntimeClaudeAuthEnv(args.env, ctx.claudeAuth, args.claudeAccountId !== undefined)
+  ctx.env = applyRuntimeClaudeAuthEnv(
+    args.env,
+    ctx.claudeAuth,
+    claudeLaunchPinsAccount(ctx.claudeAuth, args.claudeAccountId)
+  )
   ctx.requestedAgentTeamsPath = ctx.env?.ORCA_AGENT_TEAMS_TEAM_ID
     ? ctx.env[resolvePathEnvKey(ctx.env, process.platform)]
     : undefined

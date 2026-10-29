@@ -1,4 +1,7 @@
-import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
+import type {
+  ClaudeAccountPoolSetting,
+  ClaudeSessionMoverSetting
+} from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeManagedAccount,
   ClaudeManagedAccountSummary,
@@ -37,6 +40,7 @@ export type ClaudeAccountSettings = Pick<
   | 'claudeAutoSwitchEnabled'
   | 'claudeSessionMover'
   | 'claudeAuthProxy'
+  | 'claudeAccountPool'
 >
 
 export type ClaudeAccountStore = {
@@ -89,6 +93,11 @@ export class ClaudeAccountSelection {
     return this.list()
   }
 
+  setAccountPool(setting: ClaudeAccountPoolSetting): ClaudeRateLimitAccountsState {
+    this.saveSettings({ claudeAccountPool: setting })
+    return this.list()
+  }
+
   list(): ClaudeRateLimitAccountsState {
     this.pruneSelection()
     const settings = this.store.getSettings()
@@ -119,6 +128,7 @@ export class ClaudeAccountSelection {
       autoSwitchEnabled: settings.claudeAutoSwitchEnabled === true,
       sessionMover: settings.claudeSessionMover ?? 'ask',
       authProxy: settings.claudeAuthProxy === false ? 'off' : 'on',
+      accountPool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       sessionMoves: this.sessionMovesProvider?.() ?? [],
       ...(paneAssignments.length > 0 ? { paneAssignments } : {}),
       ...(accounts.length > 0

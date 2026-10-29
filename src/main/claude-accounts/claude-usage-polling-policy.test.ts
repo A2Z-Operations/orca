@@ -15,6 +15,20 @@ describe('claude usage polling policy', () => {
     expect(
       shouldPollClaudeUsage({ claudeAutoSwitchEnabled: false, claudeSessionMover: 'move' })
     ).toBe(true)
+    expect(
+      shouldPollClaudeUsage({
+        claudeAutoSwitchEnabled: false,
+        claudeSessionMover: 'off',
+        claudeAccountPool: 'on'
+      })
+    ).toBe(true)
+    expect(
+      shouldPollClaudeUsage({
+        claudeAutoSwitchEnabled: false,
+        claudeSessionMover: 'off',
+        claudeAccountPool: 'off'
+      })
+    ).toBe(false)
     // Absent means 'ask', which on a headless host acts as 'move'.
     expect(shouldPollClaudeUsage({})).toBe(true)
   })
