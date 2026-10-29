@@ -342,4 +342,38 @@ describe('runtime-selector flags on locally pinned CLI commands', () => {
     ])
     expect(callMock).not.toHaveBeenCalled()
   })
+
+  it('routes `account session-mover --environment` to the named server too', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
+    callMock.mockImplementation(async (method: string) => {
+      if (method === 'accounts.setClaudeSessionMover') {
+        return okFixture('req_session_mover', {
+          accounts: [],
+          activeAccountId: null,
+          sessionMover: 'move'
+        })
+      }
+      throw new Error(`unexpected ${method}`)
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    runtimeClientConstructorMock.mockClear()
+
+    await main(
+      [
+        'account',
+        'session-mover',
+        '--agent',
+        'claude',
+        '--move',
+        '--environment',
+        'm4air',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual({ sessionMover: 'move' })
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
+    expect(callMock).toHaveBeenCalledWith('accounts.setClaudeSessionMover', { setting: 'move' })
+  })
 })

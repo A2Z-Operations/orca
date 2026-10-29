@@ -1,8 +1,6 @@
 import { withClaudeProfileTerminalEnv } from '../../../claude-accounts/claude-profile-installed-router'
 import type { PtySpawnResult } from '../../../providers/pty-provider-contract'
 import { LocalPtyProvider } from '../../../providers/local-pty-provider'
-import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
-import { isTerminalLeafId } from '../../../../shared/stable-pane-id'
 import { getProvider } from '../provider/registry'
 import {
   isClaudeLaunchCommand,
@@ -16,6 +14,12 @@ import {
 import { resolvePathEnvKey } from '../../../pty/windows-environment-path'
 import type { RuntimePtySpawnState } from './spawn-state'
 import { localPtySpawnCwd } from '../host-env/spawn-cwd'
+import {
+  applyRuntimeClaudeAuthEnv,
+  claudeLaunchPinsAccount,
+  resolveRuntimeClaudeAuth
+} from './spawn-claude-auth'
+import { resolveRuntimeHostSessionBinding } from './spawn-host-binding'
 import { resolvePtySpawnStartupTarget } from '../spawn-startup-target'
 import { resolvePtySpawnHostEnv } from '../spawn-host-env'
 import { ptySpawnPaneFromIds, stampPtySpawnPaneEnv } from '../spawn-pane-env'
@@ -92,33 +96,19 @@ export async function prepareRuntimePtySpawn(
   ctx.expectedWslDistro = target.expectedWslDistro
   ctx.codexSelectionTarget = target.codexSelectionTarget
   args.env = withClaudeProfileTerminalEnv(args.env, ctx.codexSelectionTarget)
-  ctx.claudeAuth =
-    ctx.isClaudeLaunch && ctx.deps.prepareClaudeAuth
-      ? await ctx.deps.prepareClaudeAuth(ctx.codexSelectionTarget)
-      : null
+  // Why `??`: a replacement resolved its pinned account before the stop (spawn.ts); reuse it.
+  ctx.claudeAuth = ctx.isClaudeLaunch
+    ? (ctx.claudeAuth ?? (await resolveRuntimeClaudeAuth(ctx)))
+    : null
 
-  ctx.shouldPersistHostSessionBinding = args.persistHostSessionBinding === true
-  if (ctx.shouldPersistHostSessionBinding) {
-    if (
-      !ctx.deps.store ||
-      typeof args.worktreeId !== 'string' ||
-      typeof args.tabId !== 'string' ||
-      !isValidTerminalTabId(args.tabId) ||
-      typeof args.leafId !== 'string' ||
-      !isTerminalLeafId(args.leafId)
-    ) {
-      throw new Error('Cannot persist runtime PTY binding without worktreeId, tabId, and leafId')
-    }
-    ctx.hostSessionBinding = {
-      store: ctx.deps.store,
-      worktreeId: args.worktreeId,
-      tabId: args.tabId,
-      leafId: args.leafId,
-      ...(args.expectedSourceBinding ? { expectedSourceBinding: args.expectedSourceBinding } : {}),
-      ...(args.placement ? { placement: args.placement } : {})
-    }
-  }
-  ctx.env = ctx.claudeAuth ? { ...args.env, ...ctx.claudeAuth.envPatch } : args.env
+  // Why `??=`: a replacing spawn validated its binding before the stop (spawn.ts); reuse it.
+  ctx.hostSessionBinding ??= resolveRuntimeHostSessionBinding(ctx.deps, args)
+  ctx.shouldPersistHostSessionBinding = ctx.hostSessionBinding !== undefined
+  ctx.env = applyRuntimeClaudeAuthEnv(
+    args.env,
+    ctx.claudeAuth,
+    claudeLaunchPinsAccount(args.claudeAccountId)
+  )
   ctx.requestedAgentTeamsPath = ctx.env?.ORCA_AGENT_TEAMS_TEAM_ID
     ? ctx.env[resolvePathEnvKey(ctx.env, process.platform)]
     : undefined

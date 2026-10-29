@@ -178,6 +178,10 @@ export class RuntimeAccountController {
     return this.requireServices().claudeAccounts.setAutoSwitch(enabled)
   }
 
+  setClaudeSessionMover(setting: 'off' | 'ask' | 'move'): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setSessionMover(setting)
+  }
+
   selectCodex(accountId: string | null): Promise<CodexRateLimitAccountsState> {
     return this.requireServices().codexAccounts.selectAccount(accountId)
   }

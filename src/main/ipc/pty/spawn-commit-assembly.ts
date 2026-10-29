@@ -1,3 +1,4 @@
+import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
 import type { PtySpawnSizeSeed } from './spawn-options-assembly'
 import { isValidTerminalTabId } from '../../../shared/terminal-tab-id'
 import type { AgentSessionClaimedSpawnResult } from '../../../shared/agent-session-host-authority'
@@ -49,6 +50,7 @@ export type PtySpawnCommitState = {
     | 'resumeProviderSession'
     | 'onResumeOutcome'
     | 'telemetry'
+    | 'claudeAccountId'
   >
   result: PtySpawnResult
   provider: IPtyProvider
@@ -69,6 +71,8 @@ export type PtySpawnCommitState = {
   /** Before the provider started anything, so no output of this spawn's process predates it. */
   spawnRequestedAt?: number
   reattachedCodexHomeRoutes: Map<string, CodexPaneHomeRoute | null>
+  isClaudeLaunch: boolean
+  claudeAuth: ClaudeRuntimeAuthPreparation | null
   launchCommand: string | undefined
   preSpawnHiddenMarkId: string | null
   replacedPaneOwner?: ReplacedPaneOwner | null

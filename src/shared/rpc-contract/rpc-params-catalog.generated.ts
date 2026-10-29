@@ -61,7 +61,8 @@ import {
   SelectAccountParams,
   SelectCodexAccountForTargetParams,
   SelectDataAccountParams,
-  SetClaudeAutoSwitchParams
+  SetClaudeAutoSwitchParams,
+  SetClaudeSessionMoverParams
 } from './accounts-params'
 import { PrepareCodexForWslPaneParams } from './agent-hooks-params'
 import { AgentLaunch, AgentLaunchReplay } from './agent-launch-params'
@@ -740,6 +741,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'accounts.selectCodexForTarget': SelectCodexAccountForTargetParams,
   'accounts.selectData': SelectDataAccountParams,
   'accounts.setClaudeAutoSwitch': SetClaudeAutoSwitchParams,
+  'accounts.setClaudeSessionMover': SetClaudeSessionMoverParams,
   'accounts.setHostLaunchEnv': HostAccountLaunchEnvParams,
   'accounts.subscribe': null,
   'accounts.unsubscribe': AccountsUnsubscribeParams,

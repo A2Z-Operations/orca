@@ -56,8 +56,31 @@ describe('AgentHookServer listener replay', () => {
     expect(server.getStatusChangeSnapshot()).toEqual([
       expect.objectContaining({
         state: 'working',
-        mainAgentState: 'done'
+        mainAgentState: 'done',
+        backgroundWork: true
       })
+    ])
+  })
+
+  it('marks background work when a non-agent task is still running', () => {
+    const server = new AgentHookServer()
+    server.ingestRemote(
+      {
+        paneKey: PANE,
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        claudeRunningNonAgentTask: true,
+        payload: {
+          state: 'done',
+          agentType: 'claude',
+          mainAgent: { state: 'done', stateStartedAt: 1 }
+        }
+      },
+      'conn-1'
+    )
+
+    expect(server.getStatusChangeSnapshot()).toEqual([
+      expect.objectContaining({ state: 'done', mainAgentState: 'done', backgroundWork: true })
     ])
   })
 

@@ -41,6 +41,7 @@ import { getWslAccountTarget } from './account-wsl-location'
 import { addDataAccount, listDataAccounts, mutateDataAccount } from './data-account-commands'
 import { formatAccountsBlock, formatDataAccounts } from './account-list-format'
 import { setClaudeAutoSwitch } from './account-auto-switch'
+import { setClaudeSessionMover } from './account-session-mover'
 
 type AccountsListSnapshot = {
   opencode?: ManagedDataAccountsState
@@ -300,5 +301,6 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
     rejectAccountRemoteSelectionFlags(ctx, 'orca account rm')
     await mutateDataAccount(ctx, 'remove')
   },
-  'account auto-switch': setClaudeAutoSwitch
+  'account auto-switch': setClaudeAutoSwitch,
+  'account session-mover': setClaudeSessionMover
 }
