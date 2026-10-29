@@ -176,12 +176,19 @@ export function setup(
     paneKey: string,
     accountId: string,
     paneState: AgentHookStatusChangeEntry['state'] = 'done',
-    pinned = false
+    pinned = false,
+    mainAgentState?: AgentHookStatusChangeEntry['mainAgentState']
   ) => {
     records.push(record(ptyId, paneKey, accountId, pinned))
     statuses = [
       ...statuses,
-      { paneKey, state: paneState, receivedAt: Date.now(), observedInCurrentRuntime: true }
+      {
+        paneKey,
+        state: paneState,
+        ...(mainAgentState ? { mainAgentState } : {}),
+        receivedAt: Date.now(),
+        observedInCurrentRuntime: true
+      }
     ]
     providerSessions = [
       ...providerSessions,

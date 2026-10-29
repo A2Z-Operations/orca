@@ -124,6 +124,7 @@ export function decideClaudeSessionMove(
     return { kind: 'stay', reason: 'cooldown' }
   }
   // Why never mid-turn: a restart during a tool call or a permission prompt loses the turn.
+  // paneState is the main agent's own state when the hook published one, so background monitoring does not hold the restart.
   if (inputs.paneState === null) {
     return { kind: 'wait', reason: 'no-status' }
   }

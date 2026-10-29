@@ -270,6 +270,10 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
         statuses.push({
           paneKey,
           state: enriched.payload.state,
+          // A monitoring pane stays working after the main agent settles; movers follow the main agent.
+          ...(enriched.payload.mainAgent
+            ? { mainAgentState: enriched.payload.mainAgent.state }
+            : {}),
           receivedAt: enriched.receivedAt,
           observedInCurrentRuntime:
             Boolean(enriched.structuredHost) || this.runtimeObservedStatusPaneKeys.has(paneKey)

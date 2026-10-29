@@ -21,6 +21,14 @@ export type ClaudeMoverSessionView = {
   worktreeId: string | null
 }
 
+/** Combined pane state folds in live children. The mover follows the main agent when one was published. */
+function moverPaneState(entry: AgentHookStatusChangeEntry | undefined): AgentStatusState | null {
+  if (!entry) {
+    return null
+  }
+  return entry.mainAgentState ?? entry.state
+}
+
 /**
  * Every live Claude session the mover may act on: the registry's records, plus sessions Orca did not
  * route (a shell's own CLAUDE_CONFIG_DIR) learned from their transcript path and recorded as pinned.
@@ -40,7 +48,7 @@ export function collectClaudeMoverSessions(args: {
   recordInferred: (record: ClaudePaneAccountRecord) => void
   now: number
 }): ClaudeMoverSessionView[] {
-  const statusByPane = new Map(args.statuses.map((entry) => [entry.paneKey, entry.state]))
+  const statusByPane = new Map(args.statuses.map((entry) => [entry.paneKey, entry]))
   const identityByPane = new Map(
     args.providerSessions.map((identity) => [identity.paneKey, identity])
   )
@@ -73,7 +81,7 @@ export function collectClaudeMoverSessions(args: {
     return {
       record,
       paneKey,
-      paneState: paneKey ? (statusByPane.get(paneKey) ?? null) : null,
+      paneState: paneKey ? moverPaneState(statusByPane.get(paneKey)) : null,
       providerSession: identity
         ? (args.resolveProviderSession(identity.paneKey, identity.sessionId) ?? {
             key: 'session_id',

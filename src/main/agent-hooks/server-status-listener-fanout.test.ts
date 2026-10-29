@@ -36,6 +36,28 @@ afterEach(() => {
 })
 
 describe('AgentHookServer listener replay', () => {
+  it('carries the main agent state on the status-change snapshot', () => {
+    const server = new AgentHookServer()
+    server.ingestRemote(
+      {
+        paneKey: PANE,
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        payload: {
+          state: 'working',
+          workingMode: 'monitoring',
+          agentType: 'claude',
+          mainAgent: { state: 'done', stateStartedAt: 1 }
+        }
+      },
+      'conn-1'
+    )
+
+    expect(server.getStatusChangeSnapshot()).toEqual([
+      expect.objectContaining({ state: 'working', mainAgentState: 'done' })
+    ])
+  })
+
   it('allows multiple status-change subscribers to observe the same update', () => {
     const server = new AgentHookServer()
     const first = vi.fn()

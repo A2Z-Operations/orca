@@ -105,6 +105,16 @@ describe('session mover lifecycle and metadata', () => {
     expect(f.move).not.toHaveBeenCalled()
   })
 
+  it('moves a monitoring pane whose main agent is already done', async () => {
+    const f = setup()
+    f.session('pty-1', PANE_1, 'b', 'working', false, 'done')
+    f.mover.start()
+    f.publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    expect(f.mover.lastDecisions()[0]?.reason).not.toBe('wait:mid-turn')
+    expect(f.move).toHaveBeenCalledTimes(1)
+  })
+
   it('records under-line, read-usage and off decisions without moving', async () => {
     const f = setup()
     f.session('pty-1', PANE_1, 'b')

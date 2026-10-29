@@ -67,6 +67,13 @@ describe('decideClaudeSessionMove', () => {
     })
   })
 
+  it('does not wait mid-turn when the main agent is done and the pane only monitors', () => {
+    // paneState is the main agent's state once the session view is collected.
+    const decision = decideClaudeSessionMove(inputs({ paneState: 'done' }))
+    expect(decision).not.toEqual({ kind: 'wait', reason: 'mid-turn' })
+    expect(decision.kind).toBe('move')
+  })
+
   it('leaves a pinned session alone until its account is at the limit', () => {
     expect(decideClaudeSessionMove(inputs({ pinned: true, usage: limits(96) }))).toEqual({
       kind: 'stay',
