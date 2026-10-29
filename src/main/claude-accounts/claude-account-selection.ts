@@ -9,6 +9,7 @@ import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { RateLimitService } from '../rate-limits/service'
 import { claudeStateFile, readClaudeFolderLogin } from './claude-account-folder'
 import { savedWslClaudeAccountHome } from './claude-profile-wsl-paths'
+import { wslAuthProxyStatus } from './wsl-auth-proxy-status'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
 import { listClaudePaneAccounts } from './claude-pane-account-registry'
 import {
@@ -112,6 +113,8 @@ export class ClaudeAccountSelection {
     // Throttle parsing of the large, frequently rewritten personal state file.
     const systemDefault =
       accounts.length > 0 ? readClaudeFolderLogin(claudeStateFile(userConfigDir), 5_000) : null
+    const wslAuthProxy =
+      process.platform === 'win32' ? wslAuthProxyStatus(settings.claudeManagedAccounts) : undefined
     return {
       accounts,
       activeAccountId: selection.host,
@@ -120,6 +123,7 @@ export class ClaudeAccountSelection {
       sessionMover: settings.claudeSessionMover ?? 'ask',
       authProxy: settings.claudeAuthProxy === false ? 'off' : 'on',
       sessionMoves: this.sessionMovesProvider?.() ?? [],
+      ...(wslAuthProxy ? { wslAuthProxy } : {}),
       ...(paneAssignments.length > 0 ? { paneAssignments } : {}),
       ...(accounts.length > 0
         ? { systemDefaultHome: this.runtimeAuth.router.systemDefaultHome() }

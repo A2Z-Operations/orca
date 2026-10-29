@@ -50,6 +50,31 @@ describe('account RPC methods', () => {
     expect(setClaudeAuthProxy).toHaveBeenCalledWith(false)
   })
 
+  it('assigns a pane on the execution host, including one without account services', async () => {
+    const assigned = { assigned: true }
+    const assignClaudePane = vi.fn().mockReturnValue(assigned)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler only calls assignClaudePane.
+    const runtime = { assignClaudePane } as unknown as OrcaRuntimeService
+    const assign = method('accounts.assignClaudePane')
+    if (isStreamingMethod(assign)) {
+      throw new Error('accounts.assignClaudePane must be a request method')
+    }
+
+    expect(assign.permission).toBe('accounts-admin')
+    expect(() => assign.params?.parse({ ptyId: '', accountId: 'a' })).toThrow()
+    await expect(
+      assign.handler(
+        { ptyId: 'pty-1', accountId: 'account-b', configDir: '/home/u/.claude-b' },
+        { runtime }
+      )
+    ).resolves.toEqual(assigned)
+    expect(assignClaudePane).toHaveBeenCalledWith({
+      ptyId: 'pty-1',
+      accountId: 'account-b',
+      configDir: '/home/u/.claude-b'
+    })
+  })
+
   it.each([
     {
       methodName: 'accounts.addCodexFromHome',

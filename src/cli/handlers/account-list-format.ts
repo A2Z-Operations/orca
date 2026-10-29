@@ -15,6 +15,8 @@ type AccountsBlock = {
   sessionMoves?: readonly { ptyId: string; reason: string }[]
   /** Claude only: whether the host bills requests through the local auth proxy (absent from older hosts). */
   authProxy?: 'on' | 'off'
+  /** Claude only: whether a WSL guest can bill through its own listener (absent when this host has no WSL accounts). */
+  wslAuthProxy?: 'on' | 'unsupported:wsl'
   /** Claude only: panes whose billed account differs from the folder they launched in. */
   paneAssignments?: readonly { ptyId: string; accountId: string }[]
 }
@@ -58,6 +60,9 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   }
   if (block.authProxy !== undefined) {
     lines.push(`  auth-proxy: ${block.authProxy}`)
+  }
+  if (block.wslAuthProxy !== undefined) {
+    lines.push(`  wsl auth-proxy: ${block.wslAuthProxy}`)
   }
   for (const assignment of block.paneAssignments ?? []) {
     lines.push(`  pane ${assignment.ptyId}: account ${assignment.accountId}`)

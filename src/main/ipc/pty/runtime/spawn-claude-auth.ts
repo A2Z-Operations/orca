@@ -2,7 +2,9 @@ import {
   CLAUDE_INJECTED_CONFIG_DIR_ENV,
   CLAUDE_PROFILE_POINTER_ENV
 } from '../../../../shared/claude-profile-routing'
+import { claudeAuthProxyListeningPort } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { noteUserAnthropicBaseUrl } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-note'
+import { isForeignClaudeAuthProxyUrl } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-url'
 import { getClaudeProfileRouter } from '../../../claude-accounts/claude-profile-installed-router'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import type { RuntimePtySpawnState } from './spawn-state'
@@ -62,7 +64,11 @@ export function applyRuntimeClaudeAuthEnv(
     delete base.CLAUDE_CONFIG_DIR
   }
   const patch = { ...auth.envPatch }
-  if (base.ANTHROPIC_BASE_URL && patch.ANTHROPIC_BASE_URL) {
+  const baseUrl = base.ANTHROPIC_BASE_URL
+  // A desktop loopback slot is not a user API host. This process's own slot keeps the previous winner.
+  if (baseUrl && isForeignClaudeAuthProxyUrl(baseUrl, claudeAuthProxyListeningPort())) {
+    delete base.ANTHROPIC_BASE_URL
+  } else if (baseUrl && patch.ANTHROPIC_BASE_URL) {
     delete patch.ANTHROPIC_BASE_URL
     noteUserAnthropicBaseUrl()
   }

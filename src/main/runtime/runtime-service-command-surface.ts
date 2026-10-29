@@ -57,6 +57,7 @@ export type RuntimeServiceCommandSurface = {
   selectClaudeAccount: RuntimeAccountController['selectClaude']
   setClaudeAutoSwitch: RuntimeAccountController['setClaudeAutoSwitch']
   setClaudeAuthProxy: RuntimeAccountController['setClaudeAuthProxy']
+  assignClaudePane: RuntimeAccountController['assignClaudePane']
   setClaudeSessionMover: RuntimeAccountController['setClaudeSessionMover']
   selectCodexAccount: RuntimeAccountController['selectCodex']
   selectCodexAccountForTarget: RuntimeAccountController['selectCodexForTarget']
@@ -173,6 +174,7 @@ export function installRuntimeServiceCommandSurface(
     selectClaudeAccount: accounts.selectClaude.bind(accounts),
     setClaudeAutoSwitch: accounts.setClaudeAutoSwitch.bind(accounts),
     setClaudeAuthProxy: accounts.setClaudeAuthProxy.bind(accounts),
+    assignClaudePane: accounts.assignClaudePane.bind(accounts),
     setClaudeSessionMover: accounts.setClaudeSessionMover.bind(accounts),
     selectCodexAccount: accounts.selectCodex.bind(accounts),
     selectCodexAccountForTarget: accounts.selectCodexForTarget.bind(accounts),

@@ -14,6 +14,8 @@ import {
 import { resolvePathEnvKey } from '../../../pty/windows-environment-path'
 import type { RuntimePtySpawnState } from './spawn-state'
 import { applyRuntimeClaudeAuthEnv, resolveRuntimeClaudeAuth } from './spawn-claude-auth'
+import { applyWslGuestAuthProxyEnv } from './wsl-guest-auth-proxy-env'
+import { isWslHostOrcadProcess } from '../../wsl-guest-windows-drive-path'
 import { resolveRuntimeHostSessionBinding } from './spawn-host-binding'
 import { resolvePtySpawnStartupTarget } from '../spawn-startup-target'
 import { resolvePtySpawnHostEnv } from '../spawn-host-env'
@@ -90,6 +92,20 @@ export async function prepareRuntimePtySpawn(
   ctx.hostSessionBinding ??= resolveRuntimeHostSessionBinding(ctx.deps, args)
   ctx.shouldPersistHostSessionBinding = ctx.hostSessionBinding !== undefined
   ctx.env = applyRuntimeClaudeAuthEnv(args.env, ctx.claudeAuth, args.claudeAccountId !== undefined)
+  if (
+    ctx.isClaudeLaunch &&
+    isWslHostOrcadProcess() &&
+    !ctx.claudeAuth?.envPatch.ANTHROPIC_BASE_URL
+  ) {
+    const guestProxy = await applyWslGuestAuthProxyEnv(
+      ctx.env,
+      ctx.deps.getSettings?.()?.claudeAuthProxy !== false
+    )
+    ctx.env = guestProxy.env
+    if (guestProxy.auth) {
+      ctx.claudeAuth = guestProxy.auth
+    }
+  }
   ctx.requestedAgentTeamsPath = ctx.env?.ORCA_AGENT_TEAMS_TEAM_ID
     ? ctx.env[resolvePathEnvKey(ctx.env, process.platform)]
     : undefined

@@ -31,6 +31,10 @@ import {
   hostAccountsManagedByDesktopMessage,
   type HostAccountLaunchEnv
 } from '../../shared/host-account-launch-env'
+import {
+  assignClaudePaneOnExecutionHost,
+  type AssignClaudePaneRequest
+} from '../claude-accounts/claude-pane-account-assign'
 
 export type RuntimeAccountServices = {
   claudeAccounts: ClaudeAccountService
@@ -215,6 +219,11 @@ export class RuntimeAccountController {
 
   setClaudeAuthProxy(enabled: boolean): ClaudeRateLimitAccountsState {
     return this.requireServices().claudeAccounts.setAuthProxy(enabled)
+  }
+
+  /** Works without account services: a WSL guest has the proxy and the pane registry, not the desktop's accounts. */
+  assignClaudePane(request: AssignClaudePaneRequest): { assigned: boolean } {
+    return assignClaudePaneOnExecutionHost(request)
   }
 
   selectCodex(accountId: string | null): Promise<CodexRateLimitAccountsState> {

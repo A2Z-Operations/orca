@@ -67,6 +67,11 @@ export function createOrcadAccountServices(args: {
   isWslHost?: () => boolean
 }): OrcadAccountServices | null {
   if ((args.isWslHost ?? isWslHostOrcadProcess)()) {
+    // The guest bills through its own loopback listener. Account services stay on the desktop.
+    void startClaudeAuthProxy()
+    args.registerCleanup(async () => {
+      await stopClaudeAuthProxy()
+    })
     return null
   }
   const { store, clientCodexHomes } = args
