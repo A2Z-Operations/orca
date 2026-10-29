@@ -78,6 +78,10 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
   },
   ports: {
     all: '--all                  List every listener on the workspace host, not just this workspace'
+  },
+  'account auth-proxy': {
+    status:
+      '--status               Print the auth proxy port, slots, recent requests, and the last error'
   }
 }
 

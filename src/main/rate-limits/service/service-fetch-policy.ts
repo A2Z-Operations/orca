@@ -17,6 +17,7 @@ import {
 } from '../claude-usage-window'
 import { readUserClaudeConfigDir } from '../../claude-accounts/claude-profile-paths'
 import { getClaudeProfileRouter } from '../../claude-accounts/claude-profile-installed-router'
+import { noteClaudeAuthSnapshot } from '../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 
 export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchTargets {
   protected getMiniMaxCredentialError(message: string): ProviderRateLimits {
@@ -94,7 +95,7 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
     ) {
       return
     }
-    this.lastClaudeAuthSnapshot = {
+    const nextSnapshot = {
       // System Default uses the user config folder without injecting a managed one.
       configDir: normalizeClaudeConfigDir(
         authPreparation?.envPatch.CLAUDE_CONFIG_DIR ??
@@ -103,6 +104,9 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
       ),
       provenance: authPreparation?.provenance ?? 'system'
     }
+    // A changed folder or provenance means the bearer may have rotated. Same snapshot keeps the TTL.
+    noteClaudeAuthSnapshot(this.lastClaudeAuthSnapshot, nextSnapshot)
+    this.lastClaudeAuthSnapshot = nextSnapshot
   }
 
   ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): void {

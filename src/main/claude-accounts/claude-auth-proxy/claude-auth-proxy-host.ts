@@ -1,8 +1,14 @@
+import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
 import { readClaudeOAuthCredentials } from '../../rate-limits/claude-oauth-credentials'
 import { getClaudeProfileRouter } from '../claude-profile-installed-router'
 import { setClaudePaneProxySlotReleaser } from '../claude-pane-account-registry'
 import { noteUserAnthropicBaseUrl } from './claude-auth-proxy-note'
 import { createClaudeAuthProxy, type ClaudeAuthProxy } from './claude-auth-proxy'
+
+export type ClaudeAuthSnapshotIdentity = {
+  configDir: string | null
+  provenance: string
+}
 
 let proxy: ClaudeAuthProxy | null = null
 let pending: Promise<void> | null = null
@@ -50,6 +56,57 @@ export function getClaudeAuthProxy(): ClaudeAuthProxy | null {
   return proxy
 }
 
+export function claudeAuthProxyStatus(): ClaudeAuthProxyStatus {
+  return (
+    getClaudeAuthProxy()?.status() ?? {
+      listening: false,
+      host: '127.0.0.1',
+      port: null,
+      slots: [],
+      requestsLastHour: [],
+      unknownSlotRequests: 0,
+      lastError: null
+    }
+  )
+}
+
+/** `profile:<accountId>` and `profile:<accountId>:wsl:<distro>`. Anything else is unnamed. */
+export function claudeAccountIdFromAuthProvenance(provenance: string): string | undefined {
+  if (!provenance.startsWith('profile:')) {
+    return undefined
+  }
+  const rest = provenance.slice('profile:'.length)
+  const wslAt = rest.indexOf(':wsl:')
+  const accountId = wslAt === -1 ? rest : rest.slice(0, wslAt)
+  if (accountId.length === 0 || accountId === 'unavailable') {
+    return undefined
+  }
+  return accountId
+}
+
+export function invalidateClaudeAuthProxyToken(accountId?: string): void {
+  getClaudeAuthProxy()?.invalidateToken(accountId)
+}
+
+/**
+ * Drops cached bearer tokens when the rate-limit auth snapshot changes.
+ * Returns whether a cache drop was requested. An unchanged snapshot keeps the 20s hit.
+ */
+export function noteClaudeAuthSnapshot(
+  previous: ClaudeAuthSnapshotIdentity | null,
+  next: ClaudeAuthSnapshotIdentity
+): boolean {
+  if (
+    previous &&
+    previous.configDir === next.configDir &&
+    previous.provenance === next.provenance
+  ) {
+    return false
+  }
+  invalidateClaudeAuthProxyToken(claudeAccountIdFromAuthProvenance(next.provenance))
+  return true
+}
+
 /**
  * Slot URL for a launch, or undefined when the proxy is off, down, or the user already set a base URL.
  * Each call takes a new slot; the slot in the env that is actually applied is the one that matters.
@@ -73,7 +130,7 @@ export function claudeAuthProxyBaseUrl(
   return current.slotBaseUrl(current.allocateSlot(accountId)) ?? undefined
 }
 
-/** Re-read on each request. Never refresh: a refresh would rotate the token into the spawn folder. */
+/** Cache miss path. Never refresh: a refresh would rotate the token into the spawn folder. */
 export async function readClaudeAuthProxyAccessToken(accountId: string): Promise<string | null> {
   const router = getClaudeProfileRouter()
   if (!router) {
