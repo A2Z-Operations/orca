@@ -1,3 +1,4 @@
+import type * as LoginShellEnvironmentModule from '../startup/login-shell-environment'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,10 +9,18 @@ import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { eraseRpcMethods, isStreamingMethod } from '../runtime/rpc/core'
 import { ACCOUNT_METHODS } from '../runtime/rpc/methods/accounts'
 import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
+import { getClaudeAgentViewService } from '../claude/agent-view-service'
 import { createOrcadAccountServices } from './orcad-account-services'
+import { getClaudeAuthProxy } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { RateLimitService } from '../rate-limits/service'
 import { USAGE_CREDENTIALS_RUNTIME_CAPABILITY } from '../../shared/account-runtime-capabilities'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
+
+// Login-shell capture outlives these fixtures; keep reconciliation inside their temporary home.
+vi.mock('../startup/login-shell-environment', async (importOriginal) => {
+  const actual = await importOriginal<typeof LoginShellEnvironmentModule>()
+  return { ...actual, resolveLoginShellEnvironment: async () => ({ ...process.env }) }
+})
 
 const directories: string[] = []
 const stores: Store[] = []
@@ -29,6 +38,7 @@ beforeEach(() => {
   const userData = tempDirectory()
   vi.stubEnv('HOME', home)
   vi.stubEnv('USERPROFILE', home)
+  vi.stubEnv('CLAUDE_CONFIG_DIR', join(home, '.claude'))
   // Explicit host data root must win over inherited CI XDG configuration.
   vi.stubEnv('ORCA_USER_DATA_PATH', userData)
   installFakeAppEnvironment({
@@ -44,6 +54,7 @@ afterEach(async () => {
   for (const store of stores.splice(0)) {
     store.freezeWrites()
   }
+  await getClaudeAgentViewService().ready()
   vi.unstubAllEnvs()
   for (const directory of directories.splice(0)) {
     rmSync(directory, { recursive: true, force: true })
@@ -188,6 +199,9 @@ describe('orcad account services', () => {
   it('leaves a WSL host to the desktop that owns its accounts', async () => {
     const { runtime, store } = createRuntime()
     expect(install(runtime, store, true)).toBeNull()
+    await vi.waitFor(() => {
+      expect(getClaudeAuthProxy()?.port()).toEqual(expect.any(Number))
+    })
     expect(runtime.getUsageRateLimits()).toBeNull()
     expect(runtime.getStatus().capabilities).not.toContain(USAGE_CREDENTIALS_RUNTIME_CAPABILITY)
 

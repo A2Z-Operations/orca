@@ -30,6 +30,7 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   '  account rm                Remove an OpenCode or Devin account and its private data',
   '  account auto-switch       Turn Claude account switching before a usage limit on or off',
   '  account session-mover     Move running Claude sessions to another account before a usage limit',
+  '  account auth-proxy        Bill Claude through a local auth proxy so a session can change accounts without restarting',
   '',
   'Skills:',
   '  skills installed          List installed skill selectors',

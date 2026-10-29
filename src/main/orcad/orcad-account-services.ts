@@ -21,6 +21,10 @@ import { prepareCodexAiVaultSessionResume } from '../codex/codex-ai-vault-sessio
 import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
 import { resolveHostAgentBaseEnvironment } from '../runtime/structured-agent-shell-environment'
 import { isWslHostOrcadProcess } from '../ipc/wsl-guest-windows-drive-path'
+import {
+  startClaudeAuthProxy,
+  stopClaudeAuthProxy
+} from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
 
 type StructuredLaunchInput = { launchEnv: NodeJS.ProcessEnv }
@@ -65,6 +69,11 @@ export function createOrcadAccountServices(args: {
   isWslHost?: () => boolean
 }): OrcadAccountServices | null {
   if ((args.isWslHost ?? isWslHostOrcadProcess)()) {
+    // The guest bills through its own loopback listener. Account services stay on the desktop.
+    void startClaudeAuthProxy()
+    args.registerCleanup(async () => {
+      await stopClaudeAuthProxy()
+    })
     return null
   }
   const { store, clientCodexHomes } = args
@@ -91,9 +100,11 @@ export function createOrcadAccountServices(args: {
   const unsubscribePolling = store.onSettingsChanged((updates) => {
     polling.apply(updates)
   })
-  args.registerCleanup(() => {
+  void startClaudeAuthProxy()
+  args.registerCleanup(async () => {
     unsubscribePolling()
     services.sessionMover?.stop()
+    await stopClaudeAuthProxy()
     attachedRuntime = null
     services.rateLimits.stop()
     args.setClaudeStatusLineListener(null)

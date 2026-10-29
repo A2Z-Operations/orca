@@ -4,6 +4,7 @@ export function ignoresRemoteSelection(commandPath: readonly string[]): boolean 
     // Account policies belong to the target runtime; other account commands stay local.
     (commandPath[0] === 'account' &&
       commandPath[1] !== 'auto-switch' &&
+      commandPath[1] !== 'auth-proxy' &&
       commandPath[1] !== 'session-mover') ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||

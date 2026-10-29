@@ -40,6 +40,7 @@ import {
 import { getWslAccountTarget } from './account-wsl-location'
 import { addDataAccount, listDataAccounts, mutateDataAccount } from './data-account-commands'
 import { formatAccountsBlock, formatDataAccounts } from './account-list-format'
+import { setClaudeAuthProxy } from './account-auth-proxy'
 import { setClaudeAutoSwitch } from './account-auto-switch'
 import { setClaudeSessionMover } from './account-session-mover'
 
@@ -302,5 +303,6 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
     await mutateDataAccount(ctx, 'remove')
   },
   'account auto-switch': setClaudeAutoSwitch,
+  'account auth-proxy': setClaudeAuthProxy,
   'account session-mover': setClaudeSessionMover
 }

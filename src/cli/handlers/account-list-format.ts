@@ -11,6 +11,10 @@ type AccountsBlock = {
   autoSwitchEnabled?: boolean
   /** Claude only: what the host does with running sessions near a usage limit (absent from older hosts). */
   sessionMover?: 'off' | 'ask' | 'move'
+  /** Claude only: whether launches bill through the local auth proxy. */
+  authProxy?: 'on' | 'off'
+  /** Claude only: Windows view of WSL guest billing. */
+  wslAuthProxy?: 'on' | 'unsupported:wsl'
   /** Claude only: the mover's last decision per live session. JSON carries the same records. */
   sessionMoves?: readonly { ptyId: string; reason: string }[]
   /** Claude only: live sessions billed to each account (absent from older hosts). */
@@ -58,6 +62,12 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   }
   if (block.sessionMover !== undefined) {
     lines.push(`  session-mover: ${block.sessionMover}`)
+  }
+  if (block.authProxy !== undefined) {
+    lines.push(`  auth-proxy: ${block.authProxy}`)
+  }
+  if (block.wslAuthProxy !== undefined) {
+    lines.push(`  wsl auth-proxy: ${block.wslAuthProxy}`)
   }
   for (const move of block.sessionMoves ?? []) {
     lines.push(`  session ${move.ptyId}: ${move.reason}`)

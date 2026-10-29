@@ -144,15 +144,16 @@ export function findQueuedClaudeRestartsOnAccount(args: {
   const host = isHostTarget(args.target) ? args.host : undefined
   const ptyIds: string[] = []
   for (const pane of localClaudePanes(state, args.owner, args.target)) {
-    if (
-      pane.inLane &&
-      state.pendingPaneAccountRestarts[pane.ptyId] === 'claude' &&
-      isClaudePaneOnAccount(
-        resolveClaudePaneFolder(pane.transcriptPath, saved, host),
-        args.accountId,
-        host
-      )
-    ) {
+    const assigned = host?.paneAssignments?.find((entry) => entry.ptyId === pane.ptyId)?.accountId
+    const onAccount =
+      assigned !== undefined
+        ? assigned === args.accountId
+        : isClaudePaneOnAccount(
+            resolveClaudePaneFolder(pane.transcriptPath, saved, host),
+            args.accountId,
+            host
+          )
+    if (pane.inLane && state.pendingPaneAccountRestarts[pane.ptyId] === 'claude' && onAccount) {
       ptyIds.push(pane.ptyId)
     }
   }
@@ -207,7 +208,15 @@ function scanPane(
   if (folder.kind === 'own-folder') {
     return { group: 'cantMove', pane, reason: 'own-folder' }
   }
-  if (isClaudePaneOnAccount(folder, args.toAccountId, args.host)) {
+  const assigned = args.host?.paneAssignments?.find(
+    (entry) => entry.ptyId === pane.ptyId
+  )?.accountId
+  const accountId = assigned ?? (folder.kind === 'account' ? folder.accountId : null)
+  if (
+    assigned !== undefined
+      ? assigned === args.toAccountId
+      : isClaudePaneOnAccount(folder, args.toAccountId, args.host)
+  ) {
     return null
   }
   const resumable = resolveAgentAccountRestartResumeStartup('claude', {
@@ -219,12 +228,16 @@ function scanPane(
   if (!resumable) {
     return { group: 'cantMove', pane, reason: 'no-session' }
   }
-  return isClaudePaneOnAccount(folder, args.fromAccountId, args.host)
+  return (
+    assigned !== undefined
+      ? assigned === args.fromAccountId
+      : isClaudePaneOnAccount(folder, args.fromAccountId, args.host)
+  )
     ? { group: 'onAccount', pane }
     : {
         group: 'elsewhere',
         pane,
-        accountId: folder.kind === 'account' ? folder.accountId : null
+        accountId
       }
 }
 

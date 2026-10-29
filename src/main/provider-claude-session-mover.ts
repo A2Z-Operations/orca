@@ -1,16 +1,23 @@
 import { translateMain } from './i18n/main-i18n'
 import type { RuntimePtyController } from './runtime/runtime-pty-controller-contract'
 import { agentHookServer } from './agent-hooks/server'
+import { getClaudeAuthProxy } from './claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import {
+  assignClaudePaneAccount,
+  getClaudePaneAccount,
   listClaudePaneAccounts,
-  recordClaudePaneAccount
+  recordClaudePaneAccount,
+  rememberClaudeSessionAssignment
 } from './claude-accounts/claude-pane-account-registry'
 import {
   createClaudeSessionMover,
   type ClaudeSessionMoveNotice,
   type ClaudeSessionMover
 } from './claude-accounts/claude-session-mover'
-import { createResumeMoveStrategy } from './claude-accounts/claude-session-move-strategy'
+import {
+  createProxyMoveStrategy,
+  createResumeMoveStrategy
+} from './claude-accounts/claude-session-move-strategy'
 import { getPtyIdForPaneKey, ptyPaneKey } from './ipc/pty/pane/key-state'
 import { listRegisteredPtys } from './memory/pty-registry'
 import type { Store } from './persistence'
@@ -59,6 +66,13 @@ export function createProviderClaudeSessionMover(
           platform: process.platform,
           hooks: agentHookServer,
           translate: translateMain
+        }),
+        proxyStrategy: createProxyMoveStrategy({
+          getPane: getClaudePaneAccount,
+          assignSlot: (slot, accountId) =>
+            getClaudeAuthProxy()?.assignSlot(slot, accountId) ?? false,
+          assignAccount: assignClaudePaneAccount,
+          rememberSession: rememberClaudeSessionAssignment
         }),
         headless: options.headless,
         onNotice: options.onNotice

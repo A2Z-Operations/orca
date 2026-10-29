@@ -130,6 +130,13 @@ export type ClaudeRateLimitAccountsState = {
   autoSwitchEnabled?: boolean
   /** What this host does with a running session near a limit. Absent from older hosts; readers treat that as ask. */
   sessionMover?: 'off' | 'ask' | 'move'
+  /** Whether launches bill through the local auth proxy. Absent from older hosts; readers treat that as off. */
+  authProxy?: 'on' | 'off'
+  /**
+   * Windows desktop view of WSL guest billing. `unsupported:wsl` means the guest credential file
+   * is unreadable. Absent when this host has no WSL accounts.
+   */
+  wslAuthProxy?: 'on' | 'unsupported:wsl'
   /** The mover's last decision per live session, newest first. */
   sessionMoves?: ClaudeSessionMoveSummary[]
   /** Live sessions billed to each account. Absent from older hosts. */

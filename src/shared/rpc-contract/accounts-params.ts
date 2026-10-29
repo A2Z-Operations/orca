@@ -35,6 +35,17 @@ export const SetClaudeSessionMoverParams = z.object({
   setting: z.enum(['off', 'ask', 'move'])
 })
 
+export const SetClaudeAuthProxyParams = z.object({ enabled: z.boolean() })
+
+export const ClaudeAuthProxyStatusParams = z.object({}).strict()
+
+/** Tell the execution host which account a live pane's proxy slot bills. configDir is required on a WSL guest. */
+export const AssignClaudePaneParams = z.object({
+  ptyId: z.string().min(1),
+  accountId: z.string().min(1),
+  configDir: z.string().min(1).optional()
+})
+
 export const SetClaudeAutoSwitchParams = z.object({ enabled: z.boolean() })
 
 export const SelectAccountParams = z.object({
