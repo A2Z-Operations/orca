@@ -52,9 +52,9 @@ describe('account auth-proxy surface', () => {
     expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual({ authProxy: 'on' })
   })
 
-  it('needs exactly one of --on or --off and only --agent claude', async () => {
+  it('needs exactly one of --on, --off, or --status and only --agent claude', async () => {
     await expect(ACCOUNT_HANDLERS['account auth-proxy'](context([]))).rejects.toThrow(
-      'exactly one of --on or --off'
+      'exactly one of --on, --off, or --status'
     )
     await expect(
       ACCOUNT_HANDLERS['account auth-proxy'](
@@ -63,7 +63,7 @@ describe('account auth-proxy surface', () => {
           ['off', true]
         ])
       )
-    ).rejects.toThrow('exactly one of --on or --off')
+    ).rejects.toThrow('exactly one of --on, --off, or --status')
     await expect(
       ACCOUNT_HANDLERS['account auth-proxy'](
         context([
@@ -95,5 +95,41 @@ describe('account auth-proxy surface', () => {
     await ACCOUNT_HANDLERS['account list']({ ...context([]), flags: new Map() })
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('  auth-proxy: on'))
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('  pane pty-1: account b'))
+  })
+
+  it('prints port, slots, recent requests, and the last error', async () => {
+    callMock.mockResolvedValue({
+      id: 'test',
+      ok: true,
+      result: {
+        listening: true,
+        host: '127.0.0.1',
+        port: 43121,
+        slots: [{ slot: 'slot-a', accountId: 'account-a' }],
+        requestsLastHour: [{ accountId: 'account-a', count: 4 }],
+        unknownSlotRequests: 2,
+        lastError: {
+          at: 1,
+          method: 'POST',
+          path: '/v1/messages',
+          status: 429,
+          accountId: 'account-a'
+        }
+      },
+      _meta: { runtimeId: 'test-runtime' }
+    })
+    await ACCOUNT_HANDLERS['account auth-proxy'](
+      context([
+        ['agent', 'claude'],
+        ['status', true]
+      ])
+    )
+    expect(callMock).toHaveBeenCalledWith('accounts.claudeAuthProxyStatus', {})
+    const text = String(logSpy.mock.calls[0]?.[0])
+    expect(text).toContain('Claude auth-proxy: 127.0.0.1:43121')
+    expect(text).toContain('  slot-a → account-a')
+    expect(text).toContain('  requests last hour: account-a 4')
+    expect(text).toContain('  unknown slots: 2')
+    expect(text).toContain('  last error: 429 POST /v1/messages account-a')
   })
 })

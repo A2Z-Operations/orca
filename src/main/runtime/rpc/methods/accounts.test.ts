@@ -50,6 +50,30 @@ describe('account RPC methods', () => {
     expect(setClaudeAuthProxy).toHaveBeenCalledWith(false)
   })
 
+  it('reads the Claude auth proxy status without changing the setting', async () => {
+    const status = {
+      listening: true,
+      host: '127.0.0.1',
+      port: 9,
+      slots: [{ slot: 'abc', accountId: 'account-a' }],
+      requestsLastHour: [{ accountId: 'account-a', count: 2 }],
+      unknownSlotRequests: 1,
+      lastError: null
+    }
+    const claudeAuthProxyStatus = vi.fn().mockReturnValue(status)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler only calls claudeAuthProxyStatus.
+    const runtime = { claudeAuthProxyStatus } as unknown as OrcaRuntimeService
+    const read = method('accounts.claudeAuthProxyStatus')
+    if (isStreamingMethod(read)) {
+      throw new Error('accounts.claudeAuthProxyStatus must be a request method')
+    }
+
+    expect(read.permission).toBe('accounts-admin')
+    expect(() => read.params?.parse({ enabled: true })).toThrow()
+    await expect(read.handler({}, { runtime })).resolves.toEqual(status)
+    expect(claudeAuthProxyStatus).toHaveBeenCalledTimes(1)
+  })
+
   it.each([
     {
       methodName: 'accounts.addCodexFromHome',

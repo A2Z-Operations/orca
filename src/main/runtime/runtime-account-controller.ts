@@ -31,6 +31,8 @@ import {
   hostAccountsManagedByDesktopMessage,
   type HostAccountLaunchEnv
 } from '../../shared/host-account-launch-env'
+import type { ClaudeAuthProxyStatus } from '../../shared/claude-auth-proxy-status'
+import { claudeAuthProxyStatus as readClaudeAuthProxyStatus } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 
 export type RuntimeAccountServices = {
   claudeAccounts: ClaudeAccountService
@@ -215,6 +217,11 @@ export class RuntimeAccountController {
 
   setClaudeAuthProxy(enabled: boolean): ClaudeRateLimitAccountsState {
     return this.requireServices().claudeAccounts.setAuthProxy(enabled)
+  }
+
+  /** Live listener. Does not require the account service: the proxy is process-global. */
+  claudeAuthProxyStatus(): ClaudeAuthProxyStatus {
+    return readClaudeAuthProxyStatus()
   }
 
   selectCodex(accountId: string | null): Promise<CodexRateLimitAccountsState> {
