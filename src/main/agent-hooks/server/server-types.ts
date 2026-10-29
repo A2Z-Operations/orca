@@ -65,6 +65,8 @@ export type AgentHookStatusChangeEntry = {
   mainAgentState?: AgentStatusState
   /** A shell, cron, or monitor is still alive. Absent when nothing is running in the background. */
   backgroundWork?: boolean
+  /** When the pane's last turn ended. Absent on older rows and until the hook publishes one. */
+  turnEndedAt?: number
   receivedAt: number
   observedInCurrentRuntime: boolean
 }

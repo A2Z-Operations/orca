@@ -21366,7 +21366,8 @@
           "none": "none reported",
           "detailFallback": "its usage limit"
         },
-        "movedRestartlessBody": "{{from}} is near its usage limit. The session continues on {{to}} without a restart."
+        "movedRestartlessBody": "{{from}} is near its usage limit. The session continues on {{to}} without a restart.",
+        "rebalanceBody": "{{from}} continues on {{to}} to balance your accounts."
       },
       "authProxy": {
         "settingTitle": "Bill Claude through a local auth proxy",

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setup, state, limits, PANE_1, PANE_2 } from './claude-session-mover-test-fixture'
 import {
+  CLAUDE_POOL_REBALANCE_QUIET_MS,
   CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS,
   CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS
 } from './claude-session-mover-policy'
@@ -208,5 +209,102 @@ describe('createClaudeSessionMover', () => {
       })
     ])
     expect(move).not.toHaveBeenCalled()
+  })
+
+  it('keeps a resume session and a pool that is off on the 95/90 lines', async () => {
+    const resume = setup({ pool: 'on' })
+    resume.session('pty-1', PANE_1, 'b')
+    resume.mover.start()
+    resume.publish(state(50, { b: limits(60), c: limits(5) }))
+    await vi.runAllTimersAsync()
+    expect(resume.move).not.toHaveBeenCalled()
+    expect(resume.mover.lastDecisions()[0]?.reason).toBe('stay')
+
+    const proxyMove = vi.fn(async (request: { ptyId: string }) => ({
+      kind: 'moved' as const,
+      newPtyId: request.ptyId
+    }))
+    const off = setup({ pool: 'off', proxyStrategy: { move: proxyMove } })
+    off.session('pty-1', PANE_1, 'b')
+    off.records[0]!.proxySlot = 'slot-1'
+    off.mover.start()
+    off.publish(state(50, { b: limits(60), c: limits(5) }))
+    await vi.runAllTimersAsync()
+    expect(proxyMove).not.toHaveBeenCalled()
+    expect(off.mover.lastDecisions()[0]?.reason).toBe('stay')
+  })
+
+  it('rebalances a proxy session onto the freer account and names that in the notice', async () => {
+    const proxyMove = vi.fn(async (request: { ptyId: string }) => ({
+      kind: 'moved' as const,
+      newPtyId: request.ptyId
+    }))
+    const f = setup({ pool: 'on', proxyStrategy: { move: proxyMove } })
+    f.session('pty-1', PANE_1, 'b', 'done', false, undefined, false, Date.now() - 3 * 60_000)
+    f.records[0]!.proxySlot = 'slot-1'
+    f.mover.start()
+    f.publish(state(50, { b: limits(60), c: limits(5) }))
+    await vi.runAllTimersAsync()
+    expect(f.move).not.toHaveBeenCalled()
+    expect(proxyMove).toHaveBeenCalledTimes(1)
+    expect(proxyMove.mock.calls[0]?.[0]).toMatchObject({ ptyId: 'pty-1', toAccountId: 'c' })
+    expect(f.notices[0]).toMatchObject({
+      kind: 'moved',
+      balance: true,
+      restartless: true,
+      to: { id: 'c' }
+    })
+    expect(f.mover.lastDecisions()[0]).toMatchObject({
+      ptyId: 'pty-1',
+      fromAccountId: 'b',
+      toAccountId: 'c',
+      reason: 'rebalance'
+    })
+  })
+
+  it('asks before a rebalance when the setting is ask', async () => {
+    const proxyMove = vi.fn(async (request: { ptyId: string }) => ({
+      kind: 'moved' as const,
+      newPtyId: request.ptyId
+    }))
+    const f = setup({ pool: 'on', setting: 'ask', proxyStrategy: { move: proxyMove } })
+    f.session('pty-1', PANE_1, 'b')
+    f.records[0]!.proxySlot = 'slot-1'
+    f.mover.start()
+    f.publish(state(50, { b: limits(60), c: limits(5) }))
+    await vi.runAllTimersAsync()
+    expect(proxyMove).not.toHaveBeenCalled()
+    expect(f.notices[0]).toMatchObject({ kind: 'ask', balance: true, to: { id: 'c' } })
+    expect(f.mover.lastDecisions()[0]?.reason).toBe('ask')
+  })
+
+  it('leaves a proxy session alone until two minutes after its last turn', async () => {
+    const proxyMove = vi.fn(async (request: { ptyId: string }) => ({
+      kind: 'moved' as const,
+      newPtyId: request.ptyId
+    }))
+    const f = setup({ pool: 'on', proxyStrategy: { move: proxyMove } })
+    f.session(
+      'pty-1',
+      PANE_1,
+      'b',
+      'done',
+      false,
+      undefined,
+      false,
+      Date.now() - CLAUDE_POOL_REBALANCE_QUIET_MS + 1
+    )
+    f.records[0]!.proxySlot = 'slot-1'
+    f.mover.start()
+    f.publish(state(50, { b: limits(60), c: limits(5) }))
+    await vi.runAllTimersAsync()
+    expect(proxyMove).not.toHaveBeenCalled()
+    expect(f.mover.lastDecisions()[0]?.reason).toBe('stay')
+
+    vi.setSystemTime(Date.now() + CLAUDE_POOL_REBALANCE_QUIET_MS)
+    f.publish(state(50, { b: limits(60), c: limits(5) }))
+    await vi.runAllTimersAsync()
+    expect(proxyMove).toHaveBeenCalledTimes(1)
+    expect(f.mover.lastDecisions()[0]?.reason).toBe('rebalance')
   })
 })

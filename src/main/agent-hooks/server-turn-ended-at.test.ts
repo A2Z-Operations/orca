@@ -197,6 +197,7 @@ describe('the host-stamped turn end', () => {
     server.ingestRemote({ ...grok, hookEventName: 'user_prompt_submit', payload: working }, 'wsl')
     server.ingestRemote({ ...stop, turnEndedAt: 42, turnEndDisposition: 'ambiguous' }, 'wsl')
     expect(row()).toMatchObject({ turnEndedAt: 42, turnEndDisposition: 'ambiguous' })
+    expect(server.getStatusChangeSnapshot()[0]).toMatchObject({ turnEndedAt: 42 })
 
     // The relay never learns a non-Claude cancel inferred here, so its late cancel hook carries an end.
     server.ingestRemote({ ...grok, hookEventName: 'user_prompt_submit', payload: working }, 'wsl')

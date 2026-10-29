@@ -74,7 +74,8 @@ export function createClaudeSessionMover(deps: ClaudeSessionMoverDeps): ClaudeSe
       selectedId,
       now,
       effective,
-      lastUsageReadAt
+      lastUsageReadAt,
+      settings.claudeAccountPool === 'on'
     )
     if (readRequested) {
       lastUsageReadAt = now

@@ -72,17 +72,23 @@ export function initializeMainProcessAccountServices(): void {
         }
         const body =
           notice.kind === 'moved'
-            ? notice.restartless
+            ? notice.balance
               ? translateMain(
-                  'accounts.claude.sessionMover.movedRestartlessBody',
-                  '{{from}} is near its usage limit. The session continues on {{to}} without a restart.',
+                  'accounts.claude.sessionMover.rebalanceBody',
+                  '{{from}} continues on {{to}} to balance your accounts.',
                   { from: notice.from.email, to: notice.to?.email ?? '' }
                 )
-              : translateMain(
-                  'accounts.claude.sessionMover.movedBody',
-                  '{{from}} is near its usage limit. The session continues on {{to}}.',
-                  { from: notice.from.email, to: notice.to?.email ?? '' }
-                )
+              : notice.restartless
+                ? translateMain(
+                    'accounts.claude.sessionMover.movedRestartlessBody',
+                    '{{from}} is near its usage limit. The session continues on {{to}} without a restart.',
+                    { from: notice.from.email, to: notice.to?.email ?? '' }
+                  )
+                : translateMain(
+                    'accounts.claude.sessionMover.movedBody',
+                    '{{from}} is near its usage limit. The session continues on {{to}}.',
+                    { from: notice.from.email, to: notice.to?.email ?? '' }
+                  )
             : notice.kind === 'ask'
               ? translateMain(
                   'accounts.claude.sessionMover.askBody',

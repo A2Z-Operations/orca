@@ -86,6 +86,8 @@ function record(
 export function setup(
   options: {
     setting?: 'off' | 'ask' | 'move'
+    /** Task 1 owns the setting. Tests pass it here until that field is on GlobalSettings. */
+    pool?: 'off' | 'on'
     headless?: boolean
     accounts?: ClaudeManagedAccountSummary[]
     getStatusSnapshotForPane?: AgentHookServer['getStatusSnapshotForPane']
@@ -96,6 +98,7 @@ export function setup(
 ) {
   const settings = {
     claudeSessionMover: options.setting ?? ('move' as const),
+    claudeAccountPool: options.pool ?? ('off' as const),
     activeClaudeManagedAccountId: 'a',
     activeClaudeManagedAccountIdsByRuntime: undefined,
     claudeManagedAccounts: (options.accounts ?? [account('a'), account('b'), account('c')]).map(
@@ -188,7 +191,8 @@ export function setup(
     paneState: AgentHookStatusChangeEntry['state'] = 'done',
     pinned = false,
     mainAgentState?: AgentHookStatusChangeEntry['mainAgentState'],
-    backgroundWork = false
+    backgroundWork = false,
+    turnEndedAt?: number
   ) => {
     records.push(record(ptyId, paneKey, accountId, pinned))
     statuses = [
@@ -198,6 +202,7 @@ export function setup(
         state: paneState,
         ...(mainAgentState ? { mainAgentState } : {}),
         ...(backgroundWork ? { backgroundWork: true } : {}),
+        ...(turnEndedAt !== undefined ? { turnEndedAt } : {}),
         receivedAt: Date.now(),
         observedInCurrentRuntime: true
       }

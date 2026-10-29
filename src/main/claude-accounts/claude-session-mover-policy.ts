@@ -24,6 +24,14 @@ export const CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS = 60_000
 export const CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS = 10 * 60_000
 /** One turn's worth of a 5-hour window, debited from a target's reading after each move that claimed it. */
 export const CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT = 5
+/** A proxy session this far behind the best account moves before the 95/90 lines. */
+export const CLAUDE_POOL_REBALANCE_GAP_PTS = 25
+/** The best account must still have this much room, or a rebalance is not worth the cache miss. */
+export const CLAUDE_POOL_REBALANCE_MIN_TARGET_HEADROOM = 30
+/** At most one rebalance per pane in this window. A hard-line move keeps the shorter cooldown. */
+export const CLAUDE_POOL_REBALANCE_COOLDOWN_MS = 15 * 60_000
+/** A turn that just ended still has a warm prompt cache. A flip would miss it. */
+export const CLAUDE_POOL_REBALANCE_QUIET_MS = 2 * 60_000
 
 export type ClaudeTargetClaim = { at: number; debit: number }
 export type ClaudeSessionMoveWindow = {
@@ -35,11 +43,18 @@ export type ClaudeSessionMoveWindow = {
 export type ClaudeSessionMoveDecision =
   | {
       kind: 'stay'
-      reason: 'off' | 'no-usage' | 'under-line' | 'cooldown' | 'failed-recently' | 'no-target'
+      reason:
+        | 'off'
+        | 'no-usage'
+        | 'under-line'
+        | 'cooldown'
+        | 'failed-recently'
+        | 'no-target'
+        | 'prompt-cache'
     }
   | { kind: 'read-usage' }
   | { kind: 'wait'; reason: 'mid-turn' | 'no-status' | 'background-work' }
-  | { kind: 'move'; to: string; window: ClaudeSessionMoveWindow }
+  | { kind: 'move'; to: string; window: ClaudeSessionMoveWindow; reason?: 'rebalance' }
 
 /** Ask and move notices name this wait while the shell or monitor is still alive. */
 export function claudeSessionMoveNoticeDetail(detail: string, backgroundWork: boolean): string {
@@ -70,6 +85,13 @@ export type ClaudeSessionMoveInputs = {
   targetClaims: ReadonlyMap<string, ClaudeTargetClaim>
   /** A proxy flip takes effect on the next request, so it does not wait for the turn to end. */
   allowMidTurn?: boolean
+  /**
+   * Pool spread. `enabled` is the pool setting. `spreadLine` is a proxy session: a restart is
+   * not required, so the session may move before the 95/90 lines. Resume sessions leave it false.
+   */
+  pool?: { enabled: boolean; spreadLine: boolean }
+  /** When this pane's last turn ended. Absent until the hook publishes one. */
+  turnEndedAt?: number
 }
 
 /** A reading newer than one poll. Shared with the account pool, which skips anything older. */
@@ -119,6 +141,113 @@ export function debitClaimedUsage(
   }
 }
 
+type CandidateReadiness =
+  | { kind: 'read-usage' }
+  | { kind: 'stay'; reason: 'no-usage' }
+  | { kind: 'ready'; fresh: InactiveAccountUsage[] }
+
+/** Open, fresh, debited candidates. A recent claim is not offered; an older one still costs its debit. */
+function candidateReadiness(inputs: ClaudeSessionMoveInputs): CandidateReadiness {
+  const { now } = inputs
+  const open = inputs.candidates.filter((candidate) => {
+    const claim = inputs.targetClaims.get(candidate.accountId)
+    return !claim || now - claim.at >= CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS
+  })
+  const fresh = open
+    .filter((candidate) => isFresh(candidate, now))
+    .map((candidate) =>
+      debitClaimedUsage(candidate, inputs.targetClaims.get(candidate.accountId), now)
+    )
+  // Why: an account inside its Retry-After cannot be read, so ranking does not wait for it.
+  const unreadable = open.filter(
+    (candidate) =>
+      !isFresh(candidate, now) && (candidate.rateLimits?.usageMetadata?.retryAtMs ?? 0) > now
+  )
+  const claimedOut = inputs.candidates.length - open.length
+  if (fresh.length + unreadable.length + claimedOut < inputs.candidateCount) {
+    if (inputs.candidates.some((candidate) => candidate.isFetching)) {
+      return { kind: 'stay', reason: 'no-usage' }
+    }
+    if (now - inputs.lastUsageReadAt >= DEFAULT_POLL_MS) {
+      return { kind: 'read-usage' }
+    }
+  }
+  return { kind: 'ready', fresh }
+}
+
+function bestRebalanceCandidate(
+  fresh: InactiveAccountUsage[],
+  now: number
+): { accountId: string; headroom: number } | null {
+  const ranked = fresh.flatMap((candidate) => {
+    const headroom = claudeAutoSwitchHeadroom(candidate.rateLimits, now)
+    return headroom !== null && !isClaudeAtLimit(candidate.rateLimits, now)
+      ? [{ accountId: candidate.accountId, headroom }]
+      : []
+  })
+  ranked.sort((a, b) => b.headroom - a.headroom || a.accountId.localeCompare(b.accountId))
+  return ranked[0] ?? null
+}
+
+/**
+ * Move a proxy session before the 95/90 lines when another account is clearly freer.
+ * Null means the hard line still decides (including "stay under the line").
+ */
+function decidePoolRebalance(
+  inputs: ClaudeSessionMoveInputs,
+  headroom: number | null
+): ClaudeSessionMoveDecision | null {
+  if (!inputs.pool?.enabled || !inputs.pool.spreadLine || inputs.pinned || headroom === null) {
+    return null
+  }
+  // A live turn is a burst. The hard line still moves a proxy session; a rebalance waits.
+  if (inputs.paneState !== 'done') {
+    return null
+  }
+  const { now } = inputs
+  const ready = candidateReadiness(inputs)
+  if (ready.kind !== 'ready') {
+    if (
+      inputs.turnEndedAt !== undefined &&
+      now - inputs.turnEndedAt < CLAUDE_POOL_REBALANCE_QUIET_MS
+    ) {
+      return { kind: 'stay', reason: 'prompt-cache' }
+    }
+    if (now - inputs.lastMoveAt < CLAUDE_POOL_REBALANCE_COOLDOWN_MS) {
+      return { kind: 'stay', reason: 'cooldown' }
+    }
+    if (now - inputs.lastFailureAt < CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS) {
+      return { kind: 'stay', reason: 'failed-recently' }
+    }
+    return ready
+  }
+  const best = bestRebalanceCandidate(ready.fresh, now)
+  if (
+    !best ||
+    best.headroom < CLAUDE_POOL_REBALANCE_MIN_TARGET_HEADROOM ||
+    headroom >= best.headroom - CLAUDE_POOL_REBALANCE_GAP_PTS
+  ) {
+    return null
+  }
+  // Why after the gap test: a pane that just landed on the freer account is under the line, not cooling down.
+  if (
+    inputs.turnEndedAt !== undefined &&
+    now - inputs.turnEndedAt < CLAUDE_POOL_REBALANCE_QUIET_MS
+  ) {
+    return { kind: 'stay', reason: 'prompt-cache' }
+  }
+  if (now - inputs.lastFailureAt < CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS) {
+    return { kind: 'stay', reason: 'failed-recently' }
+  }
+  if (now - inputs.lastMoveAt < CLAUDE_POOL_REBALANCE_COOLDOWN_MS) {
+    return { kind: 'stay', reason: 'cooldown' }
+  }
+  const window = worstClaudeWindow(inputs.usage, now)
+  return window
+    ? { kind: 'move', to: best.accountId, window, reason: 'rebalance' }
+    : { kind: 'stay', reason: 'no-usage' }
+}
+
 export function decideClaudeSessionMove(
   inputs: ClaudeSessionMoveInputs
 ): ClaudeSessionMoveDecision {
@@ -136,7 +265,7 @@ export function decideClaudeSessionMove(
   const headroom = claudeAutoSwitchHeadroom(usage, now)
   const over = inputs.pinned ? atLimit : headroom !== null && headroom <= 0
   if (!over) {
-    return { kind: 'stay', reason: 'under-line' }
+    return decidePoolRebalance(inputs, headroom) ?? { kind: 'stay', reason: 'under-line' }
   }
   if (now - inputs.lastFailureAt < CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS) {
     return { kind: 'stay', reason: 'failed-recently' }
@@ -162,30 +291,14 @@ export function decideClaudeSessionMove(
       }
     }
   }
-  const open = inputs.candidates.filter((candidate) => {
-    const claim = inputs.targetClaims.get(candidate.accountId)
-    return !claim || now - claim.at >= CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS
-  })
-  const fresh = open
-    .filter((candidate) => isFresh(candidate, now))
-    .map((candidate) =>
-      debitClaimedUsage(candidate, inputs.targetClaims.get(candidate.accountId), now)
-    )
-  // Why: an account inside its Retry-After cannot be read, so ranking does not wait for it.
-  const unreadable = open.filter(
-    (candidate) =>
-      !isFresh(candidate, now) && (candidate.rateLimits?.usageMetadata?.retryAtMs ?? 0) > now
-  )
-  const claimedOut = inputs.candidates.length - open.length
-  if (fresh.length + unreadable.length + claimedOut < inputs.candidateCount) {
-    if (inputs.candidates.some((candidate) => candidate.isFetching)) {
-      return { kind: 'stay', reason: 'no-usage' }
-    }
-    if (now - inputs.lastUsageReadAt >= DEFAULT_POLL_MS) {
-      return { kind: 'read-usage' }
-    }
+  const ready = candidateReadiness(inputs)
+  if (ready.kind !== 'ready') {
+    return ready
   }
-  const to = pickClaudeAutoSwitchTarget(usage, fresh, { now, lastSwitchAt: inputs.lastMoveAt })
+  const to = pickClaudeAutoSwitchTarget(usage, ready.fresh, {
+    now,
+    lastSwitchAt: inputs.lastMoveAt
+  })
   if (!to) {
     return { kind: 'stay', reason: 'no-target' }
   }

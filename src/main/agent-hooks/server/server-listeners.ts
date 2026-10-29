@@ -284,6 +284,7 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
             ? { mainAgentState: enriched.payload.mainAgent.state }
             : {}),
           ...(backgroundWork ? { backgroundWork: true } : {}),
+          ...(enriched.turnEndedAt !== undefined ? { turnEndedAt: enriched.turnEndedAt } : {}),
           receivedAt: enriched.receivedAt,
           observedInCurrentRuntime:
             Boolean(enriched.structuredHost) || this.runtimeObservedStatusPaneKeys.has(paneKey)
