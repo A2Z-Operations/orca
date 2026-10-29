@@ -6030,7 +6030,8 @@
             "storage": "Armazenar dados na própria pasta de armazenamento do plugin",
             "secrets": "Armazenar e ler segredos no próprio cofre criptografado do plugin",
             "eventsSubscribe": "Ser notificado quando worktrees são criadas ou removidas e quando o status do agente muda",
-            "settingsOwn": "Ler e alterar as próprias configurações do plugin"
+            "settingsOwn": "Ler e alterar as próprias configurações do plugin",
+            "accountsRead": "Ler os ids, rótulos e janelas de uso das contas Claude, e quantas sessões cada conta está executando. Não inclui tokens nem caminhos de credenciais."
           },
           "decisionFailed": "Não foi possível salvar a decisão de permissão. Tente novamente."
         },
@@ -20948,6 +20949,9 @@
         "sessionsOther": "{{count}} sessões",
         "badge": "Reparto",
         "paneBadge": "Conta Claude {{label}}"
+      },
+      "sessionMover": {
+        "rebalanceBody": "{{from}} continua em {{to}} para equilibrar suas contas."
       },
       "unnamedAccount": "Conta do Claude",
       "systemDefaultNamed": "Padrão do sistema: {{value0}}",

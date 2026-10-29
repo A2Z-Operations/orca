@@ -14,7 +14,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   JOB_ID,
   assertJobId,
@@ -40,7 +40,8 @@ export {
   WAITER_FORWARDED_SIGNALS
 } from './durable-background-job-plan.mjs'
 
-const RUNNER_PATH = import.meta.filename
+// oxlint-disable-next-line unicorn/prefer-import-meta-properties -- orcad's CJS bundle rewrites import.meta.url only, not import.meta.filename
+const RUNNER_PATH = fileURLToPath(import.meta.url)
 const PENDING_MAX_AGE_MS = 60 * 60 * 1000
 const EXITED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 

@@ -229,12 +229,16 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
     if (input.shellOverride !== undefined) {
       spawnOptions.shellOverride = input.shellOverride
     }
-    spawnOptions.terminalShellArgs = resolveConfiguredTerminalShellArgs({
+    const terminalShellArgs = resolveConfiguredTerminalShellArgs({
       connectionId,
       requestedShellOverride: args.shellOverride,
       launchCommand,
       settings: input.getSettings?.()
     })
+    // Absent, not undefined: launch-parity facts treat a present key as a shell-profile choice.
+    if (terminalShellArgs !== undefined) {
+      spawnOptions.terminalShellArgs = terminalShellArgs
+    }
     if (process.platform === 'win32') {
       // Preserve the PowerShell implementation choice across both provider paths.
       spawnOptions.terminalWindowsWslDistro = input.expectedWslDistro

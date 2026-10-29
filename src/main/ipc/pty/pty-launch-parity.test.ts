@@ -3,7 +3,17 @@ import * as teamsShim from '../../runtime/claude-agent-teams-shim-env'
 import { WorktreeTerminalMutationLock } from '../../runtime/worktree-terminal-mutation-lock'
 import * as teamsPlan from '../../runtime/terminal/launch/agent-teams-launch-plan'
 import { SessionNotFoundError } from '../../daemon/daemon-errors'
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi
+} from 'vitest'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { classifyErrorMock, statSyncMock, trackMock } from './pty-ipc-mock-registry'
 import {
@@ -54,6 +64,19 @@ import { probeOpenCodeLaunchCapabilities } from '../../opencode/opencode-launch-
 import { resolveOpenCodeDirectModelExecutable } from '../../opencode/opencode-model-executable'
 import { probeOpenCodeLaunchModelContext } from '../../opencode/opencode-launch-model-context'
 import { readOpenSshDefaultShell } from '../../../shared/openssh-default-shell'
+
+// Golden commands are the launch plan. Durable-job injection is covered on its own and would append --plugin-dir.
+const previousDurableJobs = process.env.ORCA_DURABLE_JOBS
+beforeAll(() => {
+  process.env.ORCA_DURABLE_JOBS = '0'
+})
+afterAll(() => {
+  if (previousDurableJobs === undefined) {
+    delete process.env.ORCA_DURABLE_JOBS
+  } else {
+    process.env.ORCA_DURABLE_JOBS = previousDurableJobs
+  }
+})
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))

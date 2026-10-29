@@ -12012,7 +12012,8 @@
             "storage": "플러그인 자체 저장소 폴더에 데이터 저장",
             "secrets": "플러그인 자체 암호화 금고에 비밀 저장 및 읽기",
             "eventsSubscribe": "워크트리가 생성되거나 제거되고 에이전트 상태가 변경될 때 알림 받기",
-            "settingsOwn": "플러그인 자체 설정 읽기 및 변경"
+            "settingsOwn": "플러그인 자체 설정 읽기 및 변경",
+            "accountsRead": "Claude 계정 ID, 레이블, 사용량 창, 그리고 각 계정에서 실행 중인 세션 수를 읽습니다. 토큰이나 자격 증명 경로는 포함하지 않습니다."
           },
           "decisionFailed": "권한 결정을 저장할 수 없습니다. 다시 시도하세요."
         },
@@ -20841,6 +20842,9 @@
         "sessionsOther": "세션 {{count}}개",
         "badge": "분산",
         "paneBadge": "Claude 계정 {{label}}"
+      },
+      "sessionMover": {
+        "rebalanceBody": "{{from}}이(가) 계정을 고르게 쓰도록 {{to}}에서 계속됩니다."
       },
       "unnamedAccount": "Claude 계정",
       "systemDefaultNamed": "시스템 기본값: {{value0}}",

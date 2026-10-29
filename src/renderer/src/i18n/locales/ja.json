@@ -12074,7 +12074,8 @@
             "storage": "プラグインの独自ストレージフォルダーにデータを保存",
             "secrets": "プラグインの独自暗号化保管庫にシークレットを保存および読み取り",
             "eventsSubscribe": "ワークツリーが作成または削除され、Agent ステータスが変更されたときに通知を受ける",
-            "settingsOwn": "プラグインの独自設定を読み取りおよび変更"
+            "settingsOwn": "プラグインの独自設定を読み取りおよび変更",
+            "accountsRead": "Claude アカウントの ID、ラベル、使用量ウィンドウ、および各アカウントで実行中のセッション数を読み取る。トークンや認証情報のパスは含まない。"
           },
           "decisionFailed": "権限の選択を保存できませんでした。再試行してください。"
         },
@@ -20904,6 +20905,9 @@
         "sessionsOther": "{{count}} セッション",
         "badge": "分散",
         "paneBadge": "Claude アカウント {{label}}"
+      },
+      "sessionMover": {
+        "rebalanceBody": "{{from}} はアカウントを分散するため {{to}} で続行します。"
       },
       "unnamedAccount": "Claude アカウント",
       "systemDefaultNamed": "システムのデフォルト: {{value0}}",

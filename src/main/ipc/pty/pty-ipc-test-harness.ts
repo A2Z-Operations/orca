@@ -1,3 +1,5 @@
+import { beforeAll } from 'vitest'
+import { resolveLoginShellEnvironment } from '../../startup/login-shell-environment'
 import { createPtyIpcSuiteEnvironment } from './pty-ipc-suite-environment'
 import { createPtyIpcProviderFixtures } from './pty-ipc-provider-fixtures'
 import { createPtyIpcListenerAccessors } from './pty-ipc-listener-accessors'
@@ -9,6 +11,10 @@ export type PtyIpcSuiteFixtures = ReturnType<typeof createPtyIpcSuiteEnvironment
   ReturnType<typeof createPtyIpcSpawnDrivers>
 
 export function setupPtyIpcSuite(): PtyIpcSuiteFixtures {
+  // Plain shell spawns wait on this probe. A cold login shell can outlast vi.waitFor.
+  beforeAll(async () => {
+    await resolveLoginShellEnvironment()
+  })
   const environment = createPtyIpcSuiteEnvironment()
   const providers = createPtyIpcProviderFixtures({ mainWindow: environment.mainWindow })
   const listeners = createPtyIpcListenerAccessors({

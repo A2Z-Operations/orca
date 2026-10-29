@@ -10,6 +10,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { toLinuxPath } from '../../shared/wsl-paths'
 import { sweepDurableJobs } from './durable-background-job.mjs'
 
@@ -34,7 +35,8 @@ function scriptsIn(dir: string): { runner: string; hook: string } | undefined {
 export function durableJobScriptPaths(
   resourcesPath: string | undefined = process.resourcesPath
 ): { runner: string; hook: string } | undefined {
-  const here = import.meta.dirname
+  // oxlint-disable-next-line unicorn/prefer-import-meta-properties -- orcad's CJS bundle rewrites import.meta.url only, not import.meta.dirname
+  const here = dirname(fileURLToPath(import.meta.url))
   const candidates = [
     resourcesPath ? join(resourcesPath, 'durable-jobs') : undefined,
     join(here, 'durable-jobs'),

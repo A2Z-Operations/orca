@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -21,7 +21,8 @@ describe('orcad forked-child paths', () => {
   let originalArgv: string[]
 
   beforeEach(() => {
-    deployRoot = mkdtempSync(join(tmpdir(), 'orcad-deploy-'))
+    // argv[1] is realpath'd. macOS tmpdir() is /var/folders, whose real path is /private/var/folders.
+    deployRoot = realpathSync(mkdtempSync(join(tmpdir(), 'orcad-deploy-')))
     writeFileSync(join(deployRoot, 'orcad.js'), '')
     writeFileSync(join(deployRoot, 'parcel-watcher-process-entry.js'), '')
     writeFileSync(join(deployRoot, FOREIGN_SQLITE_READER_ENTRY_FILENAME), '')

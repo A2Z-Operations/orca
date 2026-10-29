@@ -138,6 +138,17 @@ function parsed(json: unknown): unknown {
   return typeof json === 'string' ? JSON.parse(json) : null
 }
 
+/** Same blob read as the store: Node 26.0's TEXT decoder stops at the NUL key separator. */
+function persistedOperationKey(value: unknown): string {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value).toString('utf8')
+  }
+  return String(value)
+}
+
 export async function readPersistedTestAgentSessionStore(
   stateDirectory: string
 ): Promise<PersistedTestAgentSessionStore> {
@@ -157,10 +168,12 @@ export async function readPersistedTestAgentSessionStore(
     ) as PersistedAgentSessionRecord
   }
   for (const row of db
-    .prepare('SELECT operation_key, row_json FROM agent_session_operations ORDER BY rowid')
+    .prepare(
+      'SELECT CAST(operation_key AS BLOB) AS operation_key, row_json FROM agent_session_operations ORDER BY rowid'
+    )
     .all()) {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: test read-back of rows the store wrote after validating them.
-    persisted.operations[String(row.operation_key)] = parsed(
+    persisted.operations[persistedOperationKey(row.operation_key)] = parsed(
       row.row_json
     ) as AgentSessionOperationRow
   }
