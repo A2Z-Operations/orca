@@ -17,6 +17,8 @@ export type ClaudeMoverSessionView = {
   record: ClaudePaneAccountRecord
   paneKey: string | null
   paneState: AgentStatusState | null
+  /** True when a shell, cron, or monitor is still alive on this pane. */
+  paneBackgroundWork: boolean
   providerSession: AgentProviderSessionMetadata | null
   worktreeId: string | null
 }
@@ -27,6 +29,10 @@ function moverPaneState(entry: AgentHookStatusChangeEntry | undefined): AgentSta
     return null
   }
   return entry.mainAgentState ?? entry.state
+}
+
+function moverPaneBackgroundWork(entry: AgentHookStatusChangeEntry | undefined): boolean {
+  return entry?.backgroundWork === true
 }
 
 /**
@@ -82,6 +88,7 @@ export function collectClaudeMoverSessions(args: {
       record,
       paneKey,
       paneState: paneKey ? moverPaneState(statusByPane.get(paneKey)) : null,
+      paneBackgroundWork: paneKey ? moverPaneBackgroundWork(statusByPane.get(paneKey)) : false,
       providerSession: identity
         ? (args.resolveProviderSession(identity.paneKey, identity.sessionId) ?? {
             key: 'session_id',

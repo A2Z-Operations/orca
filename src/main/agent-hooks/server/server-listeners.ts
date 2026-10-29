@@ -273,13 +273,17 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
         })
       }
       if (!enriched.providerSessionOnly) {
+        // Monitoring is the folded shell/cron signal; the flag covers the same work before that fold.
+        const backgroundWork =
+          enriched.payload.workingMode === 'monitoring' ||
+          enriched.claudeRunningNonAgentTask === true
         statuses.push({
           paneKey,
           state: enriched.payload.state,
-          // A monitoring pane stays working after the main agent settles; movers follow the main agent.
           ...(enriched.payload.mainAgent
             ? { mainAgentState: enriched.payload.mainAgent.state }
             : {}),
+          ...(backgroundWork ? { backgroundWork: true } : {}),
           receivedAt: enriched.receivedAt,
           observedInCurrentRuntime:
             Boolean(enriched.structuredHost) || this.runtimeObservedStatusPaneKeys.has(paneKey)

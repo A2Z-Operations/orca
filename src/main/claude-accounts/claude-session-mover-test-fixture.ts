@@ -185,7 +185,8 @@ export function setup(
     accountId: string,
     paneState: AgentHookStatusChangeEntry['state'] = 'done',
     pinned = false,
-    mainAgentState?: AgentHookStatusChangeEntry['mainAgentState']
+    mainAgentState?: AgentHookStatusChangeEntry['mainAgentState'],
+    backgroundWork = false
   ) => {
     records.push(record(ptyId, paneKey, accountId, pinned))
     statuses = [
@@ -194,6 +195,7 @@ export function setup(
         paneKey,
         state: paneState,
         ...(mainAgentState ? { mainAgentState } : {}),
+        ...(backgroundWork ? { backgroundWork: true } : {}),
         receivedAt: Date.now(),
         observedInCurrentRuntime: true
       }
@@ -216,12 +218,32 @@ export function setup(
       listener()
     }
   }
+  const setBackgroundWork = (paneKey: string, alive: boolean, notify = true) => {
+    statuses = statuses.map((entry) => {
+      if (entry.paneKey !== paneKey) {
+        return entry
+      }
+      if (alive) {
+        return { ...entry, backgroundWork: true }
+      }
+      const next = { ...entry }
+      delete next.backgroundWork
+      return next
+    })
+    if (!notify) {
+      return
+    }
+    for (const listener of statusListeners) {
+      listener()
+    }
+  }
   return {
     mover,
     settings,
     publish,
     session,
     setStatus,
+    setBackgroundWork,
     move,
     fetchInactive,
     notices,

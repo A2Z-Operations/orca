@@ -96,6 +96,39 @@ describe('account session-mover surface', () => {
     )
   })
 
+  it('prints each live session decision, including a background-work wait', async () => {
+    callMock.mockResolvedValue({
+      id: 'test',
+      ok: true,
+      result: {
+        claude: {
+          accounts: [{ id: 'a', email: 'a@example.com' }],
+          activeAccountId: 'a',
+          sessionMover: 'move',
+          sessionMoves: [
+            {
+              ptyId: 'pty-1',
+              paneKey: 'pane-1',
+              fromAccountId: 'a',
+              toAccountId: null,
+              window: 'session',
+              percent: 96,
+              line: 95,
+              reason: 'wait:background-work',
+              at: 123
+            }
+          ]
+        },
+        codex: { accounts: [], activeAccountId: null }
+      },
+      _meta: { runtimeId: 'test-runtime' }
+    })
+    await ACCOUNT_HANDLERS['account list']({ ...context('claude'), flags: new Map() })
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('  session pty-1: wait:background-work')
+    )
+  })
+
   it('preserves the host session-mover policy and live decisions in account list JSON', async () => {
     const snapshot = {
       claude: {

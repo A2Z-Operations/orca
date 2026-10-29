@@ -20,6 +20,8 @@ export const CLAUDE_SESSION_MOVE_COOLDOWN_MS = 5 * 60_000
 export const CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS = 60_000
 /** Per session: after a failed or skipped move, no retry for this long. */
 export const CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS = 60_000
+/** How long a settled main agent may keep a live shell or monitor. The hard limit does not wait. */
+export const CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS = 10 * 60_000
 /** One turn's worth of a 5-hour window, debited from a target's reading after each move that claimed it. */
 export const CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT = 5
 
@@ -36,14 +38,26 @@ export type ClaudeSessionMoveDecision =
       reason: 'off' | 'no-usage' | 'under-line' | 'cooldown' | 'failed-recently' | 'no-target'
     }
   | { kind: 'read-usage' }
-  | { kind: 'wait'; reason: 'mid-turn' | 'no-status' }
+  | { kind: 'wait'; reason: 'mid-turn' | 'no-status' | 'background-work' }
   | { kind: 'move'; to: string; window: ClaudeSessionMoveWindow }
+
+/** Ask and move notices name this wait while the shell or monitor is still alive. */
+export function claudeSessionMoveNoticeDetail(detail: string, backgroundWork: boolean): string {
+  return backgroundWork ? `${detail} (wait:background-work)` : detail
+}
 
 export type ClaudeSessionMoveInputs = {
   now: number
   setting: ClaudeSessionMoverSetting
   pinned: boolean
   paneState: AgentStatusState | null
+  /** A shell, cron, or monitor is still alive after the main agent. */
+  paneBackgroundWork?: boolean
+  /**
+   * When the current background-work wait started. 0 or omitted means it has not been
+   * stamped yet, which still waits; the caller records that instant.
+   */
+  backgroundWaitStartedAt?: number
   /** The session's own account's reading. */
   usage: ProviderRateLimits | null
   /** Readings of the other signed-in accounts of the same runtime. */
@@ -124,12 +138,19 @@ export function decideClaudeSessionMove(
     return { kind: 'stay', reason: 'cooldown' }
   }
   // Why never mid-turn: a restart during a tool call or a permission prompt loses the turn.
-  // paneState is the main agent's own state when the hook published one, so background monitoring does not hold the restart.
+  // paneState is the main agent's own state when the hook published one.
   if (inputs.paneState === null) {
     return { kind: 'wait', reason: 'no-status' }
   }
   if (inputs.paneState !== 'done') {
     return { kind: 'wait', reason: 'mid-turn' }
+  }
+  // A shell or monitor can outlive the main agent. Hold briefly, and never past the hard limit.
+  if (inputs.paneBackgroundWork && !atLimit) {
+    const startedAt = inputs.backgroundWaitStartedAt ?? 0
+    if (startedAt === 0 || now - startedAt < CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS) {
+      return { kind: 'wait', reason: 'background-work' }
+    }
   }
   const open = inputs.candidates.filter((candidate) => {
     const claim = inputs.targetClaims.get(candidate.accountId)

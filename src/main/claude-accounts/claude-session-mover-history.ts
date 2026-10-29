@@ -3,7 +3,11 @@ import type {
   ClaudeSessionMoveSummary
 } from '../../shared/managed-account-types'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
-import { worstClaudeWindow, type ClaudeTargetClaim } from './claude-session-mover-policy'
+import {
+  claudeSessionMoveNoticeDetail,
+  worstClaudeWindow,
+  type ClaudeTargetClaim
+} from './claude-session-mover-policy'
 import type { ClaudeMoverSessionView } from './claude-session-mover-sessions'
 import type {
   ClaudeSessionMoverDeps,
@@ -15,6 +19,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
   const lastMoveAt = new Map<string, number>()
   const lastFailureAt = new Map<string, number>()
   const lastAskAt = new Map<string, number>()
+  const backgroundWaitAt = new Map<string, number>()
   const lastDecision = new Map<string, ClaudeSessionMoveSummary>()
   const targetClaims = new Map<string, ClaudeTargetClaim>()
   const inflight = new Set<string>()
@@ -82,7 +87,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         ptyId: view.record.ptyId,
         from,
         to: kind === 'moved' ? to : null,
-        detail
+        detail: claudeSessionMoveNoticeDetail(detail, kind === 'moved' && view.paneBackgroundWork)
       })
     }
 
@@ -90,6 +95,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
     lastMoveAt,
     lastFailureAt,
     lastAskAt,
+    backgroundWaitAt,
     lastDecision,
     targetClaims,
     inflight,

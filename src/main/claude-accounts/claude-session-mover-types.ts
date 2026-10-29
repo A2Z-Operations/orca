@@ -14,6 +14,7 @@ export type ClaudeSessionMoveReason =
   | 'read-usage'
   | 'wait:mid-turn'
   | 'wait:no-status'
+  | 'wait:background-work'
   | 'moving'
   | 'moved'
   | 'failed'
