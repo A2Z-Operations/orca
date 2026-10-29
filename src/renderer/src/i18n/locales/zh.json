@@ -20845,7 +20845,16 @@
         "paneBadge": "Claude 账户 {{label}}"
       },
       "sessionMover": {
-        "rebalanceBody": "{{from}} 改在 {{to}} 上继续，以均衡各账户。"
+        "rebalanceBody": "{{from}} 改在 {{to}} 上继续，以均衡各账户。",
+        "recentMoves": "最近的转移",
+        "recentMovesDescription": "每个仍在运行的 Claude 会话上，移动功能的最近一次决定。",
+        "recentMovesEmpty": "没有 Claude 会话转移。",
+        "keyword": {
+          "move": "转移",
+          "session": "会话",
+          "strategy": "策略",
+          "rebalance": "再平衡"
+        }
       },
       "unnamedAccount": "Claude 账户",
       "systemDefaultNamed": "系统默认：{{value0}}",

@@ -11,6 +11,8 @@ import type {
 } from '../../shared/ai-vault-resume-preparation'
 import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
 import { resolveTuiAgentLaunchEnv } from '../../shared/tui-agent-launch-defaults'
+import { translateMain } from '../i18n/main-i18n'
+import { dispatchClaudeRecentMoves } from '../claude-accounts/claude-session-move-mobile-notice'
 import { createProviderAccountServices } from '../provider-account-services'
 import { createClaudeUsagePollingSwitch } from '../claude-accounts/claude-usage-polling-policy'
 import { createCodexRuntimeHomeLaunchPreparation } from '../codex/codex-runtime-home-launch-preparation'
@@ -84,18 +86,13 @@ export function createOrcadAccountServices(args: {
     sessionMover: {
       headless: true,
       getController: () => attachedRuntime?.getPtyController() ?? null,
-      // Why the notification stream: no window is attached here; a paired client sees it when it next connects.
+      // Why the notification stream: no window is attached here; a paired client sees the same list as `orca account moves`.
       onNotice: (notice) =>
-        attachedRuntime?.dispatchMobileNotification({
-          type: 'notification',
-          source: 'plugin',
-          title: 'Claude session mover',
-          body: notice.balance
-            ? `${notice.from.email} continues on ${notice.to?.email ?? ''} to balance your accounts`
-            : notice.restartless
-              ? `${notice.from.email} continues on ${notice.to?.email ?? ''} without a restart`
-              : `${notice.kind}: session ${notice.ptyId} on ${notice.from.email}${notice.to ? ` → ${notice.to.email}` : ''} (${notice.detail})`
-        })
+        dispatchClaudeRecentMoves(
+          attachedRuntime?.dispatchMobileNotification,
+          notice,
+          translateMain('accounts.claude.sessionMover.recentMoves', 'Recent moves')
+        )
     }
   })
   // Headless usage-driven features need readings even without a window requesting them.

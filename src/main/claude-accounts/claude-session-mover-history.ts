@@ -3,6 +3,7 @@ import type {
   ClaudeSessionMoveSummary
 } from '../../shared/managed-account-types'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
+import { noteClaudeSessionMoveStat } from './claude-session-move-stats'
 import { publishClaudeAccountSessionMoved } from './claude-account-plugin-publish'
 import {
   claudeSessionMoveNoticeDetail,
@@ -92,9 +93,17 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         now,
         detail
       )
+      if (kind === 'moved' || kind === 'failed') {
+        noteClaudeSessionMoveStat({
+          strategy: view.record.proxySlot ? 'proxy' : 'resume',
+          rebalance: kind === 'moved' && balance,
+          failed: kind === 'failed'
+        })
+      }
       deps.onNotice({
         kind,
         ptyId: view.record.ptyId,
+        paneKey: view.paneKey,
         from,
         to: kind === 'moved' ? to : null,
         detail: claudeSessionMoveNoticeDetail(detail, kind === 'moved' && view.paneBackgroundWork),

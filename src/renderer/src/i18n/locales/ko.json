@@ -20844,7 +20844,16 @@
         "paneBadge": "Claude 계정 {{label}}"
       },
       "sessionMover": {
-        "rebalanceBody": "{{from}}이(가) 계정을 고르게 쓰도록 {{to}}에서 계속됩니다."
+        "rebalanceBody": "{{from}}이(가) 계정을 고르게 쓰도록 {{to}}에서 계속됩니다.",
+        "recentMoves": "최근 이동",
+        "recentMovesDescription": "실행 중인 각 Claude 세션에 대한 이동 기능의 마지막 결정입니다.",
+        "recentMovesEmpty": "Claude 세션 이동이 없습니다.",
+        "keyword": {
+          "move": "이동",
+          "session": "세션",
+          "strategy": "전략",
+          "rebalance": "재조정"
+        }
       },
       "unnamedAccount": "Claude 계정",
       "systemDefaultNamed": "시스템 기본값: {{value0}}",

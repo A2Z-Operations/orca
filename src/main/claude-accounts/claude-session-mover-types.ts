@@ -34,6 +34,10 @@ export type ClaudeSessionMoveNotice = {
   restartless?: true
   /** The move evens out the pool. The notice says the session continues in order to balance accounts. */
   balance?: true
+  /** The phone opens this pane. Absent when the session has no pane key. */
+  paneKey?: string | null
+  /** `orca account moves` rows, newest first, including this notice. */
+  moves?: readonly ClaudeSessionMoveSummary[]
 }
 
 export type ClaudeSessionMoverDeps = {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setClaudeAccountPluginPublishListener } from './claude-account-plugin-publish'
+import { setClaudeSessionMoveStatsRecorder } from './claude-session-move-stats'
 import { setup, state, limits, PANE_1, PANE_2 } from './claude-session-mover-test-fixture'
 import {
   CLAUDE_POOL_REBALANCE_QUIET_MS,
@@ -14,6 +15,7 @@ describe('createClaudeSessionMover', () => {
   })
   afterEach(() => {
     setClaudeAccountPluginPublishListener(null)
+    setClaudeSessionMoveStatsRecorder(null)
     vi.useRealTimers()
   })
 
@@ -170,6 +172,8 @@ describe('createClaudeSessionMover', () => {
   })
 
   it('marks a failed move and retries only after the hold', async () => {
+    const seen: { strategy: string; rebalance: boolean; failed: boolean }[] = []
+    setClaudeSessionMoveStatsRecorder((stat) => seen.push(stat))
     const { mover, session, publish, move, notices, log } = setup()
     move.mockResolvedValueOnce({
       kind: 'failed',
@@ -181,6 +185,8 @@ describe('createClaudeSessionMover', () => {
     publish(state(30, { b: limits(96), c: limits(20) }))
     await vi.runAllTimersAsync()
     expect(notices.map((notice) => notice.kind)).toEqual(['failed'])
+    expect(notices[0]?.moves?.[0]).toMatchObject({ ptyId: 'pty-1', reason: 'failed' })
+    expect(notices[0]?.paneKey).toBe(PANE_1)
     expect(log).toHaveBeenLastCalledWith(
       expect.stringContaining('terminal_pane_owner_changed'),
       expect.objectContaining({ reason: 'failed' })
@@ -192,6 +198,10 @@ describe('createClaudeSessionMover', () => {
     publish(state(30, { b: limits(97), c: limits(20) }))
     await vi.runAllTimersAsync()
     expect(move).toHaveBeenCalledTimes(2)
+    expect(seen).toEqual([
+      { strategy: 'resume', rebalance: false, failed: true },
+      { strategy: 'resume', rebalance: false, failed: false }
+    ])
   })
 
   it('skips a session with no conversation to resume, with a reason', async () => {
@@ -254,6 +264,8 @@ describe('createClaudeSessionMover', () => {
   })
 
   it('rebalances a proxy session onto the freer account and names that in the notice', async () => {
+    const seen: { strategy: string; rebalance: boolean; failed: boolean }[] = []
+    setClaudeSessionMoveStatsRecorder((stat) => seen.push(stat))
     const proxyMove = vi.fn(async (request: { ptyId: string }) => ({
       kind: 'moved' as const,
       newPtyId: request.ptyId
@@ -279,6 +291,8 @@ describe('createClaudeSessionMover', () => {
       toAccountId: 'c',
       reason: 'rebalance'
     })
+    expect(f.notices[0]?.moves).toEqual(f.mover.lastDecisions())
+    expect(seen).toEqual([{ strategy: 'proxy', rebalance: true, failed: false }])
   })
 
   it('asks before a rebalance when the setting is ask', async () => {

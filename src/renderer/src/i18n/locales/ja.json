@@ -20907,7 +20907,16 @@
         "paneBadge": "Claude アカウント {{label}}"
       },
       "sessionMover": {
-        "rebalanceBody": "{{from}} はアカウントを分散するため {{to}} で続行します。"
+        "rebalanceBody": "{{from}} はアカウントを分散するため {{to}} で続行します。",
+        "recentMoves": "最近の移動",
+        "recentMovesDescription": "実行中の各 Claude セッションについて、移動機能が最後に下した判断です。",
+        "recentMovesEmpty": "Claude セッションの移動はありません。",
+        "keyword": {
+          "move": "移動",
+          "session": "セッション",
+          "strategy": "方式",
+          "rebalance": "再配分"
+        }
       },
       "unnamedAccount": "Claude アカウント",
       "systemDefaultNamed": "システムのデフォルト: {{value0}}",

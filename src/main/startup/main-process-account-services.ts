@@ -19,6 +19,7 @@ import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent
 import { createAgentModelCatalogSettingsExpiry } from '../native-chat/agent-model-catalog/agent-model-catalog-account-expiry'
 import { getRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
 import { translateMain } from '../i18n/main-i18n'
+import { dispatchClaudeRecentMoves } from '../claude-accounts/claude-session-move-mobile-notice'
 import type {
   ClaudeAutoSwitchedEvent,
   ClaudePaneAssignedEvent
@@ -75,6 +76,11 @@ export function initializeMainProcessAccountServices(): void {
       // Why lazy: the runtime is built after the account services; the mover reads it per move.
       getController: () => state.runtime?.getPtyController() ?? null,
       onNotice: (notice) => {
+        dispatchClaudeRecentMoves(
+          state.runtime?.dispatchMobileNotification,
+          notice,
+          translateMain('accounts.claude.sessionMover.recentMoves', 'Recent moves')
+        )
         if (notice.kind === 'skipped' || !store.getSettings().notifications.enabled) {
           return
         }

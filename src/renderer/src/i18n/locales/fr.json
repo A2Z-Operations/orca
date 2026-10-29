@@ -20845,7 +20845,16 @@
         "paneBadge": "Compte Claude {{label}}"
       },
       "sessionMover": {
-        "rebalanceBody": "{{from}} continue sur {{to}} pour équilibrer vos comptes."
+        "rebalanceBody": "{{from}} continue sur {{to}} pour équilibrer vos comptes.",
+        "recentMoves": "Déplacements récents",
+        "recentMovesDescription": "La dernière décision de déplacement pour chaque session Claude en cours.",
+        "recentMovesEmpty": "Aucun déplacement de session Claude.",
+        "keyword": {
+          "move": "déplacement",
+          "session": "session",
+          "strategy": "stratégie",
+          "rebalance": "rééquilibrage"
+        }
       },
       "unnamedAccount": "Compte Claude",
       "systemDefaultNamed": "Système par défaut : {{value0}}",

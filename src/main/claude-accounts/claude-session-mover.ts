@@ -7,11 +7,28 @@ export type {
   ClaudeSessionMoverDeps,
   ClaudeSessionMoveNotice
 } from './claude-session-mover-types'
-import { createClaudeMoverHistory } from './claude-session-mover-history'
+import { createClaudeMoverHistory, type ClaudeMoverHistory } from './claude-session-mover-history'
 import { evaluateClaudeMoverSessions } from './claude-session-mover-evaluation'
 
 export function createClaudeSessionMover(deps: ClaudeSessionMoverDeps): ClaudeSessionMover {
-  const history = createClaudeMoverHistory(deps)
+  // Filled before any notice. createClaudeMoverHistory does not publish during construction.
+  const historyBox: { current: ClaudeMoverHistory | null } = { current: null }
+  const snapshotMoves = (): ReturnType<ClaudeSessionMover['lastDecisions']> => {
+    const decisions = historyBox.current?.lastDecision
+    if (!decisions) {
+      return []
+    }
+    const live = new Set(deps.registry.list().map((record) => record.ptyId))
+    return [...decisions.values()]
+      .filter((record) => live.has(record.ptyId))
+      .sort((a, b) => b.at - a.at)
+  }
+  const publishing: ClaudeSessionMoverDeps = {
+    ...deps,
+    onNotice: (notice) => deps.onNotice({ ...notice, moves: snapshotMoves() })
+  }
+  const history = createClaudeMoverHistory(publishing)
+  historyBox.current = history
   const { lastMoveAt, lastFailureAt, lastAskAt, backgroundWaitAt, lastDecision, targetClaims } =
     history
   let lastUsageReadAt = 0
@@ -66,7 +83,7 @@ export function createClaudeSessionMover(deps: ClaudeSessionMoverDeps): ClaudeSe
       }
     }
     const readRequested = evaluateClaudeMoverSessions(
-      deps,
+      publishing,
       history,
       views,
       state,
@@ -125,11 +142,6 @@ export function createClaudeSessionMover(deps: ClaudeSessionMoverDeps): ClaudeSe
       }
     },
     evaluate,
-    lastDecisions: () => {
-      const live = new Set(deps.registry.list().map((record) => record.ptyId))
-      return [...lastDecision.values()]
-        .filter((record) => live.has(record.ptyId))
-        .sort((a, b) => b.at - a.at)
-    }
+    lastDecisions: snapshotMoves
   }
 }

@@ -58,5 +58,19 @@ export const getAccountsClaudeSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('accounts.claude.switchSessions.keyword.restart', 'restart'),
       ...translateSearchKeyword('accounts.claude.switchSessions.keyword.running', 'running')
     ]
+  },
+  {
+    title: translate('accounts.claude.sessionMover.recentMoves', 'Recent moves'),
+    description: translate(
+      'accounts.claude.sessionMover.recentMovesDescription',
+      "The mover's last decision for each live Claude session."
+    ),
+    keywords: [
+      ...translateSearchKeyword('auto.components.settings.accounts.search.e14049e1a8', 'claude'),
+      ...translateSearchKeyword('accounts.claude.sessionMover.recentMoves', 'Recent moves'),
+      ...translateSearchKeyword('accounts.claude.sessionMover.keyword.move', 'move'),
+      ...translateSearchKeyword('accounts.claude.sessionMover.keyword.session', 'session'),
+      ...translateSearchKeyword('accounts.claude.sessionMover.keyword.strategy', 'strategy')
+    ]
   }
 ])

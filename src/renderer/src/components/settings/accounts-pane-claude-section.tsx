@@ -12,6 +12,7 @@ import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-swit
 import { ClaudeAccountPoolSetting } from './claude-account-pool-setting'
 import { ClaudeAuthProxySetting } from './claude-auth-proxy-setting'
 import { ClaudeSessionMoverSetting } from './claude-session-mover-setting'
+import { ClaudeRecentMoves } from './claude-recent-moves'
 import {
   getProviderAccountRuntime,
   providerAccountIsActiveInView
@@ -397,6 +398,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
           <ClaudeAuthProxySetting settings={settings} updateSettings={updateSettings} />
         </>
       )}
+      <ClaudeRecentMoves moves={claudeAccounts.sessionMoves} />
     </section>
   )
 }

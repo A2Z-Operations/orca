@@ -1,5 +1,6 @@
 import type { HandlerContext } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
+import { formatClaudeSessionMoveLine } from '../../shared/claude-session-move-line'
 import type { ClaudeSessionMoveSummary } from '../../shared/managed-account-types'
 
 type MovesSnapshot = {
@@ -30,11 +31,6 @@ export async function printClaudeAccountMoves(ctx: HandlerContext): Promise<void
     return
   }
   for (const move of moves) {
-    const pane = move.paneKey ?? move.ptyId
-    const to = move.toAccountId ?? '-'
-    const strategy = move.strategy ?? '-'
-    console.log(
-      `${new Date(move.at).toISOString()}  ${pane}  ${move.fromAccountId} → ${to}  ${move.reason}  ${strategy}`
-    )
+    console.log(formatClaudeSessionMoveLine(move))
   }
 }

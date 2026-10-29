@@ -120,6 +120,7 @@ export function evaluateClaudeMoverSessions(
         deps.onNotice({
           kind: 'ask',
           ptyId,
+          paneKey: view.paneKey,
           from,
           to,
           detail: claudeSessionMoveNoticeDetail(

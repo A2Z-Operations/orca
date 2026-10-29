@@ -21368,7 +21368,16 @@
           "detailFallback": "its usage limit"
         },
         "movedRestartlessBody": "{{from}} is near its usage limit. The session continues on {{to}} without a restart.",
-        "rebalanceBody": "{{from}} continues on {{to}} to balance your accounts."
+        "rebalanceBody": "{{from}} continues on {{to}} to balance your accounts.",
+        "recentMoves": "Recent moves",
+        "recentMovesDescription": "The mover's last decision for each live Claude session.",
+        "recentMovesEmpty": "No Claude session moves.",
+        "keyword": {
+          "move": "move",
+          "session": "session",
+          "strategy": "strategy",
+          "rebalance": "rebalance"
+        }
       },
       "authProxy": {
         "settingTitle": "Bill Claude through a local auth proxy",

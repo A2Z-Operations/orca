@@ -342,4 +342,33 @@ describe('Claude accounts section', () => {
     // An older server reports no setting and has no way to change it.
     expect(render({ accounts }, {}, remote)).not.toContain('Switch accounts before a usage limit')
   })
+
+  it('lists recent session moves with the same rows as orca account moves', () => {
+    expect(render({})).not.toContain('Recent moves')
+    expect(render({ sessionMoves: [] })).toContain('No Claude session moves.')
+    const markup = render(
+      {
+        sessionMoves: [
+          {
+            ptyId: 'pty-new',
+            paneKey: 'tab-1:leaf-1',
+            fromAccountId: 'acct-a',
+            toAccountId: 'acct-b',
+            window: 'session',
+            percent: 96,
+            line: 95,
+            reason: 'moved',
+            at: Date.parse('2026-10-29T15:04:05.000Z'),
+            strategy: 'proxy'
+          }
+        ]
+      },
+      {},
+      { isRemoteAccountScope: true }
+    )
+    expect(markup).toContain('Recent moves')
+    expect(markup).toContain(
+      '2026-10-29T15:04:05.000Z  tab-1:leaf-1  acct-a → acct-b  moved  proxy'
+    )
+  })
 })
