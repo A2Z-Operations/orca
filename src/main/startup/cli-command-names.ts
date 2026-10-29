@@ -44,6 +44,7 @@ export const CLI_COMMAND_NAMES = [
   'is',
   'keypress',
   'jira',
+  'job',
   'linear',
   'mouse',
   'network',
