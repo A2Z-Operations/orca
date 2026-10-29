@@ -22,6 +22,8 @@ Orca fetches your Claude usage from Anthropic with your existing Claude Code log
 
 Orca supports multiple Claude accounts and can swap between them in one click, matching the Codex flow. Switching accounts works even with live Claude sessions running — Orca holds the in-progress switch behind a guard so you don't trigger overlapping auth refreshes. See [Hot-swap Codex accounts](/docs/agents/codex-hot-swap) — the Claude flow is identical in shape.
 
+A shell command Claude starts in the background can be detached so it keeps running after that Claude process restarts. `orca job` lists those jobs, shows their status and logs, and stops them. The runner ships with Orca, and leftover job state is swept the next time Orca starts.
+
 ## Subagents and teams
 
 Background subagents and Agent Teams teammates can show as expandable child rows under the lead agent in the worktree agent list and [Agent Dashboard](/docs/model/agents-sessions#agent-dashboard). Selecting a child focuses the lead terminal.

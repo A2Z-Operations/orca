@@ -296,6 +296,29 @@ describe('addOrcaWslInteropEnv', () => {
     expect(env.WSLENV).not.toContain('ORCA_OPENCODE_CONFIG_DIR')
   })
 
+  it('publishes Windows durable-job plugin paths for guest translation', () => {
+    const env: Record<string, string> = {
+      CLAUDE_CODE_PLUGIN_DIRS: 'C:\\Users\\a\\plugin;D:\\other',
+      ORCA_DURABLE_JOB_PLUGIN_DIR: 'C:\\Users\\a\\plugin'
+    }
+    addOrcaWslInteropEnv(env)
+    expect(env.WSLENV).toContain('CLAUDE_CODE_PLUGIN_DIRS/pl')
+    expect(env.WSLENV).toContain('ORCA_DURABLE_JOB_PLUGIN_DIR/p')
+    expect(env.WSLENV).not.toContain('PATH/')
+  })
+
+  it('leaves already-linux durable-job plugin paths untranslated', () => {
+    const env: Record<string, string> = {
+      CLAUDE_CODE_PLUGIN_DIRS: '/mnt/c/Users/a/plugin',
+      ORCA_DURABLE_JOB_PLUGIN_DIR: '/mnt/c/Users/a/plugin'
+    }
+    addOrcaWslInteropEnv(env)
+    expect(env.WSLENV).toContain('CLAUDE_CODE_PLUGIN_DIRS/u')
+    expect(env.WSLENV).toContain('ORCA_DURABLE_JOB_PLUGIN_DIR/u')
+    expect(env.WSLENV).not.toContain('CLAUDE_CODE_PLUGIN_DIRS/pl')
+    expect(env.WSLENV).not.toContain('ORCA_DURABLE_JOB_PLUGIN_DIR/p')
+  })
+
   it('does not register the OpenCode config vars when they are absent', () => {
     const env: Record<string, string> = { ORCA_TERMINAL_HANDLE: 'term_wsl' }
     addOrcaWslInteropEnv(env)

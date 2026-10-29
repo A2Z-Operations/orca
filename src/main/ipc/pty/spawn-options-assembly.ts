@@ -140,10 +140,14 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   })
   const env = openCodeLaunch.env
   const pluginDir = !connectionId ? env?.ORCA_CLAUDE_AGENT_VIEW_PLUGIN_DIR : undefined
-  const launchCommand =
+  const durablePluginDir = !connectionId ? env?.ORCA_DURABLE_JOB_PLUGIN_DIR : undefined
+  let launchCommand =
     pluginDir && openCodeLaunch.command
       ? withClaudeAgentViewPlugin(openCodeLaunch.command, pluginDir, shell)
       : openCodeLaunch.command
+  if (durablePluginDir && launchCommand) {
+    launchCommand = withClaudeAgentViewPlugin(launchCommand, durablePluginDir, shell)
+  }
   promoteAgentTeamsShimPath(env, input.requestedAgentTeamsPath)
   const spawnOptions: PtySpawnOptions = {
     cols: args.cols,
