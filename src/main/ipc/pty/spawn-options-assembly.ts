@@ -140,10 +140,14 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   })
   const env = openCodeLaunch.env
   const pluginDir = !connectionId ? env?.ORCA_CLAUDE_AGENT_VIEW_PLUGIN_DIR : undefined
-  const launchCommand =
+  const durablePluginDir = !connectionId ? env?.ORCA_DURABLE_JOB_PLUGIN_DIR : undefined
+  let launchCommand =
     pluginDir && openCodeLaunch.command
       ? withClaudeAgentViewPlugin(openCodeLaunch.command, pluginDir, shell)
       : openCodeLaunch.command
+  if (durablePluginDir && launchCommand) {
+    launchCommand = withClaudeAgentViewPlugin(launchCommand, durablePluginDir, shell)
+  }
   promoteAgentTeamsShimPath(env, input.requestedAgentTeamsPath)
   const spawnOptions: PtySpawnOptions = {
     cols: args.cols,
@@ -225,12 +229,16 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
     if (input.shellOverride !== undefined) {
       spawnOptions.shellOverride = input.shellOverride
     }
-    spawnOptions.terminalShellArgs = resolveConfiguredTerminalShellArgs({
+    const terminalShellArgs = resolveConfiguredTerminalShellArgs({
       connectionId,
       requestedShellOverride: args.shellOverride,
       launchCommand,
       settings: input.getSettings?.()
     })
+    // Absent, not undefined: launch-parity facts treat a present key as a shell-profile choice.
+    if (terminalShellArgs !== undefined) {
+      spawnOptions.terminalShellArgs = terminalShellArgs
+    }
     if (process.platform === 'win32') {
       // Preserve the PowerShell implementation choice across both provider paths.
       spawnOptions.terminalWindowsWslDistro = input.expectedWslDistro

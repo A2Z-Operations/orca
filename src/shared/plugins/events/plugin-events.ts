@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { AGENT_STATUS_STATES } from '../../agent-status-types'
 import { AGENT_TURN_OUTCOMES } from '../../agent-turn-outcome'
+import {
+  pluginClaudeSessionMovedPayloadSchema,
+  pluginClaudeUsageChangedPayloadSchema
+} from '../plugin-claude-account-contract'
 import type { PluginEventName } from '../manifest/plugin-manifest'
 
 /**
@@ -61,7 +65,9 @@ export const agentStatusChangedPayloadSchema = z.object({
 export const PLUGIN_EVENT_PAYLOAD_SCHEMAS = {
   'workspace.created': workspaceCreatedPayloadSchema,
   'workspace.removed': workspaceRemovedPayloadSchema,
-  'agent.status.changed': agentStatusChangedPayloadSchema
+  'agent.status.changed': agentStatusChangedPayloadSchema,
+  'accounts.usage.changed': pluginClaudeUsageChangedPayloadSchema,
+  'accounts.session.moved': pluginClaudeSessionMovedPayloadSchema
 } satisfies Record<PluginEventName, z.ZodType>
 
 export type PluginEventPayload<E extends PluginEventName> = z.infer<

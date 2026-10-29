@@ -193,6 +193,15 @@ function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   if (flag === 'key' && command === 'computer press-key') {
     return '--key <key>            Single key, e.g. Return, Escape, Tab, Left, or PageUp'
   }
+  if (command === 'job start' && flag === 'command') {
+    return '--command <text>       Shell command to detach from Claude'
+  }
+  if (command === 'job start' && flag === 'cwd') {
+    return '--cwd <path>           Working directory for the detached command'
+  }
+  if (command.startsWith('job ') && flag === 'id') {
+    return '--id <dj_id>          Detached job id'
+  }
   return formatFlagHelp(flag)
 }
 

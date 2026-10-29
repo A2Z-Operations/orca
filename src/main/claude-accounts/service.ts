@@ -1,5 +1,7 @@
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeAccountSignIn,
+  ClaudeSessionMoveSummary,
   ClaudeRateLimitAccountsState,
   ClaudeSignInRequest
 } from '../../shared/managed-account-types'
@@ -21,6 +23,7 @@ export class ClaudeAccountService {
   private mutationQueue: Promise<unknown> = Promise.resolve()
   private cancelPendingClaudeLogin: (() => boolean) | null = null
   private pendingSignInLink: Promise<string | null> | null = null
+  private userActionCount = 0
   private openWslSignInLink: ((signInLink: string) => void) | null = null
   private readonly selection: ClaudeAccountSelection
   private readonly registration: ClaudeAccountRegistration
@@ -118,6 +121,43 @@ export class ClaudeAccountService {
     return this.serializeMutation(() => this.selection.select(accountId, target))
   }
 
+  /** A usage-driven switch waits behind a pending sign-in instead of cancelling it. */
+  autoSelectAccountForTarget(
+    accountId: string,
+    target: ClaudeAccountSelectionTarget,
+    stillWanted: () => boolean
+  ): Promise<boolean> {
+    const userActionCountWhenQueued = this.userActionCount
+    return this.serializeMutation(async () => {
+      // Why: anything the user did while this waited in the queue outranks it.
+      if (this.userActionCount !== userActionCountWhenQueued || !stillWanted()) {
+        return false
+      }
+      await this.selection.select(accountId, target)
+      return true
+    })
+  }
+
+  setAutoSwitch(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.selection.setAutoSwitch(enabled)
+  }
+
+  setSessionMover(setting: ClaudeSessionMoverSetting): ClaudeRateLimitAccountsState {
+    return this.selection.setSessionMover(setting)
+  }
+
+  setAuthProxy(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.selection.setAuthProxy(enabled)
+  }
+
+  setAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.selection.setAccountPool(enabled)
+  }
+
+  setSessionMovesProvider(provider: (() => ClaudeSessionMoveSummary[]) | null): void {
+    this.selection.setSessionMovesProvider(provider)
+  }
+
   getRuntimeConfigDir(target?: ClaudeAccountSelectionTarget): string {
     return this.runtimeAuth.getRuntimeConfigDir(target)
   }
@@ -156,6 +196,7 @@ export class ClaudeAccountService {
 
   // User actions cancel before queueing because the pending login holds the queue slot.
   private supersedePendingLogin(): void {
+    this.userActionCount += 1
     if (this.cancelPendingLogin()) {
       console.info(
         '[claude-accounts] Cancelled a pending Claude login superseded by a new request.'

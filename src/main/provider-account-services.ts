@@ -1,3 +1,8 @@
+import {
+  createProviderClaudeSessionMover,
+  type StartedClaudeSessionMover,
+  type ProviderClaudeSessionMoverOptions
+} from './provider-claude-session-mover'
 // Keep Electron imports out: both desktop and orcad bundle these account services.
 import { getClaudeAgentViewService } from './claude/agent-view-service'
 import type { Store } from './persistence'
@@ -6,6 +11,11 @@ import { CodexRuntimeHomeService } from './codex-accounts/runtime-home-service'
 import { CodexAccountService } from './codex-accounts/service'
 import { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import { ClaudeAccountService } from './claude-accounts/service'
+import { claudeBillingAccountForPaneKey } from './claude-accounts/claude-pane-account-registry'
+import {
+  createClaudeAccountAutoSwitch,
+  type ClaudeAutoSwitched
+} from './claude-accounts/claude-account-auto-switch'
 import { getInitialCodexRateLimitTarget } from './rate-limits/codex-rate-limit-target'
 import { getInitialClaudeRateLimitTarget } from './rate-limits/claude-rate-limit-target'
 import { getKimiRuntimeTarget, resolveKimiHome } from './kimi/kimi-runtime-home'
@@ -20,8 +30,11 @@ import { createAccountRuntimeTargetSettingsSync } from './rate-limits/account-ru
 import { normalizeCodexRuntimeSelection } from './codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from './claude-accounts/runtime-selection'
 import type { ClaudeStatusLineRateLimits } from '../shared/claude-statusline-rate-limits'
+import { resolveClaudeAccountHome } from './claude-accounts/claude-account-home-attribution'
+import { bindClaudePoolLaunchToServices } from './claude-accounts/claude-account-pool-launch'
 
 export type ProviderAccountServices = {
+  sessionMover: StartedClaudeSessionMover | null
   rateLimits: RateLimitService
   codexRuntimeHome: CodexRuntimeHomeService
   codexAccounts: CodexAccountService
@@ -32,8 +45,10 @@ export type ProviderAccountServices = {
 export function createProviderAccountServices(
   store: Store,
   options: {
+    sessionMover?: ProviderClaudeSessionMoverOptions
     codexAccountLifecycle?: ConstructorParameters<typeof CodexAccountService>[3]
     setClaudeStatusLineListener: (listener: (event: ClaudeStatusLineRateLimits) => void) => void
+    onClaudeAutoSwitched?: (switched: ClaudeAutoSwitched) => void
   }
 ): ProviderAccountServices {
   const agentView = getClaudeAgentViewService()
@@ -48,6 +63,19 @@ export function createProviderAccountServices(
   )
   const claudeRuntimeAuth = new ClaudeRuntimeAuthService(store)
   const claudeAccounts = new ClaudeAccountService(store, rateLimits, claudeRuntimeAuth)
+  bindClaudePoolLaunchToServices({
+    getSettings: () => store.getSettings(),
+    listAccounts: () => claudeAccounts.listAccounts(),
+    getRateLimits: () => rateLimits.getState()
+  })
+  rateLimits.onStateChange(
+    createClaudeAccountAutoSwitch({
+      getSettings: () => store.getSettings(),
+      rateLimits,
+      accounts: claudeAccounts,
+      onSwitched: (switched) => options.onClaudeAutoSwitched?.(switched)
+    })
+  )
   // Background quota polls must not boot stopped distros; user-driven resets may prepare them.
   rateLimits.setCodexHomePathResolver(async (target) =>
     target?.runtime === 'wsl' && !(await isWslDistroRunningForBackgroundWork(target.wslDistro))
@@ -107,7 +135,8 @@ export function createProviderAccountServices(
   )
   // Live statusLine usage avoids OAuth endpoint polling and its 429s.
   options.setClaudeStatusLineListener((event) => {
-    rateLimits.ingestLiveClaudeRateLimits(event)
+    const billingAccountId = event.paneKey ? claudeBillingAccountForPaneKey(event.paneKey) : null
+    rateLimits.ingestLiveClaudeRateLimits(billingAccountId ? { ...event, billingAccountId } : event)
   })
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()
@@ -157,6 +186,17 @@ export function createProviderAccountServices(
         wslLinuxAuthPath: account.wslLinuxAuthPath
       }))
   })
+  // Why: a statusline post names its CLAUDE_CONFIG_DIR; only the account layer knows whose folder that is.
+  rateLimits.setLiveClaudeAccountResolver((configDir) =>
+    resolveClaudeAccountHome(configDir, store.getSettings().claudeManagedAccounts, (id) =>
+      claudeRuntimeAuth.router.accountHome(id)
+    )
+  )
+  const sessionMover = createProviderClaudeSessionMover(
+    store,
+    { rateLimits, claudeAccounts, claudeRuntimeAuth },
+    options.sessionMover
+  )
   rateLimits.setInactiveCodexAccountsResolver(() => {
     const settings = store.getSettings()
     const activeIds = new Set(
@@ -175,5 +215,12 @@ export function createProviderAccountServices(
           )
       }))
   })
-  return { rateLimits, codexRuntimeHome, codexAccounts, claudeRuntimeAuth, claudeAccounts }
+  return {
+    rateLimits,
+    codexRuntimeHome,
+    codexAccounts,
+    claudeRuntimeAuth,
+    claudeAccounts,
+    sessionMover
+  }
 }

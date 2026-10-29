@@ -1,3 +1,5 @@
+import type { ClaudeSessionMoverSetting } from './claude-account-switch-settings'
+
 export type ManagedDataAccountProvider = 'opencode' | 'devin'
 
 export type ManagedDataAccountSummary = {
@@ -126,7 +128,76 @@ export type ClaudeRateLimitAccountsState = {
   systemDefaultHome?: string
   /** An older Orca's copy-based switching once wrote an account's login into System default. */
   systemDefaultMayBeCopied?: boolean
+  /** Whether this host switches accounts before a usage limit; absent from older hosts. */
+  autoSwitchEnabled?: boolean
+  /** What this host does with running sessions near a usage limit; absent from older hosts. */
+  sessionMover?: ClaudeSessionMoverSetting
+  /** Whether launches bill through the local auth proxy; absent from older hosts. */
+  authProxy?: 'on' | 'off'
+  /** Whether Orca-made Claude launches spread across accounts; absent from older hosts means off. */
+  accountPool?: 'off' | 'on'
+  /** Same value as `accountPool`. The CLI and status bar read this name. */
+  pool?: 'on' | 'off'
+  /** Live sessions billed to each account. Absent from older hosts. */
+  assignedSessions?: { accountId: string; count: number }[]
+  /** Every live pane and the account it bills. The tab badge reads this snapshot. */
+  paneAccounts?: ClaudePaneAccountSnapshot[]
+  /**
+   * Windows desktop view of WSL guest billing. `unsupported:wsl` means the guest credential file
+   * is unreadable, so the guest listener does not replace the API host. Absent when this host has no WSL accounts.
+   */
+  wslAuthProxy?: 'on' | 'unsupported:wsl'
+  /** Panes whose billed account differs from the folder they were spawned in. */
+  paneAssignments?: { ptyId: string; accountId: string }[]
+  /** The mover's last decision per live session, newest first. */
+  sessionMoves?: ClaudeSessionMoveSummary[]
 }
+
+/** One live Claude pane and the account its next request bills. */
+export type ClaudePaneAccountSnapshot = {
+  ptyId: string
+  paneKey: string | null
+  accountId: string
+  /** Email local-part, or `local@domain` when two accounts share a local-part. */
+  label: string
+  email: string
+}
+
+/** Pushed when a pane's billed account changes, including when the pane is gone (`accountId` null). */
+export type ClaudePaneAssignedEvent = {
+  ptyId: string
+  paneKey: string | null
+  accountId: string | null
+  label: string
+  email: string
+}
+
+/** The session mover's last decision for a live Claude session (`orca account list --json`). */
+export type ClaudeSessionMoveSummary = {
+  ptyId: string
+  paneKey: string | null
+  fromAccountId: string
+  toAccountId: string | null
+  window: 'session' | 'weekly' | 'fableWeekly' | null
+  percent: number | null
+  line: number | null
+  reason: string
+  at: number
+  /** How a move of this pane would land. Absent from hosts that predate the pool surface. */
+  strategy?: 'resume' | 'proxy'
+}
+
+/** Orca moved Claude to another account before a usage limit, so running sessions can follow. */
+export type ClaudeAutoSwitchedEvent = {
+  /** The accounts at the switch, so following it waits on no read another switch could overtake. */
+  accounts: ClaudeManagedAccountSummary[]
+  fromAccountId: string
+  toAccountId: string
+  target: { runtime?: 'host' | 'wsl'; wslDistro?: string | null }
+} & Pick<
+  ClaudeRateLimitAccountsState,
+  'systemDefaultHome' | 'systemDefaultEmail' | 'systemDefaultOrganizationUuid' | 'paneAssignments'
+>
 
 export type ClaudeManagedAccountRuntimeSelection = {
   host: string | null

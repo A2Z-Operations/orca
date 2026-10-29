@@ -25,7 +25,8 @@ function createServices(storageSet: PluginHostServices['storage']['set']): Plugi
     settings: {
       getAll: vi.fn().mockReturnValue({}),
       set: vi.fn().mockReturnValue({ ok: true })
-    }
+    },
+    listClaudeAccounts: vi.fn().mockReturnValue({ accounts: [] })
   }
 }
 

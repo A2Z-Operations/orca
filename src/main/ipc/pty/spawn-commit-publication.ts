@@ -1,3 +1,4 @@
+import { recordClaudePaneAccountForSpawn } from './host-env/claude-pane-account'
 import { agentHookServer } from '../../agent-hooks/server'
 import { clearMigrationUnsupportedPtysForPaneKey } from '../../agent-hooks/migration-unsupported-pty-state'
 import { registerPty } from '../../memory/pty-registry'
@@ -83,6 +84,16 @@ export function publishCommittedPtySpawn(input: PtySpawnCommitInput): PtySpawnOu
   }
   // Publish reverse pane lookup for hook titles and provider cleanup.
   const rememberedPaneKey = rememberPaneKeyForPty(result.id, input.paneKey)
+  recordClaudePaneAccountForSpawn({
+    ptyId: result.id,
+    paneKey: rememberedPaneKey,
+    isClaudeLaunch: state.isClaudeLaunch,
+    isReattach: result.isReattach === true,
+    claudeAuth: state.claudeAuth,
+    claudeAccountId: args.claudeAccountId,
+    settings: deps.getSettings?.(),
+    target: state.codexSelectionTarget
+  })
   if (input.paneKeyAliases) {
     registerSpawnPaneKeyAliases(result, input.paneKey, input.paneKeyAliases)
   }

@@ -209,7 +209,8 @@ function account(
 
 function render(
   state: Partial<ClaudeRateLimitAccountsState> = {},
-  settings: Partial<GlobalSettings> = {}
+  settings: Partial<GlobalSettings> = {},
+  scope: Partial<AccountsPaneSectionModel> = {}
 ): string {
   const claudeAccounts: ClaudeRateLimitAccountsState = {
     accounts: [],
@@ -257,7 +258,8 @@ function render(
     settings: { ...getDefaultSettings('/tmp'), ...settings },
     systemClaudeActive: claudeAccounts.activeAccountId === null,
     visibleClaudeAccounts: claudeAccounts.accounts,
-    wslCapabilitiesLoading: false
+    wslCapabilitiesLoading: false,
+    ...scope
   }
   return renderToStaticMarkup(React.createElement(() => renderClaudeAccountsSection(model)))
 }
@@ -313,5 +315,60 @@ describe('Claude accounts section', () => {
     })
     expect(own).toContain('System default: me@example.test')
     expect(own).not.toContain('An earlier Orca version')
+  })
+
+  it('offers auto-switching only once there is another account to switch to', () => {
+    const one = render({ accounts: [account('a', 'a@example.test')], autoSwitchEnabled: false })
+    const two = render({
+      accounts: [account('a', 'a@example.test'), account('b', 'b@example.test')],
+      autoSwitchEnabled: true
+    })
+    expect(one).not.toContain('Switch accounts before a usage limit')
+    expect(two).toContain('Switch accounts before a usage limit')
+    expect(two).toMatch(
+      /aria-label="Switch accounts before a usage limit"[^>]*aria-checked="true"|aria-checked="true"[^>]*aria-label="Switch accounts before a usage limit"/
+    )
+  })
+
+  it("offers auto-switching for a server's accounts only when that server can do it", () => {
+    const accounts = [account('a', 'a@example.test'), account('b', 'b@example.test')]
+    const remote: Partial<AccountsPaneSectionModel> = {
+      isRemoteAccountScope: true,
+      accountOwner: { kind: 'environment', environmentId: 'server-a' }
+    }
+    expect(render({ accounts, autoSwitchEnabled: false }, {}, remote)).toContain(
+      'Switch accounts before a usage limit'
+    )
+    // An older server reports no setting and has no way to change it.
+    expect(render({ accounts }, {}, remote)).not.toContain('Switch accounts before a usage limit')
+  })
+
+  it('lists recent session moves with the same rows as orca account moves', () => {
+    expect(render({})).not.toContain('Recent moves')
+    expect(render({ sessionMoves: [] })).toContain('No Claude session moves.')
+    const markup = render(
+      {
+        sessionMoves: [
+          {
+            ptyId: 'pty-new',
+            paneKey: 'tab-1:leaf-1',
+            fromAccountId: 'acct-a',
+            toAccountId: 'acct-b',
+            window: 'session',
+            percent: 96,
+            line: 95,
+            reason: 'moved',
+            at: Date.parse('2026-10-29T15:04:05.000Z'),
+            strategy: 'proxy'
+          }
+        ]
+      },
+      {},
+      { isRemoteAccountScope: true }
+    )
+    expect(markup).toContain('Recent moves')
+    expect(markup).toContain(
+      '2026-10-29T15:04:05.000Z  tab-1:leaf-1  acct-a → acct-b  moved  proxy'
+    )
   })
 })

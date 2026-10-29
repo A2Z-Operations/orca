@@ -11763,10 +11763,30 @@
             "secrets": "Stocker ses propres secrets chiffrés",
             "settingsOwn": "Lire et modifier ses propres réglages",
             "agentsRead": "Être notifié quand le statut d'un agent change",
-            "terminalRun": "Exécuter des commandes dans vos terminaux, y compris SSH"
+            "terminalRun": "Exécuter des commandes dans vos terminaux, y compris SSH",
+            "terminalSend": "Saisir du texte dans un terminal visible (toujours un terminal spécifique)",
+            "eventsSubscribe": "Être notifié quand des worktrees sont créés ou supprimés et quand le statut d'un agent change",
+            "accountsRead": "Lire les identifiants, les libellés et les fenêtres d'utilisation des comptes Claude, ainsi que le nombre de sessions de chaque compte. N'inclut ni les jetons ni les chemins d'identifiants."
           },
           "decisionFailed": "Impossible d'enregistrer la décision d'autorisation. Réessayez.",
-          "fullAccessWarning": "Accès complet : s’exécute comme un programme normal et peut lire vos fichiers, utiliser le réseau et lancer d’autres programmes."
+          "fullAccessWarning": "Accès complet : s’exécute comme un programme normal et peut lire vos fichiers, utiliser le réseau et lancer d’autres programmes.",
+          "workerTrust": "Worker en arrière-plan — exécute son propre processus",
+          "instructionalTrust": "Contenu instructif — s'exécute plus tard sous l'autorité de l'utilisateur ou d'un agent",
+          "declarativeTrust": "Contenu déclaratif — aucun code de plugin",
+          "panelTrust": "Contenu de panneau ou intégré à l'hôte — aucun processus worker",
+          "trustShortWorker": "Worker",
+          "trustShortInstructional": "Instructif",
+          "trustShortPanel": "Panneau",
+          "trustShortDeclarative": "Déclaratif",
+          "reviewTitle": "Examiner le plugin",
+          "title": "Examiner les autorisations",
+          "mixedTitle": "Examiner l'accès et le contenu",
+          "instructionalTitle": "Examiner le contenu du plugin",
+          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
+          "capabilities": "Ce plugin peut",
+          "warning": "Ces autorisations limitent la façon dont le plugin utilise l'API d'Orca. Son worker s'exécute néanmoins comme un processus normal sur votre ordinateur, avec un accès complet à vos fichiers, votre réseau et vos autres processus.",
+          "panelWarning": "Ces autorisations limitent la façon dont le plugin utilise l'API d'Orca. Ce plugin n'a pas de worker en arrière-plan.",
+          "keepDisabled": "Garder désactivé"
         },
         "PluginConsentProvenance": {
           "official": "Officiel",
@@ -11953,6 +11973,8 @@
           "worktreeCreated": "Quand un espace de travail est créé",
           "worktreeRemoved": "Quand un espace de travail est supprimé",
           "agentStatusChanged": "Quand l’état d’un Agent change",
+          "usageChanged": "Quand l’utilisation d’un compte Claude change",
+          "sessionMoved": "Quand une session Claude passe sur un autre compte",
           "detail": "Du code s’exécute en arrière-plan"
         },
         "pluginInstallAction": {
@@ -13142,6 +13164,79 @@
             "mod": "mod",
             "shortcut": "raccourci"
           }
+        },
+        "AgentLocationSetting": {
+          "92f4238f1a": "WSL par défaut",
+          "fc806485ae": "Chargement de WSL",
+          "43663b5e69": "WSL",
+          "9bccf48906": "Emplacement des agents",
+          "d00949e59b": "Affiche les agents installés depuis {{value0}}. L'actualisation revérifie PATH dans cet environnement.",
+          "c7c516946f": "WSL n'est pas disponible sur cette machine.",
+          "f97b986b7f": "wsl"
+        },
+        "AutoRenameBranchPromptEditor": {
+          "63121132c0": "Abandonner",
+          "4416b25d29": "Privilégiez les noms du domaine de la tâche, évitez les IDs de ticket et gardez des noms faciles à relire.",
+          "39278f4411": "; votre paramètre de préfixe de branche s'applique toujours.",
+          "ebb942a2ec": "fix-login-flow",
+          "af2d9a2cc6": ". Orca ne génère que le dernier segment, comme",
+          "182d419b97": "l'invite intégrée de nom de branche d'Orca",
+          "2f5dc661fe": "Ajouté à",
+          "7d6176f506": "Prompt",
+          "5968112152": "Enregistrer",
+          "54ac229ad4": "Enregistrement...",
+          "af0831a590": "Enregistré",
+          "0691753cf2": "Modifications non enregistrées"
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "Cet appareil"
+        },
+        "MobileRelayStatusSection": {
+          "registered": "Enregistré",
+          "connecting": "Connexion",
+          "reconnecting": "Reconnexion",
+          "offline": "Hors ligne",
+          "title": "Orca Relay",
+          "automatic": "Connexion depuis n'importe où quand un téléphone est jumelé",
+          "signInPrompt": "Connectez-vous sur cet ordinateur pour accéder depuis n'importe où",
+          "directStillAvailable": "Les connexions LAN et Tailscale restent disponibles.",
+          "directNeedsNoAccount": "Le jumelage LAN et Tailscale fonctionne toujours sans compte.",
+          "signIn": "Se connecter",
+          "unavailable": "Indisponible",
+          "standby": "Veille — aucun appareil via Relay"
+        },
+        "MobileRelayBetaAvailability": {
+          "about": "À propos de la bêta d'Orca Relay",
+          "beta": "Beta",
+          "availability": "Disponible sur",
+          "testFlight": "TestFlight",
+          "androidApk": "APK Android"
+        },
+        "PluginMarketplacePreviewDialog": {
+          "languagePacksOne": "1 pack de langue",
+          "languagePacks": "{{value0}} packs de langue",
+          "commandsOne": "1 commande",
+          "commands": "{{value0}} commandes",
+          "keybindingsOne": "1 raccourci clavier",
+          "keybindings": "{{value0}} raccourcis clavier",
+          "vmRecipesOne": "1 recette de VM",
+          "vmRecipes": "{{value0}} recettes de VM",
+          "panelsOne": "1 panneau",
+          "panels": "{{value0}} panneaux",
+          "eventsOne": "1 abonnement aux événements",
+          "events": "{{value0}} abonnements aux événements",
+          "worker": "Worker en arrière-plan",
+          "versionLine": "v{{value0}} · {{value1}}",
+          "includes": "Inclut",
+          "noContributions": "Métadonnées du manifeste uniquement",
+          "capabilities": "Accès demandé",
+          "workerWarning": "Les capabilities limitent la façon dont ce plugin utilise l'API d'Orca. Son worker s'exécute toujours comme un processus normal sur cet ordinateur, avec un accès complet à vos fichiers, au réseau et aux autres processus.",
+          "blocked": "La liste de sécurité d'Orca bloque ce plugin : {{value0}}",
+          "current": "Ce contenu exact de plugin est déjà installé.",
+          "close": "Fermer",
+          "cancel": "Annuler",
+          "update": "Mettre à jour le plugin",
+          "install": "Installer le plugin"
         }
       },
       "right": {
@@ -19021,7 +19116,9 @@
         "agentNotSignedIn": "Connectez-vous à {{agent}}.",
         "thenSendAgain": "Puis envoyez à nouveau votre message.",
         "runCommandWhenDone": "Lancez /{{command}} quand il aura terminé.",
-        "commandAfterAnswer": "Répondez à la question ou à la demande d'approbation de l'agent, puis lancez /{{command}}."
+        "commandAfterAnswer": "Répondez à la question ou à la demande d'approbation de l'agent, puis lancez /{{command}}.",
+        "claudeAccountUnknown": "Ce compte Claude n'est plus enregistré. Choisissez un autre compte.",
+        "claudeAccountWslUnsupported": "Ce compte Claude est dans WSL et ne peut pas s'exécuter ici. Choisissez un autre compte."
       },
       "writeNotice": {
         "notDoneReadHistory": "L'historique de ce chat n'a pas pu être chargé.",
@@ -21489,6 +21586,59 @@
         "body_one": "{{count}} session Claude est toujours active sur {{previous}}. Le redémarrage poursuit la conversation sur {{next}}. Les sessions occupées attendent d’être inactives avant de redémarrer.",
         "body_other": "{{count}} sessions Claude sont toujours actives sur {{previous}}. Le redémarrage poursuit chaque conversation sur {{next}}. Les sessions occupées attendent d’être inactives avant de redémarrer.",
         "body_many": "{{count}} sessions Claude sont toujours actives sur {{previous}}. Le redémarrage poursuit chaque conversation sur {{next}}. Les sessions occupées attendent d’être inactives avant de redémarrer."
+      },
+      "pool": {
+        "settingTitle": "Répartir les sessions entre les comptes",
+        "settingDescription": "Les nouvelles sessions Claude démarrent sur le compte connecté qui a le plus de marge.",
+        "sessionsOne": "1 session",
+        "sessionsOther": "{{count}} sessions",
+        "badge": "Réparti",
+        "paneBadge": "Compte Claude {{label}}"
+      },
+      "sessionMover": {
+        "rebalanceBody": "{{from}} continue sur {{to}} pour équilibrer vos comptes.",
+        "recentMoves": "Déplacements récents",
+        "recentMovesDescription": "La dernière décision de déplacement pour chaque session Claude en cours.",
+        "recentMovesEmpty": "Aucun déplacement de session Claude.",
+        "keyword": {
+          "move": "déplacement",
+          "session": "session",
+          "strategy": "stratégie",
+          "rebalance": "rééquilibrage"
+        },
+        "settingTitle": "Déplacer les sessions en cours avant une limite d'utilisation",
+        "settingDescription": "Une session Claude en cours dont le compte approche de sa limite continue sur le compte qui a le plus de marge, entre les tours, dans le même volet.",
+        "settingOff": "Désactivé",
+        "settingAsk": "Demander",
+        "settingMove": "Déplacer",
+        "noticeTitle": "Déplacement des sessions Claude",
+        "movedBody": "{{from}} approche de sa limite d'utilisation. La session continue sur {{to}}.",
+        "askBody": "Une session sur {{from}} approche de sa limite d'utilisation. Réglez « Déplacer les sessions en cours avant une limite d'utilisation » sur Déplacer pour la déplacer automatiquement.",
+        "failedBody": "Impossible de déplacer une session sur {{from}} : {{detail}}",
+        "handoff": {
+          "moved": "Orca a déplacé cette session de {{from}} vers {{to}} parce que {{detail}}.",
+          "ended": "Le redémarrage a arrêté les sous-agents du processus précédent ({{known}}).",
+          "continue": "Relancez ce qui est encore nécessaire, puis poursuivez.",
+          "monitoring": "surveillance",
+          "backgroundTask": "une tâche en arrière-plan était encore en cours",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "et {{count}} de plus",
+          "none": "aucun signalé",
+          "detailFallback": "sa limite d'utilisation"
+        },
+        "movedRestartlessBody": "{{from}} approche de sa limite d'utilisation. La session continue sur {{to}} sans redémarrage."
+      },
+      "autoSwitch": "Changer de compte avant une limite d'utilisation",
+      "autoSwitchDescription": "Lorsque le compte sélectionné dépasse 90 % de sa limite de 5 heures ou hebdomadaire, Orca passe au compte qui a le plus de marge, comme si vous aviez changé à la main.",
+      "autoSwitchedTitle": "Compte Claude changé",
+      "autoSwitchedBody": "{{from}} approche de sa limite d'utilisation. Les nouvelles sessions Claude démarrent sur {{to}}.",
+      "keyword": {
+        "auto": "auto"
+      },
+      "authProxy": {
+        "settingTitle": "Faire passer Claude par un proxy d'authentification local",
+        "settingDescription": "Une session Claude en cours peut changer de compte sans redémarrer. La requête suivante utilise le nouveau compte."
       }
     },
     "hostSignIn": {

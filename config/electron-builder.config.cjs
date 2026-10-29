@@ -138,6 +138,14 @@ const emojiShortcodeDatasetResource = {
   from: 'node_modules/emojibase-data/en/shortcodes/emojibase.json',
   to: 'node_modules/emojibase-data/en/shortcodes/emojibase.json'
 }
+const durableJobScriptResources = [
+  'durable-background-job.mjs',
+  'durable-background-job-hook.mjs',
+  'durable-background-job-plan.mjs'
+].map((name) => ({
+  from: `resources/durable-jobs/${name}`,
+  to: `durable-jobs/${name}`
+}))
 const commonExtraResources = [
   relayExtraResource,
   orcadTemplateExtraResource,
@@ -147,7 +155,8 @@ const commonExtraResources = [
   skillFreshnessResources,
   ...agentBrowserSkillResources,
   nativeChatVisualsResource,
-  emojiShortcodeDatasetResource
+  emojiShortcodeDatasetResource,
+  ...durableJobScriptResources
 ]
 // Native speech addons need real disk paths; copy only the artifact target’s variant.
 const macSpeechNativeResource = {

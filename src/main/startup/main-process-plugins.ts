@@ -22,6 +22,10 @@ import {
   normalizePluginIdList
 } from '../../shared/plugins/approval/plugin-consent-state'
 import { projectPluginAgentStatusChangedPayload } from '../plugins/plugin-agent-status-event'
+import { bindPluginClaudeAccountEvents } from '../plugins/plugin-claude-account-events'
+import { projectPluginClaudeAccounts } from '../plugins/plugin-claude-account-projection'
+import { listClaudePaneAccounts } from '../claude-accounts/claude-pane-account-registry'
+import { normalizeClaudeRuntimeSelection } from '../claude-accounts/runtime-selection'
 import { setMainPluginLanguagePacks, setMainUiLanguage } from '../i18n/main-i18n'
 import { isUsablePluginLanguagePack } from '../../shared/plugins/languages/plugin-language-pack-coverage'
 import { rebuildAppMenu } from '../menu/register-app-menu'
@@ -31,6 +35,25 @@ import { agentHookServer } from '../agent-hooks/server'
 import { emitPluginWorktreeLifecycle } from './main-process-pty-startup'
 import { mainProcessState as state } from './main-process-state'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import type { PluginClaudeAccountView } from '../../shared/plugins/plugin-claude-account-contract'
+
+function readDesktopPluginClaudeAccounts(): PluginClaudeAccountView[] {
+  try {
+    const settings = state.store?.getSettings()
+    const rateLimits = state.rateLimits?.getState()
+    if (!settings || !rateLimits) {
+      return []
+    }
+    return projectPluginClaudeAccounts({
+      accounts: settings.claudeManagedAccounts,
+      activeAccountId: normalizeClaudeRuntimeSelection(settings).host,
+      rateLimits,
+      panes: listClaudePaneAccounts()
+    })
+  } catch {
+    return []
+  }
+}
 
 const PLUGIN_AUTO_UPDATE_STARTUP_DELAY_MS = 60_000
 // Why: the official catalog fetch must not compete with first paint; opening the marketplace seeds sooner.
@@ -85,6 +108,14 @@ export async function initializeMainProcessPlugins(runtime: OrcaRuntimeService):
     getKeybindings: () => state.keybindings?.getOverrides() ?? {},
     getPluginKillListEntry: (pluginKey) => state.pluginKillListService?.find(pluginKey) ?? null,
     hostEntryPath: resolvePluginHostEntryPath(app.getAppPath(), app.isPackaged)
+  })
+  bindPluginClaudeAccountEvents({
+    emit: (event, payload) => {
+      state.pluginService?.emitEvent(event, payload)
+    },
+    readAccounts: readDesktopPluginClaudeAccounts,
+    subscribeRateLimits: (listener) =>
+      state.rateLimits?.onStateChange(() => listener()) ?? (() => undefined)
   })
   const pluginService = state.pluginService
   const pluginAutoUpdater = new PluginAutoUpdater({

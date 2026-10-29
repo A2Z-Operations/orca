@@ -69,10 +69,13 @@ async function isClaudeInForeground(
   return isClaudeProcess(fresh)
 }
 
-/** Whether the pane's Claude is mid-turn; a restart during a permission prompt or question drops it. */
+/** Whether Claude's main agent is mid-turn. Monitoring keeps the pane working after the main agent is done; a permission prompt or question still blocks. */
 export function isClaudePaneMidTurn(state: AppState, paneKey: string): boolean {
   const entry = state.agentStatusByPaneKey[paneKey]
-  return entry?.agentType === 'claude' && entry.state !== 'done'
+  return (
+    entry?.agentType === 'claude' &&
+    (entry.mainAgent ? entry.mainAgent.state !== 'done' : entry.state !== 'done')
+  )
 }
 
 /** Resolve the account actually used at launch; an account without its own login may use System default (null). */
@@ -141,15 +144,16 @@ export function findQueuedClaudeRestartsOnAccount(args: {
   const host = isHostTarget(args.target) ? args.host : undefined
   const ptyIds: string[] = []
   for (const pane of localClaudePanes(state, args.owner, args.target)) {
-    if (
-      pane.inLane &&
-      state.pendingPaneAccountRestarts[pane.ptyId] === 'claude' &&
-      isClaudePaneOnAccount(
-        resolveClaudePaneFolder(pane.transcriptPath, saved, host),
-        args.accountId,
-        host
-      )
-    ) {
+    const assigned = host?.paneAssignments?.find((entry) => entry.ptyId === pane.ptyId)?.accountId
+    const onAccount =
+      assigned !== undefined
+        ? assigned === args.accountId
+        : isClaudePaneOnAccount(
+            resolveClaudePaneFolder(pane.transcriptPath, saved, host),
+            args.accountId,
+            host
+          )
+    if (pane.inLane && state.pendingPaneAccountRestarts[pane.ptyId] === 'claude' && onAccount) {
       ptyIds.push(pane.ptyId)
     }
   }
@@ -204,7 +208,15 @@ function scanPane(
   if (folder.kind === 'own-folder') {
     return { group: 'cantMove', pane, reason: 'own-folder' }
   }
-  if (isClaudePaneOnAccount(folder, args.toAccountId, args.host)) {
+  const assigned = args.host?.paneAssignments?.find(
+    (entry) => entry.ptyId === pane.ptyId
+  )?.accountId
+  const accountId = assigned ?? (folder.kind === 'account' ? folder.accountId : null)
+  if (
+    assigned !== undefined
+      ? assigned === args.toAccountId
+      : isClaudePaneOnAccount(folder, args.toAccountId, args.host)
+  ) {
     return null
   }
   const resumable = resolveAgentAccountRestartResumeStartup('claude', {
@@ -216,12 +228,16 @@ function scanPane(
   if (!resumable) {
     return { group: 'cantMove', pane, reason: 'no-session' }
   }
-  return isClaudePaneOnAccount(folder, args.fromAccountId, args.host)
+  return (
+    assigned !== undefined
+      ? assigned === args.fromAccountId
+      : isClaudePaneOnAccount(folder, args.fromAccountId, args.host)
+  )
     ? { group: 'onAccount', pane }
     : {
         group: 'elsewhere',
         pane,
-        accountId: folder.kind === 'account' ? folder.accountId : null
+        accountId
       }
 }
 

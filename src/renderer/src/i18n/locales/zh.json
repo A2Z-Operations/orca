@@ -11265,10 +11265,30 @@
             "secrets": "存储自己的加密密钥",
             "settingsOwn": "读取和更改自己的设置",
             "agentsRead": "在智能体状态更改时获得通知",
-            "terminalRun": "在终端中运行命令（包括 SSH）"
+            "terminalRun": "在终端中运行命令（包括 SSH）",
+            "terminalSend": "在您可见的终端中输入文本（始终是特定终端）",
+            "eventsSubscribe": "在工作树创建或移除以及智能体状态更改时获得通知",
+            "accountsRead": "读取 Claude 账户的 id、标签、用量窗口，以及每个账户正在运行的会话数。不包括令牌或凭据路径。"
           },
           "decisionFailed": "无法保存权限决定。请重试。",
-          "fullAccessWarning": "完全访问：作为普通程序运行，可以读取你的文件、使用网络并运行其他程序。"
+          "fullAccessWarning": "完全访问：作为普通程序运行，可以读取你的文件、使用网络并运行其他程序。",
+          "workerTrust": "后台工作进程 — 运行自己的进程",
+          "instructionalTrust": "指令内容 — 在用户或智能体权限下运行",
+          "declarativeTrust": "声明式内容 — 无插件代码",
+          "panelTrust": "面板或主机集成内容 — 无工作进程",
+          "trustShortWorker": "工作进程",
+          "trustShortInstructional": "指令",
+          "trustShortPanel": "面板",
+          "trustShortDeclarative": "声明式",
+          "reviewTitle": "审查插件",
+          "title": "审查权限",
+          "mixedTitle": "审查访问和内容",
+          "instructionalTitle": "审查插件内容",
+          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
+          "capabilities": "此插件可以",
+          "warning": "这些权限限制了插件如何使用 Orca 的 API。其工作进程仍作为普通进程在您的计算机上运行，可以完全访问您的文件、网络和其他进程。",
+          "panelWarning": "这些权限限制了插件如何使用 Orca 的 API。此插件没有后台工作进程。",
+          "keepDisabled": "保持禁用"
         },
         "PluginConsentProvenance": {
           "official": "Official",
@@ -11455,6 +11475,8 @@
           "worktreeCreated": "创建工作区时",
           "worktreeRemoved": "移除工作区时",
           "agentStatusChanged": "Agent 状态变化时",
+          "usageChanged": "Claude 账户用量变化时",
+          "sessionMoved": "Claude 会话移到另一个账户时",
           "detail": "后台代码会运行"
         },
         "pluginInstallAction": {
@@ -12632,6 +12654,79 @@
               "windowsFailureDescription": "请在 Windows 设置中为 Orca 开启通知。"
             }
           }
+        },
+        "AgentLocationSetting": {
+          "92f4238f1a": "WSL 默认值",
+          "fc806485ae": "正在加载 WSL",
+          "43663b5e69": "WSL",
+          "9bccf48906": "智能体位置",
+          "d00949e59b": "显示来自 {{value0}} 的已安装智能体。刷新会重新检查该环境中的 PATH。",
+          "c7c516946f": "WSL 在此计算机上不可用。",
+          "f97b986b7f": "wsl"
+        },
+        "AutoRenameBranchPromptEditor": {
+          "63121132c0": "放弃",
+          "4416b25d29": "优先使用任务中的领域名词，避免工单 ID，并保持名称便于评审人理解。",
+          "39278f4411": ";您的分支前缀设置仍然适用。",
+          "ebb942a2ec": "fix-login-flow",
+          "af2d9a2cc6": "。 Orca 仅生成最后一段，例如",
+          "182d419b97": "内置分支名称提示",
+          "2f5dc661fe": "附加到 Orca 的",
+          "7d6176f506": "提示词",
+          "5968112152": "保存",
+          "54ac229ad4": "保存中...",
+          "af0831a590": "已保存",
+          "0691753cf2": "未保存的更改"
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "此设备"
+        },
+        "MobileRelayStatusSection": {
+          "registered": "已注册",
+          "connecting": "正在连接",
+          "reconnecting": "正在重新连接",
+          "offline": "离线",
+          "title": "Orca Relay",
+          "automatic": "手机配对后可从任何地方连接",
+          "signInPrompt": "在此桌面端登录以从任何地方连接",
+          "directStillAvailable": "局域网和 Tailscale 连接仍然可用。",
+          "directNeedsNoAccount": "无需账户即可使用局域网和 Tailscale 配对。",
+          "signIn": "登录",
+          "unavailable": "不可用",
+          "standby": "待机 — 无 Relay 设备"
+        },
+        "MobileRelayBetaAvailability": {
+          "about": "关于 Orca Relay 测试版",
+          "beta": "测试版",
+          "availability": "可用平台：",
+          "testFlight": "TestFlight",
+          "androidApk": "Android APK"
+        },
+        "PluginMarketplacePreviewDialog": {
+          "languagePacksOne": "1 个语言包",
+          "languagePacks": "{{value0}} 个语言包",
+          "commandsOne": "1 个命令",
+          "commands": "{{value0}} 个命令",
+          "keybindingsOne": "1 个键盘快捷键",
+          "keybindings": "{{value0}} 个键盘快捷键",
+          "vmRecipesOne": "1 个 VM 配方",
+          "vmRecipes": "{{value0}} 个 VM 配方",
+          "panelsOne": "1 个面板",
+          "panels": "{{value0}} 个面板",
+          "eventsOne": "1 个事件订阅",
+          "events": "{{value0}} 个事件订阅",
+          "worker": "后台工作进程",
+          "versionLine": "v{{value0}} · {{value1}}",
+          "includes": "包含",
+          "noContributions": "仅清单元数据",
+          "capabilities": "请求的访问权限",
+          "workerWarning": "能力限制了此插件如何使用 Orca 的 API。其工作进程仍作为普通进程在此计算机上运行，可以完全访问您的文件、网络和其他进程。",
+          "blocked": "Orca 的安全列表阻止了此插件：{{value0}}",
+          "current": "此插件内容已安装。",
+          "close": "关闭",
+          "cancel": "取消",
+          "update": "更新插件",
+          "install": "安装插件"
         }
       },
       "right": {
@@ -18326,7 +18421,9 @@
         "agentNotSignedIn": "请登录 {{agent}}。",
         "thenSendAgain": "然后再次发送消息。",
         "runCommandWhenDone": "完成后再运行 /{{command}}。",
-        "commandAfterAnswer": "请先回答智能体的问题或审批，然后再运行 /{{command}}。"
+        "commandAfterAnswer": "请先回答智能体的问题或审批，然后再运行 /{{command}}。",
+        "claudeAccountUnknown": "该 Claude 账户已不再保存。请选择其他账户。",
+        "claudeAccountWslUnsupported": "该 Claude 账户位于 WSL 中，无法在此运行。请选择其他账户。"
       },
       "writeNotice": {
         "notDoneReadHistory": "无法加载此聊天的历史记录。",
@@ -20832,6 +20929,59 @@
         "restartCount_other": "重启 {{count}} 个会话",
         "reviewBody_other": "其他 {{count}} 个 Claude 会话未移至 {{next}}。",
         "body_other": "{{count}} 个 Claude 会话仍在 {{previous}} 上运行。重启后，各对话将在 {{next}} 上继续。忙碌的会话会等待空闲后再重启。"
+      },
+      "pool": {
+        "settingTitle": "在账户之间分担会话",
+        "settingDescription": "新的 Claude 会话从剩余额度最多的已登录账户开始。",
+        "sessionsOne": "1 个会话",
+        "sessionsOther": "{{count}} 个会话",
+        "badge": "分担",
+        "paneBadge": "Claude 账户 {{label}}"
+      },
+      "sessionMover": {
+        "rebalanceBody": "{{from}} 改在 {{to}} 上继续，以均衡各账户。",
+        "recentMoves": "最近的转移",
+        "recentMovesDescription": "每个仍在运行的 Claude 会话上，移动功能的最近一次决定。",
+        "recentMovesEmpty": "没有 Claude 会话转移。",
+        "keyword": {
+          "move": "转移",
+          "session": "会话",
+          "strategy": "策略",
+          "rebalance": "再平衡"
+        },
+        "settingTitle": "在用量上限之前移动正在运行的会话",
+        "settingDescription": "正在运行的 Claude 会话若自身账户接近上限，会在回合之间、同一窗格内，改到剩余额度最多的账户上继续。",
+        "settingOff": "关闭",
+        "settingAsk": "询问",
+        "settingMove": "移动",
+        "noticeTitle": "Claude 会话移动",
+        "movedBody": "{{from}} 已接近用量上限。会话在 {{to}} 上继续。",
+        "askBody": "{{from}} 上的会话已接近用量上限。将「在用量上限之前移动正在运行的会话」设为「移动」即可自动移动。",
+        "failedBody": "无法移动 {{from}} 上的会话：{{detail}}",
+        "handoff": {
+          "moved": "Orca 将此会话从 {{from}} 移到 {{to}}，因为{{detail}}。",
+          "ended": "重启结束了上一个进程的子任务（{{known}}）。",
+          "continue": "重新运行仍然需要的部分，然后继续。",
+          "monitoring": "监控",
+          "backgroundTask": "一个后台任务仍在运行",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "以及另外 {{count}} 个",
+          "none": "没有报告",
+          "detailFallback": "用量上限"
+        },
+        "movedRestartlessBody": "{{from}} 已接近用量上限。会话在 {{to}} 上继续，无需重启。"
+      },
+      "autoSwitch": "在用量上限之前切换账户",
+      "autoSwitchDescription": "当所选账户超过 5 小时或每周上限的 90% 时，Orca 会切换到剩余额度最多的账户，就像你手动切换一样。",
+      "autoSwitchedTitle": "已切换 Claude 账户",
+      "autoSwitchedBody": "{{from}} 已接近用量上限。新的 Claude 会话从 {{to}} 开始。",
+      "keyword": {
+        "auto": "自动"
+      },
+      "authProxy": {
+        "settingTitle": "通过本地身份验证代理为 Claude 计费",
+        "settingDescription": "正在运行的 Claude 会话可以不重启就更换账户。下一个请求使用新账户。"
       }
     },
     "hostSignIn": {

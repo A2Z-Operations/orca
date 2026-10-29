@@ -383,7 +383,8 @@ export abstract class OrcaRuntimeWithRuntimeId extends RuntimeConstructionServic
     this.terminalIdlePolls
   )
 
-  protected ptyController: RuntimePtyController | null = null
+  /** Installed controller for main-side pane spawns, including the Claude session mover. */
+  ptyController: RuntimePtyController | null = null
 
   protected readonly ptyLivenessVerdictByPtyId = new Map<
     string,

@@ -11265,10 +11265,30 @@
             "secrets": "자체 암호화된 비밀 저장",
             "settingsOwn": "자체 설정 읽기 및 변경",
             "agentsRead": "에이전트 상태가 변경될 때 알림 받기",
-            "terminalRun": "터미널에서 명령 실행 (SSH 포함)"
+            "terminalRun": "터미널에서 명령 실행 (SSH 포함)",
+            "terminalSend": "보이는 터미널에 텍스트 입력 (항상 특정 터미널)",
+            "eventsSubscribe": "워크트리가 생성되거나 제거되고 에이전트 상태가 변경될 때 알림 받기",
+            "accountsRead": "Claude 계정 ID, 레이블, 사용량 창, 그리고 각 계정에서 실행 중인 세션 수를 읽습니다. 토큰이나 자격 증명 경로는 포함하지 않습니다."
           },
           "decisionFailed": "권한 결정을 저장할 수 없습니다. 다시 시도하세요.",
-          "fullAccessWarning": "전체 액세스: 일반 프로그램처럼 실행되며 파일을 읽고, 네트워크를 사용하고, 다른 프로그램을 실행할 수 있습니다."
+          "fullAccessWarning": "전체 액세스: 일반 프로그램처럼 실행되며 파일을 읽고, 네트워크를 사용하고, 다른 프로그램을 실행할 수 있습니다.",
+          "workerTrust": "백그라운드 워커 — 자체 프로세스 실행",
+          "instructionalTrust": "지시 내용 — 사용자 또는 에이전트 권한으로 나중에 실행",
+          "declarativeTrust": "선언적 내용 — 플러그인 코드 없음",
+          "panelTrust": "패널 또는 호스트 통합 내용 — 워커 프로세스 없음",
+          "trustShortWorker": "워커",
+          "trustShortInstructional": "지시",
+          "trustShortPanel": "패널",
+          "trustShortDeclarative": "선언적",
+          "reviewTitle": "플러그인 검토",
+          "title": "권한 검토",
+          "mixedTitle": "접근 및 내용 검토",
+          "instructionalTitle": "플러그인 내용 검토",
+          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
+          "capabilities": "이 플러그인은 다음을 수행할 수 있습니다",
+          "warning": "이러한 권한은 플러그인이 Orca API를 사용하는 방식을 제한합니다. 워커는 여전히 컴퓨터에서 일반 프로세스로 실행되며 파일, 네트워크 및 기타 프로세스에 대한 전체 액세스 권한을 보유합니다.",
+          "panelWarning": "이러한 권한은 플러그인이 Orca API를 사용하는 방식을 제한합니다. 이 플러그인에는 백그라운드 워커가 없습니다.",
+          "keepDisabled": "비활성화 유지"
         },
         "PluginConsentProvenance": {
           "official": "공식",
@@ -11455,6 +11475,8 @@
           "worktreeCreated": "워크스페이스가 생성될 때",
           "worktreeRemoved": "워크스페이스가 제거될 때",
           "agentStatusChanged": "Agent 상태가 바뀔 때",
+          "usageChanged": "Claude 계정 사용량이 바뀔 때",
+          "sessionMoved": "Claude 세션이 다른 계정으로 옮겨질 때",
           "detail": "백그라운드 코드가 실행됩니다"
         },
         "pluginInstallAction": {
@@ -12632,6 +12654,79 @@
             "mod": "모드",
             "shortcut": "단축키"
           }
+        },
+        "AgentLocationSetting": {
+          "92f4238f1a": "WSL 기본값",
+          "fc806485ae": "WSL 로드 중",
+          "43663b5e69": "WSL",
+          "9bccf48906": "Agent 위치",
+          "d00949e59b": "{{value0}}에서 설치된 agents를 표시합니다. 새로 고침은 해당 환경에서 PATH를 다시 ​​확인합니다.",
+          "c7c516946f": "이 컴퓨터에서는 WSL을 사용할 수 없습니다.",
+          "f97b986b7f": "wsl"
+        },
+        "AutoRenameBranchPromptEditor": {
+          "63121132c0": "버리기",
+          "4416b25d29": "작업에서 도메인 명사를 선호하고, 티켓 ID를 피하고, 리뷰어 친화적인 이름을 유지하세요.",
+          "39278f4411": "; 브랜치 접두사 설정이 계속 적용됩니다.",
+          "ebb942a2ec": "fix-login-flow",
+          "af2d9a2cc6": ". Orca는 다음과 같은 마지막 세그먼트만 생성합니다.",
+          "182d419b97": "내장된 브랜치 이름 프롬프트",
+          "2f5dc661fe": "Orca에 추가됨",
+          "7d6176f506": "프롬프트",
+          "5968112152": "저장",
+          "54ac229ad4": "저장 중...",
+          "af0831a590": "저장됨",
+          "0691753cf2": "저장되지 않은 변경사항"
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "이 기기"
+        },
+        "MobileRelayStatusSection": {
+          "registered": "Registered",
+          "connecting": "Connecting",
+          "reconnecting": "Reconnecting",
+          "offline": "Offline",
+          "title": "Orca Relay",
+          "automatic": "휴대폰이 페어링되면 어디서나 연결",
+          "signInPrompt": "어디서나 연결하려면 이 데스크톱에서 로그인하세요",
+          "directStillAvailable": "LAN 및 Tailscale 연결은 계속 사용할 수 있습니다.",
+          "directNeedsNoAccount": "LAN 및 Tailscale 페어링은 계정 없이도 계속 작동합니다.",
+          "signIn": "Sign in",
+          "unavailable": "Unavailable",
+          "standby": "대기 중 — 릴레이 기기 없음"
+        },
+        "MobileRelayBetaAvailability": {
+          "about": "Orca Relay 베타 정보",
+          "beta": "베타",
+          "availability": "이용 가능:",
+          "testFlight": "TestFlight",
+          "androidApk": "Android APK"
+        },
+        "PluginMarketplacePreviewDialog": {
+          "languagePacksOne": "1개 언어 팩",
+          "languagePacks": "{{value0}}개 언어 팩",
+          "commandsOne": "1개 명령",
+          "commands": "{{value0}}개 명령",
+          "keybindingsOne": "1개 키보드 단축키",
+          "keybindings": "{{value0}}개 키보드 단축키",
+          "vmRecipesOne": "1개 VM 레시피",
+          "vmRecipes": "{{value0}}개 VM 레시피",
+          "panelsOne": "1개 패널",
+          "panels": "{{value0}}개 패널",
+          "eventsOne": "1개 이벤트 구독",
+          "events": "{{value0}}개 이벤트 구독",
+          "worker": "백그라운드 워커",
+          "versionLine": "v{{value0}} · {{value1}}",
+          "includes": "포함",
+          "noContributions": "매니페스트 메타데이터만",
+          "capabilities": "요청된 액세스",
+          "workerWarning": "기능은 이 플러그인이 Orca API를 사용하는 방식을 제한합니다. 워커는 여전히 컴퓨터에서 일반 프로세스로 실행되며 파일, 네트워크 및 기타 프로세스에 대한 전체 액세스 권한을 보유합니다.",
+          "blocked": "Orca 안전 목록이 이 플러그인을 차단했습니다: {{value0}}",
+          "current": "이 플러그인 내용이 이미 설치되어 있습니다.",
+          "close": "닫기",
+          "cancel": "취소",
+          "update": "플러그인 업데이트",
+          "install": "플러그인 설치"
         }
       },
       "right": {
@@ -18360,7 +18455,9 @@
         "agentNotSignedIn": "{{agent}}에 로그인하세요.",
         "thenSendAgain": "그런 다음 메시지를 다시 보내세요.",
         "runCommandWhenDone": "작업이 끝나면 /{{command}}을(를) 실행하세요.",
-        "commandAfterAnswer": "에이전트의 질문 또는 승인에 응답한 다음 /{{command}}을(를) 실행하세요."
+        "commandAfterAnswer": "에이전트의 질문 또는 승인에 응답한 다음 /{{command}}을(를) 실행하세요.",
+        "claudeAccountUnknown": "해당 Claude 계정은 더 이상 저장되어 있지 않습니다. 다른 계정을 선택하세요.",
+        "claudeAccountWslUnsupported": "해당 Claude 계정은 WSL에 있어 여기서 실행할 수 없습니다. 다른 계정을 선택하세요."
       },
       "writeNotice": {
         "notDoneReadHistory": "이 채팅의 기록을 불러오지 못했습니다.",
@@ -20831,6 +20928,59 @@
         "restartCount_other": "세션 {{count}}개 다시 시작",
         "reviewBody_other": "다른 Claude 세션 {{count}}개가 {{next}}(으)로 이동되지 않았습니다.",
         "body_other": "Claude 세션 {{count}}개가 아직 {{previous}}에서 실행 중입니다. 다시 시작하면 각 대화가 {{next}}에서 계속됩니다. 작업 중인 세션은 유휴 상태가 된 후 다시 시작됩니다."
+      },
+      "pool": {
+        "settingTitle": "세션을 계정에 분산",
+        "settingDescription": "새 Claude 세션은 여유가 가장 많은 계정에서 시작합니다.",
+        "sessionsOne": "세션 1개",
+        "sessionsOther": "세션 {{count}}개",
+        "badge": "분산",
+        "paneBadge": "Claude 계정 {{label}}"
+      },
+      "sessionMover": {
+        "rebalanceBody": "{{from}}이(가) 계정을 고르게 쓰도록 {{to}}에서 계속됩니다.",
+        "recentMoves": "최근 이동",
+        "recentMovesDescription": "실행 중인 각 Claude 세션에 대한 이동 기능의 마지막 결정입니다.",
+        "recentMovesEmpty": "Claude 세션 이동이 없습니다.",
+        "keyword": {
+          "move": "이동",
+          "session": "세션",
+          "strategy": "전략",
+          "rebalance": "재조정"
+        },
+        "settingTitle": "사용량 한도에 도달하기 전에 실행 중인 세션 이동",
+        "settingDescription": "자신의 계정이 한도에 가까운 실행 중인 Claude 세션은 턴 사이에, 같은 창에서, 여유가 가장 많은 계정으로 이어집니다.",
+        "settingOff": "끄기",
+        "settingAsk": "묻기",
+        "settingMove": "이동",
+        "noticeTitle": "Claude 세션 이동",
+        "movedBody": "{{from}}이(가) 사용량 한도에 가깝습니다. 세션은 {{to}}에서 계속됩니다.",
+        "askBody": "{{from}}의 세션이 사용량 한도에 가깝습니다. 자동으로 이동하려면 \"사용량 한도에 도달하기 전에 실행 중인 세션 이동\"을 이동으로 설정하세요.",
+        "failedBody": "{{from}}의 세션을 이동하지 못했습니다: {{detail}}",
+        "handoff": {
+          "moved": "Orca가 {{detail}} 때문에 이 세션을 {{from}}에서 {{to}}(으)로 옮겼습니다.",
+          "ended": "다시 시작하면서 이전 프로세스의 하위 작업이 종료되었습니다 ({{known}}).",
+          "continue": "아직 필요한 작업을 다시 실행한 다음 계속하세요.",
+          "monitoring": "모니터링",
+          "backgroundTask": "백그라운드 작업이 아직 실행 중이었습니다",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "외 {{count}}개",
+          "none": "보고된 항목 없음",
+          "detailFallback": "사용량 한도"
+        },
+        "movedRestartlessBody": "{{from}}이(가) 사용량 한도에 가깝습니다. 세션은 다시 시작하지 않고 {{to}}에서 계속됩니다."
+      },
+      "autoSwitch": "사용량 한도에 도달하기 전에 계정 전환",
+      "autoSwitchDescription": "선택한 계정이 5시간 또는 주간 한도의 90%를 넘으면 Orca가 여유가 가장 많은 계정으로 전환합니다. 직접 전환한 것과 같습니다.",
+      "autoSwitchedTitle": "Claude 계정을 전환함",
+      "autoSwitchedBody": "{{from}}이(가) 사용량 한도에 가깝습니다. 새 Claude 세션은 {{to}}에서 시작합니다.",
+      "keyword": {
+        "auto": "자동"
+      },
+      "authProxy": {
+        "settingTitle": "로컬 인증 프록시로 Claude 사용량 청구",
+        "settingDescription": "실행 중인 Claude 세션은 다시 시작하지 않고 계정을 바꿀 수 있습니다. 다음 요청은 새 계정을 사용합니다."
       }
     },
     "hostSignIn": {

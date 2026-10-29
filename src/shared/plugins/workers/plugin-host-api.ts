@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { PluginCapabilityKind } from '../capabilities/plugin-capabilities'
 import type { PluginSurface } from '../frames/plugin-protocol'
+import { pluginClaudeAccountListSchema } from '../plugin-claude-account-contract'
 
 /**
  * Host API 1 (`pluginApi: 1`) — the separately-versioned public facade plugins call. Every
@@ -242,6 +243,17 @@ export const PLUGIN_HOST_API = {
     surfaces: WORKER_ONLY,
     params: settingsSetParams,
     result: settingsSetResult
+  }),
+  'accounts.listClaudeAccounts': spec({
+    summary:
+      'Lists Claude account ids, labels, usage windows, and session counts. Does not include tokens or credential paths.',
+    since: 1,
+    scope: 'desktop',
+    capability: 'accounts.read',
+    mutation: false,
+    surfaces: WORKER_ONLY,
+    params: z.strictObject({}).optional(),
+    result: pluginClaudeAccountListSchema
   })
 }
 

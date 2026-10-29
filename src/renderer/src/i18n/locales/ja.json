@@ -11265,10 +11265,30 @@
             "secrets": "独自の暗号化されたシークレットを保存",
             "settingsOwn": "独自の設定を読み取り・変更",
             "agentsRead": "Agent ステータスが変更されたときに通知を受ける",
-            "terminalRun": "ターミナルでコマンドを実行 (SSH を含む)"
+            "terminalRun": "ターミナルでコマンドを実行 (SSH を含む)",
+            "terminalSend": "見えるターミナルにテキストを入力（常に特定のターミナル）",
+            "eventsSubscribe": "ワークツリーが作成または削除され、Agent ステータスが変更されたときに通知を受ける",
+            "accountsRead": "Claude アカウントの ID、ラベル、使用量ウィンドウ、および各アカウントで実行中のセッション数を読み取る。トークンや認証情報のパスは含まない。"
           },
           "decisionFailed": "権限の選択を保存できませんでした。再試行してください。",
-          "fullAccessWarning": "フルアクセス：通常のプログラムとして実行され、ファイルの読み取り、ネットワークの使用、他のプログラムの実行ができます。"
+          "fullAccessWarning": "フルアクセス：通常のプログラムとして実行され、ファイルの読み取り、ネットワークの使用、他のプログラムの実行ができます。",
+          "workerTrust": "バックグラウンドワーカー — 自身のプロセスを実行",
+          "instructionalTrust": "インストラクショナルコンテンツ — ユーザーまたは Agent の権限で後から実行",
+          "declarativeTrust": "宣言型コンテンツ — プラグインコードなし",
+          "panelTrust": "パネルまたはホスト統合コンテンツ — ワーカープロセスなし",
+          "trustShortWorker": "ワーカー",
+          "trustShortInstructional": "インストラクショナル",
+          "trustShortPanel": "パネル",
+          "trustShortDeclarative": "宣言型",
+          "reviewTitle": "プラグインを確認",
+          "title": "権限を確認",
+          "mixedTitle": "アクセスとコンテンツを確認",
+          "instructionalTitle": "プラグインコンテンツを確認",
+          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
+          "capabilities": "このプラグインは",
+          "warning": "これらの権限は、プラグインが Orca APIを使用する方法を制限します。ワーカーは引き続きコンピュータで通常のプロセスとして実行され、ファイル、ネットワーク、その他のプロセスへの完全なアクセス権を持ちます。",
+          "panelWarning": "これらの権限は、プラグインが Orca APIを使用する方法を制限します。このプラグインにはバックグラウンドワーカーがありません。",
+          "keepDisabled": "無効のまま維持"
         },
         "PluginConsentProvenance": {
           "official": "公式",
@@ -11455,6 +11475,8 @@
           "worktreeCreated": "ワークスペースが作成されたとき",
           "worktreeRemoved": "ワークスペースが削除されたとき",
           "agentStatusChanged": "Agent のステータスが変わったとき",
+          "usageChanged": "Claude アカウントの使用量が変わったとき",
+          "sessionMoved": "Claude セッションが別のアカウントに移ったとき",
           "detail": "バックグラウンドでコードが実行されます"
         },
         "pluginInstallAction": {
@@ -12632,6 +12654,79 @@
             "mod": "モッド",
             "shortcut": "ショートカット"
           }
+        },
+        "AgentLocationSetting": {
+          "92f4238f1a": "WSL のデフォルト",
+          "fc806485ae": "WSL の読み込み中",
+          "43663b5e69": "WSL",
+          "9bccf48906": "Agent の実行場所",
+          "d00949e59b": "{{value0}} からインストールされている Agent を表示します。更新すると、その環境で PATH が再チェックされます。",
+          "c7c516946f": "このマシンでは WSL を利用できません。",
+          "f97b986b7f": "wsl"
+        },
+        "AutoRenameBranchPromptEditor": {
+          "63121132c0": "破棄",
+          "4416b25d29": "タスクのドメイン名詞を優先し、チケット ID を避け、レ​​ビュー担当者が理解しやすい名前を保ちます。",
+          "39278f4411": ";ブランチプレフィックス設定は引き続き適用されます。",
+          "ebb942a2ec": "fix-login-flow",
+          "af2d9a2cc6": "。 Orca は次のような最後のセグメントのみを生成します。",
+          "182d419b97": "組み込みのブランチ名プロンプト",
+          "2f5dc661fe": "Orca に追加されました",
+          "7d6176f506": "プロンプト",
+          "5968112152": "保存",
+          "54ac229ad4": "保存中…",
+          "af0831a590": "保存済み",
+          "0691753cf2": "未保存の変更"
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "このデバイス"
+        },
+        "MobileRelayStatusSection": {
+          "registered": "登録済み",
+          "connecting": "接続中",
+          "reconnecting": "再接続中",
+          "offline": "オフライン",
+          "title": "Orca Relay",
+          "automatic": "スマートフォンをペアリングすると、どこからでも接続できます",
+          "signInPrompt": "どこからでも接続するには、このデスクトップでサインインしてください",
+          "directStillAvailable": "LAN と Tailscale の接続は引き続き利用できます。",
+          "directNeedsNoAccount": "LAN と Tailscale のペアリングは、アカウントがなくても利用できます。",
+          "signIn": "サインイン",
+          "unavailable": "利用不可",
+          "standby": "待機中 — リレー対象のデバイスがありません"
+        },
+        "MobileRelayBetaAvailability": {
+          "about": "Orca Relay ベータについて",
+          "beta": "ベータ",
+          "availability": "で利用可能",
+          "testFlight": "TestFlight",
+          "androidApk": "Android APK"
+        },
+        "PluginMarketplacePreviewDialog": {
+          "languagePacksOne": "1つの言語パック",
+          "languagePacks": "{{value0}}つの言語パック",
+          "commandsOne": "1つのコマンド",
+          "commands": "{{value0}}つのコマンド",
+          "keybindingsOne": "1つのキーボードショートカット",
+          "keybindings": "{{value0}}つのキーボードショートカット",
+          "vmRecipesOne": "1つのVMレシピ",
+          "vmRecipes": "{{value0}}つのVMレシピ",
+          "panelsOne": "1つのパネル",
+          "panels": "{{value0}}つのパネル",
+          "eventsOne": "1つのイベントサブスクリプション",
+          "events": "{{value0}}つのイベントサブスクリプション",
+          "worker": "バックグラウンドワーカー",
+          "versionLine": "v{{value0}} · {{value1}}",
+          "includes": "含む",
+          "noContributions": "マニフェストメタデータのみ",
+          "capabilities": "要求されたアクセス",
+          "workerWarning": "機能はこのプラグインが Orca APIを使用する方法を制限します。ワーカーは引き続きコンピュータで通常のプロセスとして実行され、ファイル、ネットワーク、その他のプロセスへの完全なアクセス権を持ちます。",
+          "blocked": "Orca の安全リストがこのプラグインをブロック: {{value0}}",
+          "current": "このプラグインコンテンツはすでにインストールされています。",
+          "close": "閉じる",
+          "cancel": "キャンセル",
+          "update": "プラグインを更新",
+          "install": "プラグインをインストール"
         }
       },
       "right": {
@@ -18360,7 +18455,9 @@
         "agentNotSignedIn": "{{agent}} にサインインしてください。",
         "thenSendAgain": "その後、メッセージをもう一度送信してください。",
         "runCommandWhenDone": "終わったら /{{command}} を実行してください。",
-        "commandAfterAnswer": "Agent の質問または承認に回答してから、/{{command}} を実行してください。"
+        "commandAfterAnswer": "Agent の質問または承認に回答してから、/{{command}} を実行してください。",
+        "claudeAccountUnknown": "その Claude アカウントは保存されていません。別のアカウントを選択してください。",
+        "claudeAccountWslUnsupported": "その Claude アカウントは WSL にあるため、ここでは実行できません。別のアカウントを選択してください。"
       },
       "writeNotice": {
         "notDoneReadHistory": "このチャットの履歴を読み込めませんでした。",
@@ -20831,6 +20928,59 @@
         "restartCount_other": "{{count}} 件のセッションを再起動",
         "reviewBody_other": "ほかの {{count}} 件の Claude セッションは {{next}} に移動されませんでした。",
         "body_other": "{{count}} 件の Claude セッションがまだ {{previous}} で実行中です。再起動すると、各会話が {{next}} で続行されます。処理中のセッションは待機状態になってから再起動します。"
+      },
+      "pool": {
+        "settingTitle": "セッションをアカウントに分散",
+        "settingDescription": "新しい Claude セッションは、残りが多いアカウントで始まります。",
+        "sessionsOne": "1 セッション",
+        "sessionsOther": "{{count}} セッション",
+        "badge": "分散",
+        "paneBadge": "Claude アカウント {{label}}"
+      },
+      "sessionMover": {
+        "rebalanceBody": "{{from}} はアカウントを分散するため {{to}} で続行します。",
+        "recentMoves": "最近の移動",
+        "recentMovesDescription": "実行中の各 Claude セッションについて、移動機能が最後に下した判断です。",
+        "recentMovesEmpty": "Claude セッションの移動はありません。",
+        "keyword": {
+          "move": "移動",
+          "session": "セッション",
+          "strategy": "方式",
+          "rebalance": "再配分"
+        },
+        "settingTitle": "使用量の上限の前に実行中のセッションを移動",
+        "settingDescription": "自分のアカウントが上限に近づいた実行中の Claude セッションは、ターンの間に、同じペインのまま、残りが多いアカウントで続きます。",
+        "settingOff": "オフ",
+        "settingAsk": "確認する",
+        "settingMove": "移動",
+        "noticeTitle": "Claude セッションの移動",
+        "movedBody": "{{from}} は使用量の上限に近づいています。セッションは {{to}} で続行します。",
+        "askBody": "{{from}} のセッションが使用量の上限に近づいています。自動で移動するには、「使用量の上限の前に実行中のセッションを移動」を「移動」にしてください。",
+        "failedBody": "{{from}} のセッションを移動できませんでした: {{detail}}",
+        "handoff": {
+          "moved": "Orca は {{detail}} のため、このセッションを {{from}} から {{to}} へ移動しました。",
+          "ended": "再起動により、前のプロセスの下位の作業が終了しました ({{known}})。",
+          "continue": "まだ必要な作業をやり直してから、続けてください。",
+          "monitoring": "監視",
+          "backgroundTask": "バックグラウンドタスクがまだ実行中でした",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "ほか {{count}} 件",
+          "none": "報告なし",
+          "detailFallback": "使用量の上限"
+        },
+        "movedRestartlessBody": "{{from}} は使用量の上限に近づいています。セッションは再起動せず {{to}} で続行します。"
+      },
+      "autoSwitch": "使用量の上限の前にアカウントを切り替える",
+      "autoSwitchDescription": "選択中のアカウントが 5 時間または週間の上限の 90% を超えると、Orca は残りが多いアカウントに切り替えます。手で切り替えたときと同じです。",
+      "autoSwitchedTitle": "Claude のアカウントを切り替えました",
+      "autoSwitchedBody": "{{from}} は使用量の上限に近づいています。新しい Claude セッションは {{to}} で始まります。",
+      "keyword": {
+        "auto": "自動"
+      },
+      "authProxy": {
+        "settingTitle": "ローカルの認証プロキシ経由で Claude を課金する",
+        "settingDescription": "実行中の Claude セッションは再起動せずにアカウントを変更できます。次のリクエストは新しいアカウントを使います。"
       }
     },
     "hostSignIn": {

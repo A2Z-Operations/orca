@@ -52,6 +52,18 @@ function text(row: SqliteRow, column: string): string | null {
   return typeof value === 'string' ? value : null
 }
 
+/** Node 26.0 reads TEXT with sqlite3_column_text and drops bytes after the NUL separator. */
+function operationKey(row: SqliteRow): string | null {
+  const value = row.operation_key
+  if (typeof value === 'string') {
+    return value
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value).toString('utf8')
+  }
+  return null
+}
+
 function parseJson(json: string | null): { ok: true; value: unknown } | { ok: false } {
   if (json === null) {
     return { ok: false }
@@ -128,9 +140,11 @@ export function loadAgentSessionStoreRows(db: Database.Database): AgentSessionSt
     }
   }
   for (const row of db
-    .prepare('SELECT operation_key, row_json FROM agent_session_operations ORDER BY rowid')
+    .prepare(
+      'SELECT CAST(operation_key AS BLOB) AS operation_key, row_json FROM agent_session_operations ORDER BY rowid'
+    )
     .all()) {
-    const key = text(row, 'operation_key')
+    const key = operationKey(row)
     const parsed = parseJson(text(row, 'row_json'))
     if (key !== null && parsed.ok && isReadableAgentSessionStoreOperation(key, parsed.value)) {
       state.operations.set(key, parsed.value)

@@ -11957,10 +11957,30 @@
             "secrets": "Store its own encrypted secrets",
             "settingsOwn": "Read and change its own settings",
             "agentsRead": "Get notified when agent status changes",
-            "terminalRun": "Run commands in your terminals, including SSH"
+            "terminalRun": "Run commands in your terminals, including SSH",
+            "terminalSend": "Type text into a terminal you can see (always a specific terminal)",
+            "eventsSubscribe": "Get notified when worktrees are created or removed and when agent status changes",
+            "accountsRead": "Read Claude account ids, labels, usage windows, and how many sessions each account is running. Does not include tokens or credential paths."
           },
           "decisionFailed": "Could not save the permission decision. Try again.",
-          "fullAccessWarning": "Full access: runs as a normal program and can read your files, use the network and run other programs."
+          "fullAccessWarning": "Full access: runs as a normal program and can read your files, use the network and run other programs.",
+          "workerTrust": "Background worker — runs its own process",
+          "instructionalTrust": "Instructional content — runs later under user or agent authority",
+          "declarativeTrust": "Declarative content — no plugin code",
+          "panelTrust": "Panel or host-integrated content — no worker process",
+          "trustShortWorker": "Worker",
+          "trustShortInstructional": "Instructional",
+          "trustShortPanel": "Panel",
+          "trustShortDeclarative": "Declarative",
+          "reviewTitle": "Review plugin",
+          "title": "Review permissions",
+          "mixedTitle": "Review access and content",
+          "instructionalTitle": "Review plugin content",
+          "subtitle": "{{value0}} v{{value1}} · {{value2}}",
+          "capabilities": "This plugin can",
+          "warning": "These permissions limit how the plugin uses Orca's API. Its worker still runs as a normal process on your computer with full access to your files, network, and other processes.",
+          "panelWarning": "These permissions limit how the plugin uses Orca's API. This plugin has no background worker.",
+          "keepDisabled": "Keep Disabled"
         },
         "PluginConsentProvenance": {
           "official": "Official",
@@ -13310,6 +13330,8 @@
           "worktreeCreated": "When a workspace is created",
           "worktreeRemoved": "When a workspace is removed",
           "agentStatusChanged": "When an agent’s status changes",
+          "usageChanged": "When Claude account usage changes",
+          "sessionMoved": "When a Claude session moves to another account",
           "detail": "Background code runs"
         },
         "pluginInstallAction": {
@@ -13372,6 +13394,79 @@
         },
         "pluginTryAction": {
           "incompleteLanguage": "This language pack is too incomplete to switch to."
+        },
+        "AgentLocationSetting": {
+          "92f4238f1a": "WSL default",
+          "fc806485ae": "Loading WSL",
+          "43663b5e69": "WSL",
+          "9bccf48906": "Agent location",
+          "d00949e59b": "Show installed agents from {{value0}}. Refresh re-checks PATH in that environment.",
+          "c7c516946f": "WSL is not available on this machine.",
+          "f97b986b7f": "wsl"
+        },
+        "AutoRenameBranchPromptEditor": {
+          "63121132c0": "Discard",
+          "4416b25d29": "Prefer domain nouns from the task, avoid ticket IDs, and keep names reviewer-friendly.",
+          "39278f4411": "; your branch prefix setting still applies.",
+          "ebb942a2ec": "fix-login-flow",
+          "af2d9a2cc6": ". Orca generates only the final segment, like",
+          "182d419b97": "built-in branch-name prompt",
+          "2f5dc661fe": "Appended to Orca's",
+          "7d6176f506": "Prompt",
+          "5968112152": "Save",
+          "54ac229ad4": "Saving...",
+          "af0831a590": "Saved",
+          "0691753cf2": "Unsaved changes"
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "This device"
+        },
+        "MobileRelayStatusSection": {
+          "registered": "Registered",
+          "connecting": "Connecting",
+          "reconnecting": "Reconnecting",
+          "offline": "Offline",
+          "title": "Orca Relay",
+          "automatic": "Connect from anywhere when a phone is paired",
+          "signInPrompt": "Sign in on this desktop to connect from anywhere",
+          "directStillAvailable": "LAN and Tailscale connections remain available.",
+          "directNeedsNoAccount": "LAN and Tailscale pairing still work without an account.",
+          "signIn": "Sign in",
+          "unavailable": "Unavailable",
+          "standby": "Standby — no relay devices"
+        },
+        "MobileRelayBetaAvailability": {
+          "about": "About the Orca Relay beta",
+          "beta": "Beta",
+          "availability": "Available on",
+          "testFlight": "TestFlight",
+          "androidApk": "Android APK"
+        },
+        "PluginMarketplacePreviewDialog": {
+          "languagePacksOne": "1 language pack",
+          "languagePacks": "{{value0}} language packs",
+          "commandsOne": "1 command",
+          "commands": "{{value0}} commands",
+          "keybindingsOne": "1 keyboard shortcut",
+          "keybindings": "{{value0}} keyboard shortcuts",
+          "vmRecipesOne": "1 VM recipe",
+          "vmRecipes": "{{value0}} VM recipes",
+          "panelsOne": "1 panel",
+          "panels": "{{value0}} panels",
+          "eventsOne": "1 event subscription",
+          "events": "{{value0}} event subscriptions",
+          "worker": "Background worker",
+          "versionLine": "v{{value0}} · {{value1}}",
+          "includes": "Includes",
+          "noContributions": "Manifest metadata only",
+          "capabilities": "Requested access",
+          "workerWarning": "Capabilities limit how this plugin uses Orca's API. Its worker still runs as a normal process on this computer with full access to your files, network, and other processes.",
+          "blocked": "Orca's safety list blocks this plugin: {{value0}}",
+          "current": "This exact plugin content is already installed.",
+          "close": "Close",
+          "cancel": "Cancel",
+          "update": "Update plugin",
+          "install": "Install plugin"
         }
       },
       "right": {
@@ -19169,7 +19264,9 @@
         "agentNotSignedIn": "Sign in to {{agent}}.",
         "thenSendAgain": "Then send your message again.",
         "runCommandWhenDone": "Run /{{command}} when it's done.",
-        "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}."
+        "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}.",
+        "claudeAccountUnknown": "That Claude account is no longer saved. Choose another account.",
+        "claudeAccountWslUnsupported": "That Claude account is in WSL and can't run here. Choose another account."
       },
       "writeNotice": {
         "notDoneReadHistory": "This chat's history couldn't be loaded.",
@@ -21456,6 +21553,59 @@
         "body_one": "{{count}} Claude session is still running on {{previous}}. Restarting continues the conversation on {{next}}. Busy sessions wait for idle before restarting.",
         "body_other": "{{count}} Claude sessions are still running on {{previous}}. Restarting continues each conversation on {{next}}. Busy sessions wait for idle before restarting.",
         "restartCount_one": "Restart {{count}} session"
+      },
+      "autoSwitch": "Switch accounts before a usage limit",
+      "autoSwitchDescription": "When the selected account passes 90% of its 5-hour or weekly limit, Orca switches to the account with the most room left, as if you had switched by hand.",
+      "autoSwitchedTitle": "Claude account switched",
+      "autoSwitchedBody": "{{from}} is near its usage limit. New Claude sessions start on {{to}}.",
+      "keyword": {
+        "auto": "auto"
+      },
+      "sessionMover": {
+        "settingTitle": "Move running sessions before a usage limit",
+        "settingDescription": "A running Claude session whose own account nears its limit continues on the account with the most room, between turns, in the same pane.",
+        "settingOff": "Off",
+        "settingAsk": "Ask",
+        "settingMove": "Move",
+        "noticeTitle": "Claude session mover",
+        "movedBody": "{{from}} is near its usage limit. The session continues on {{to}}.",
+        "askBody": "A session on {{from}} is near its usage limit. Set \"Move running sessions before a usage limit\" to Move to move it automatically.",
+        "failedBody": "A session on {{from}} could not be moved: {{detail}}",
+        "handoff": {
+          "moved": "Orca moved this session from {{from}} to {{to}} because {{detail}}.",
+          "ended": "The restart ended subagents of the previous process ({{known}}).",
+          "continue": "Re-run what is still needed, then continue.",
+          "monitoring": "monitoring",
+          "backgroundTask": "a background task was still running",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "and {{count}} more",
+          "none": "none reported",
+          "detailFallback": "its usage limit"
+        },
+        "movedRestartlessBody": "{{from}} is near its usage limit. The session continues on {{to}} without a restart.",
+        "rebalanceBody": "{{from}} continues on {{to}} to balance your accounts.",
+        "recentMoves": "Recent moves",
+        "recentMovesDescription": "The mover's last decision for each live Claude session.",
+        "recentMovesEmpty": "No Claude session moves.",
+        "keyword": {
+          "move": "move",
+          "session": "session",
+          "strategy": "strategy",
+          "rebalance": "rebalance"
+        }
+      },
+      "authProxy": {
+        "settingTitle": "Bill Claude through a local auth proxy",
+        "settingDescription": "A running Claude session can change accounts without restarting. The next request uses the new account."
+      },
+      "pool": {
+        "settingTitle": "Spread sessions across accounts",
+        "settingDescription": "New Claude sessions start on the signed-in account with the most room left.",
+        "sessionsOne": "1 session",
+        "sessionsOther": "{{count}} sessions",
+        "badge": "Pool",
+        "paneBadge": "Claude account {{label}}"
       }
     },
     "managedData": {

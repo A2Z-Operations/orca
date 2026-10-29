@@ -8,6 +8,20 @@
         "restartCount_other": "Restart {{count}} sessions",
         "reviewBody_one": "{{count}} other Claude session wasn't moved to {{next}}.",
         "reviewBody_other": "{{count}} other Claude sessions weren't moved to {{next}}."
+      },
+      "sessionMover": {
+        "handoff": {
+          "backgroundTask": "a background task was still running",
+          "continue": "Re-run what is still needed, then continue.",
+          "detailFallback": "its usage limit",
+          "ended": "The restart ended subagents of the previous process ({{known}}).",
+          "monitoring": "monitoring",
+          "more": "and {{count}} more",
+          "moved": "Orca moved this session from {{from}} to {{to}} because {{detail}}.",
+          "none": "none reported",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})"
+        }
       }
     },
     "hostSignIn": {
@@ -820,6 +834,802 @@
           "imported_other": "Imported {{value0}} themes",
           "over_limit_one": "Importing these themes would exceed the {{value0}} custom terminal theme limit. Deselect {{value1}} new theme and try again.",
           "over_limit_other": "Importing these themes would exceed the {{value0}} custom terminal theme limit. Deselect {{value1}} new themes and try again."
+        },
+        "AccountsPane": {
+          "0023cc336e": "Paste either the raw token value (e.g.",
+          "15e831350e": "Configure MiniMax usage tracking from platform.minimax.io.",
+          "1fd1b1b6b4": "Cookie not set",
+          "338820326a": ") or the full cookie header (e.g.",
+          "3455cf43fa": "Claude login.",
+          "350b2a1aa7": "Use your current",
+          "4e32e030b2": "Stored locally. Orca sends it only to platform.minimax.io for usage refreshes.",
+          "566d9a99ab": "_token=…; minimax_group_id_v2=…",
+          "5e08b0fe57": "Stored locally and sent only to platform.minimax.io for usage refreshes.",
+          "79418c782a": "Open platform.minimax.io/console/usage in your browser, sign in, then copy the Cookie request header from DevTools (Network → any remains request → Cookie).",
+          "7ce0e1907c": "). Find it in your browser's DevTools → Network → any opencode.ai request → Cookie header. OpenCode Go auth is web-based and shared across Windows and WSL terminals.",
+          "8951c5309f": "auth=Fe26.2**…",
+          "9107406589": "Could not load Claude accounts.",
+          "922b51e02d": "Fe26.2**…",
+          "a7e38affcd": "Fe26.2**… token or auth=Fe26.2**… header",
+          "b10cb4f696": "adding",
+          "b11078a9c2": "wsl",
+          "b2b1aa936d": "Paste your opencode.ai session cookie for rate limit fetching.",
+          "b8c2905c2b": "Could not load Codex accounts.",
+          "f5d8d2a6a1": "Open platform.minimax.io/console/usage in your browser and sign in.",
+          "remoteScopeLocalAccountsKept": "Accounts managed on this desktop are unchanged. Switch the default runtime back to Local desktop to view them."
+        },
+        "AdvancedNetworkSettingsSection": {
+          "d93c7cd531": "Configure app-level network routing.",
+          "fb7130dcb9": "Hosts that should bypass the configured HTTP proxy."
+        },
+        "AgentLocationSetting": {
+          "43663b5e69": "WSL",
+          "92f4238f1a": "WSL default",
+          "9bccf48906": "Agent location",
+          "c7c516946f": "WSL is not available on this machine.",
+          "d00949e59b": "Show installed agents from {{value0}}. Refresh re-checks PATH in that environment.",
+          "f97b986b7f": "wsl",
+          "fc806485ae": "Loading WSL"
+        },
+        "AgentSkillSetupPanel": {
+          "0b810ec59f": "Press Enter to run the command.",
+          "378ad26865": "Copied command.",
+          "817d3f9f18": "Copy command",
+          "a31e2aa302": "Failed to copy command."
+        },
+        "AgentsPane": {
+          "9b175d0f5e": "Pre-selected agent when opening a new workspace.",
+          "c8794e622e": "Detected",
+          "db9e9e5887": "Customize command",
+          "df123171d1": "Not installed"
+        },
+        "AppearancePane": {
+          "0f28e7b30c": "Choose how Orca looks in the app window.",
+          "2df8f79aa5": "Show Orca in the titlebar.",
+          "42554f615f": "Choose the font used by the Orca interface.",
+          "4de76f6902": "Control what appears in the application titlebar.",
+          "5db6ba961f": "Show the Orca Mobile button at the top of the left sidebar.",
+          "622e1c3465": "Scale the entire application interface.",
+          "661942ab7f": "Show the Tasks button at the top of the left sidebar.",
+          "6a272ca553": "Titlebar",
+          "75f07ab60c": "Show files matched by .gitignore in the file explorer.",
+          "872af9556e": "System Tray",
+          "e9f2ca5582": "Turn off to hide files matched by .gitignore from the file explorer.",
+          "ea943d0db0": "Choose which indicators appear at the bottom of the window. You can also right-click the status bar for the same toggles.",
+          "f687711a9b": "Scale the entire application interface. Use",
+          "fa882a3e6b": "Show the Automations button at the top of the left sidebar.",
+          "statusBarCount": "{{value0}} indicators visible.",
+          "workspaceCardLayoutGuidance": "Managed from the workspace sidebar."
+        },
+        "AutoRenameBranchFromWorkSetting": {
+          "ef787db0e3": "Auto-Rename Branch"
+        },
+        "AutoRenameBranchPromptEditor": {
+          "0691753cf2": "Unsaved changes",
+          "182d419b97": "built-in branch-name prompt",
+          "2f5dc661fe": "Appended to Orca's",
+          "39278f4411": "; your branch prefix setting still applies.",
+          "4416b25d29": "Prefer domain nouns from the task, avoid ticket IDs, and keep names reviewer-friendly.",
+          "54ac229ad4": "Saving...",
+          "5968112152": "Save",
+          "63121132c0": "Discard",
+          "7d6176f506": "Prompt",
+          "af0831a590": "Saved",
+          "af2d9a2cc6": ". Orca generates only the final segment, like",
+          "ebb942a2ec": "fix-login-flow"
+        },
+        "BrowserPane": {
+          "4af9a17947": "kagi"
+        },
+        "BrowserProfileRow": {
+          "7df818977e": "From",
+          "b5c0479e21": "Unmodified user agent",
+          "d420c43729": "Imported {{value0}} cookies from {{value1}}{{value2}} into {{value3}}."
+        },
+        "BrowserUsePane": {
+          "de9b2f32f3": "Enable",
+          "e44c5d681e": "From"
+        },
+        "CliSection": {
+          "4c7e3e4c5f": "install",
+          "5d432fe44d": "installed",
+          "8a9b784c60": "stale",
+          "8d96213669": "remove",
+          "cliSkillTerminalAria": "CLI skill install terminal",
+          "cliSkillTerminalTitle": "CLI skill setup"
+        },
+        "CliSkillRuntimeSetup": {
+          "04325573f8": "WSL",
+          "0c9f3cf9da": "Choose where Orca checks and installs global agent skills.",
+          "7c776ff9d8": "wsl",
+          "a58ba464ad": "Skill location",
+          "f00d6aa9b5": "WSL is not available on this machine."
+        },
+        "CloudVmSetupGuide": {
+          "createWorkspace": "Create a workspace and select that recipe under Run on.",
+          "description": "Cloud VMs are created from environment recipes when you create a workspace.",
+          "openSetup": "Set up environment recipes",
+          "setupRecipe": "Set up an environment recipe for your cloud provider.",
+          "title": "Create a Cloud VM"
+        },
+        "CommitMessageAiPane": {
+          "841ed9884a": "Used by repositories that have not customized Source Control AI."
+        },
+        "EphemeralVmRuntimesSection": {
+          "cleaned": "Cleaned up temporary VM runtime.",
+          "cleanupFailedToast": "Couldn’t clean up temporary VM runtime.",
+          "cloudVmEmptyWithSetup": "No Cloud VM runtimes yet. Create one from a workspace using an environment recipe.",
+          "cloudVmLoading": "Checking Cloud VM runtimes…",
+          "cloudVmTitle": "Cloud VM runtimes",
+          "description": "Recipe-created runtimes are workspace-owned. Clean up stale entries after crashes, failed creates, or manual recovery.",
+          "empty": "No temporary VM runtimes need cleanup.",
+          "loadFailed": "Couldn’t load temporary VM runtimes.",
+          "loading": "Checking temporary VM runtimes…",
+          "markedCleaned": "Marked temporary VM runtime as cleaned.",
+          "refresh": "Refresh temporary VM runtimes",
+          "title": "Temporary VM runtimes"
+        },
+        "ExperimentalPane": {
+          "0277901cf7": "Adds an Agents entry to the left sidebar with a threaded worktree feed for completed agents, blocking questions, unread state, and worktree creation events. Experimental — the event model and UI may change.",
+          "24416f42cd": "Shared paths on worktrees",
+          "9762364929": "Uses APFS clone-copy on macOS when possible, otherwise symlinks configured folders or files into created worktrees.",
+          "a05bcdaf57": "Agents View",
+          "f63ea281e3": "Threaded left-sidebar feed for agent completions and blocking states.",
+          "fb82ea1d7a": "Automatically materialize configured files or folders into newly created worktrees.",
+          "newWorktreeCardStyle": {
+            "copy": "Preview updated worktree-card layout, metadata placement, card-display menu options, and status presentation."
+          }
+        },
+        "GeneralPane": {
+          "confirm_running_terminal_close": "Confirm before closing running terminals",
+          "confirm_running_terminal_close_description": "Ask before stopping a running agent or command when closing a terminal."
+        },
+        "GeneralRemoteServerUpdates": {
+          "reviewUpdateOne": "1 update available",
+          "reviewUpdates": "{{value0}} updates available"
+        },
+        "GeneralSupportSection": {
+          "1e29570462": "starring",
+          "511782265b": "Support the project with a GitHub star via the gh CLI.",
+          "5c49f02662": "hidden",
+          "73b327e793": "Try Again",
+          "9d181300e3": "starred",
+          "b3f0584f5d": "loading",
+          "c9f96d4234": "error"
+        },
+        "GeneralUpdateSettingsSection": {
+          "3394d1f663": "checking",
+          "4c1c001813": "downloading",
+          "6405510b92": "error",
+          "7173352632": "idle",
+          "82465b2444": "available",
+          "90eb7309d7": "not-available",
+          "a0832ccdb1": "downloaded"
+        },
+        "GeneralWorkspaceSettingsSection": {
+          "externalWorktreesDescription": "Choose whether worktrees created outside Orca appear by default.",
+          "hide": "Hide",
+          "show": "Show"
+        },
+        "GitPane": {
+          "f35007e6e8": "git-username",
+          "untrackedFirst": "Untracked first"
+        },
+        "GrokAccountsSection": {
+          "c3d4e5f6a7": "Signed in. Orca only reads that file on disk — run grok login again if usage fails.",
+          "d4e5f6a7b8": "Session expired — run grok login in a terminal to refresh."
+        },
+        "IntegrationsPane": {
+          "01f6c7582e": "Learn more",
+          "027440e1cb": "Merge requests, issues, todos, and pipelines via the",
+          "05e5245af7": "The GitLab CLI is installed but not authenticated. Run this command in a terminal:",
+          "077844591a": "Add workspace access",
+          "0879860c58": "Pull requests and build statuses via Bitbucket Cloud API tokens.",
+          "09285e9fe6": "The GitHub CLI is installed but not authenticated. Run this command in a terminal:",
+          "15cf990798": "Not authenticated",
+          "1a62c295c6": "Gitea credentials are configured but could not authenticate. Check the token, API base URL, and repository permissions, then restart Orca if environment variables changed.",
+          "1fac9b4910": "{{value0}} · Pull requests and commit statuses",
+          "2122e15517": "Each connected Linear workspace has one key stored by the active runtime. Full-access keys can cover all teams the key owner can access; restricted keys can be replaced any time.",
+          "264a9b6128": "Linear",
+          "277fc23929": "{{value0}} · Pull requests and build statuses",
+          "295154e54e": "connected",
+          "2c0330ec3e": "for private repositories, and set",
+          "33ae9730a8": "Add Linear access to browse and link issues.",
+          "35a3379372": "Install the GitLab CLI to enable merge requests, issues, and pipelines.",
+          "3614887c40": "checking",
+          "399cf46867": "Install GitHub CLI",
+          "3c3cf05c63": "Bitbucket credentials are configured but could not authenticate. Check the token and repository permissions, then restart Orca if environment variables changed.",
+          "44cde4aa01": "ORCA_BITBUCKET_API_TOKEN",
+          "45bf5e6e4b": "Auth failed",
+          "4831ba1083": "Re-check",
+          "4972f3c95d": "configured",
+          "4ab9b96925": "Gitea",
+          "4bdc6fe4f5": "not-configured",
+          "4ee74d1470": "Set",
+          "51000487c4": "gh auth login",
+          "513abfe47d": "GitLab",
+          "5a1f86225a": "only when Orca cannot derive the API URL from the remote.",
+          "5ee6ef6405": "ORCA_AZURE_DEVOPS_TOKEN",
+          "5efce6953d": "Azure DevOps",
+          "6193444689": "ORCA_GITEA_API_BASE_URL",
+          "62b20292de": "error",
+          "6355fe585e": "Pull requests and commit statuses for detected repositories",
+          "6432f6522e": "Connected",
+          "6791d7af95": "Pull requests and build statuses via Azure DevOps REST API tokens.",
+          "67a9f26a80": ". Set",
+          "6bd148dcb5": "Pull requests and commit statuses via the Gitea REST API.",
+          "6e0ff3403e": "ORCA_BITBUCKET_ACCESS_TOKEN",
+          "6f317f5132": "only when Orca cannot derive the API base URL from the git remote.",
+          "70c5f74f36": "GitHub",
+          "8489c0aa49": "Bitbucket",
+          "8e078e480c": "Disconnect {{value0}}",
+          "8f960935c1": "ORCA_AZURE_DEVOPS_ACCESS_TOKEN",
+          "953b7bf6f7": "Azure DevOps credentials are configured but could not authenticate. Check the token, API base URL, and repository permissions, then restart Orca if environment variables changed.",
+          "95b9a87e7e": "Test",
+          "9707523939": "Pull requests and build statuses",
+          "98ded79cd7": "{{value0}} workspace{{value1}} connected",
+          "a3326f6f1b": "glab",
+          "a565377c38": "not-installed",
+          "a6c2816115": "and",
+          "a83cac5726": "Install GitLab CLI",
+          "ae38fc62a8": "ok",
+          "ae6b7f5f40": "ORCA_AZURE_DEVOPS_API_BASE_URL",
+          "b8a7efb3f6": "ORCA_BITBUCKET_EMAIL",
+          "c0c8575e05": "Install the GitHub CLI to enable pull requests, issues, and checks.",
+          "ce3c58cd63": ", or set",
+          "d9467ab026": "Public repositories are detected from their git remote. Set",
+          "de6a0d13ab": "Pull requests, issues, and checks via the",
+          "e1bd5364e6": "Optional setup",
+          "e3d5a24979": "Pull requests and build statuses for detected Azure Repos",
+          "e678d89e8c": "ORCA_GITEA_TOKEN",
+          "e74de656ce": "glab auth login",
+          "e7a961e1c5": "Configured",
+          "e7b2dd46f9": "Testing…",
+          "ea160a9978": "CLI.",
+          "f36365ed45": "gh",
+          "f5c5246514": "Add Linear access",
+          "f7eb5f0b24": "Not installed",
+          "f92fbf11aa": "Not configured",
+          "fe4d378dc4": "Verified"
+        },
+        "ManageSessionsSection": {
+          "9c940434af": "Switch back to the local runtime to restart or kill local daemon sessions.",
+          "a06ababda0": "killAll",
+          "ad467eaadc": "Session management is unavailable while a remote runtime server is active.",
+          "e3d1fbe008": "restart"
+        },
+        "McpConfigFileRow": {
+          "845ae248e8": "valid"
+        },
+        "MobileEmulatorAgentControlRow": {
+          "1861982430": "Failed to load CLI status.",
+          "cdeaed9e37": "Registered the Orca CLI in PATH."
+        },
+        "MobileEmulatorSdkStatus": {
+          "536026130e": "Emulator SDKs",
+          "dde0ec1cd8": "Toolchains Orca uses to run emulators. Android works on any OS via the Android SDK; iOS Simulators need Xcode on macOS."
+        },
+        "MobileNetworkInterfaceSection": {
+          "1dc87a7fbc": "Tailscale",
+          "1e64659126": "Regenerate",
+          "1f7c26d36a": "Sign in to the same tailnet on both devices.",
+          "39fad211d9": "Connect outside your Wi-Fi with a tailnet",
+          "406a35121c": "Network Interface",
+          "51d29927eb": "Install",
+          "63d5e4ae1e": "Regenerate the QR code and scan it from the Orca mobile app.",
+          "668016be7a": "on your computer and phone.",
+          "87985ba6f5": "In this Network Interface menu, choose the Tailscale address, usually a 100.x.y.z IP.",
+          "9fc5d203ff": "Orca Mobile connects directly to this computer. To use it away from the same LAN, put your computer and phone on the same private overlay network, then generate the QR code with that network address selected.",
+          "a9db5d771d": "Refresh network interfaces",
+          "c541f67790": "Generate QR Code",
+          "d536b5e20d": "Choose which network address to advertise in the QR code. Use your LAN address for same-network pairing, or an overlay network address (Tailscale, ZeroTier) for cross-network access."
+        },
+        "MobilePane": {
+          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your LAN or Tailscale. Regenerate to try again."
+        },
+        "MobileRelayBetaAvailability": {
+          "about": "About the Orca Relay beta",
+          "androidApk": "Android APK",
+          "availability": "Available on",
+          "beta": "Beta",
+          "testFlight": "TestFlight"
+        },
+        "MobileRelayStatusSection": {
+          "automatic": "Connect from anywhere when a phone is paired",
+          "connecting": "Connecting",
+          "directNeedsNoAccount": "LAN and Tailscale pairing still work without an account.",
+          "directStillAvailable": "LAN and Tailscale connections remain available.",
+          "offline": "Offline",
+          "reconnecting": "Reconnecting",
+          "registered": "Registered",
+          "signIn": "Sign in",
+          "signInPrompt": "Sign in on this desktop to connect from anywhere",
+          "standby": "Standby — no relay devices",
+          "title": "Orca Relay",
+          "unavailable": "Unavailable"
+        },
+        "MobileSettingsPane": {
+          "9a3c280e49": "GitHub Releases",
+          "b0088412a1": "or the Android APK from",
+          "c8491c17ef": "Control Orca from your phone by scanning a QR code. Beta / early preview - expect bugs and breaking changes. Get the iOS app from the"
+        },
+        "NotificationsPane": {
+          "274af61bc0": "system",
+          "d3756cf5bc": "disabled"
+        },
+        "PluginConsentDialog": {
+          "capability": {
+            "accountsRead": "Read Claude account ids, labels, usage windows, and how many sessions each account is running. Does not include tokens or credential paths."
+          }
+        },
+        "PrivacyPane": {
+          "afec8b03be": "ci"
+        },
+        "QuickCommandsPane": {
+          "44923dd982": "destructive",
+          "7784912ed6": "repo",
+          "f91b649324": "Saved Commands"
+        },
+        "RemoteServerUpdateDialog": {
+          "checkAgain": "Check for Server Updates",
+          "restartWarning": "Updating restarts these servers. {{value0}} live tabs and {{value1}} terminal panes may briefly disconnect.",
+          "updateOne": "Update server",
+          "updating": "Updating servers…"
+        },
+        "RepositoryGitHubAccountSection": {
+          "retry": "Retry"
+        },
+        "RepositoryHooksSection": {
+          "0e0dd5b9a5": "loaded",
+          "32f417fe17": "text-emerald-700 dark:text-emerald-300",
+          "8dbe6bedf5": "invalid",
+          "925f9e0dc4": "text-foreground",
+          "b5e3e77e89": "action",
+          "c90b858573": "text-amber-700 dark:text-amber-300"
+        },
+        "RepositoryIconPicker": {
+          "2b7d27b93c": "Use {{value0}} repo color"
+        },
+        "RepositoryPane": {
+          "createPendingSetup": "Track setup",
+          "creatingPendingSetup": "Creating...",
+          "settingUpHost": "Importing...",
+          "setupExistingFolder": "Import existing folder",
+          "setupExistingFolderHelp": "Make this project available on another host by linking a checkout that already exists there.",
+          "setupHost": "Import",
+          "setupProjectOnHost": "Set up on another host",
+          "setupProjectOnHostHelp": "Choose a host, then import an existing checkout, clone the repository there, or track a setup that will be provisioned later."
+        },
+        "RepositorySourceControlAiActionRows": {
+          "7a3a8e431d": "CLI arguments"
+        },
+        "RepositorySourceControlAiEnablement": {
+          "30ae6dcce8": "Global default is",
+          "84233d1bb3": "Off",
+          "bea897eec2": "On",
+          "cf5959c834": "Source Control AI enabled"
+        },
+        "RepositorySourceControlAiSection": {
+          "152268c295": "Save",
+          "57e6e9d4b1": "Saving...",
+          "67b3ff5467": "Discard",
+          "8b8bc5913a": "Repository action recipes. Global settings are used until this repository customizes them.",
+          "ccb07dd027": "Saved",
+          "e57dde9d93": "Unsaved changes"
+        },
+        "RuntimeAccessGrantList": {
+          "27cf8507ad": "Refresh shared access",
+          "68ec21309f": "Revoke access",
+          "87b16cd11d": "Created",
+          "8b82879581": "Anyone with an active grant can connect until you revoke it. Revoking shared access disconnects active clients immediately.",
+          "f031182867": "Shared Server Access",
+          "fd83b94095": "No shared server access yet."
+        },
+        "RuntimeEnvironmentsPane": {
+          "0ef838094a": "Protocol {{value0}}",
+          "163671f7b5": "Run",
+          "1826bd0608": "Saved Servers",
+          "2c85efb3e8": "Selecting a saved server makes this browser use that paired Orca runtime as its default Host.",
+          "3595fd1948": "New Link",
+          "3f67e8078a": "New projects are created on this computer unless you choose a saved server here. Existing projects, files and terminals stay on their own host.",
+          "54dee18f5c": "Hide Form",
+          "54ebacc600": "Server name",
+          "55fcc964cd": "on the server and paste the printed pairing URL.",
+          "64b6bea541": "Default host for new projects",
+          "6ce4664003": "Refresh servers",
+          "6e1280ca55": "Share this Orca server",
+          "78692becbd": "Local desktop",
+          "7b5986c8df": "Connected to {{value0}}. To create new projects there by default, choose it under Advanced > Default host for new projects.",
+          "84b9b2be05": "Create a revocable access grant so a browser or another Orca client can connect.",
+          "8cf8790697": "Saved servers route this browser through a paired Orca runtime.",
+          "960e901ae4": "orca serve --pairing-address <host>",
+          "9a3758d983": "No saved servers.",
+          "9bc9b83474": "Pairing code",
+          "9bee6bbeeb": "Add Server",
+          "9f7665a01b": "Removing the active server first switches Orca back to Local desktop. Existing host sessions are left alone.",
+          "activeServerRowHelp": "Default host for new projects. Existing projects stay on their own host.",
+          "advanced": "Advanced",
+          "advertiseThisApp": "Advertise this app as a server",
+          "advertiseThisAppHelp": "Create access links for browsers, mobile clients, or another Orca client to connect back to this running app.",
+          "aeb26635d2": "Remove {{value0}}",
+          "b2fda48c39": "Removing the active server disconnects this browser from that host. Existing host sessions are left alone.",
+          "c3d772c514": "orca://pair?code=...",
+          "cloudVmWorkflow": "Cloud VM",
+          "cloudVmWorkflowHelp": "Manage recipe-created cloud machines",
+          "connectToRemoteServers": "Connect to remote servers",
+          "connectToRemoteServersHelp": "Pair another Orca runtime, then connect or disconnect it here.",
+          "connectWorkflow": "Connect to a host",
+          "connectWorkflowHelp": "This app joins another machine",
+          "e038625857": "Dev box",
+          "f3a3d6d834": "{{value0}} capabilities",
+          "f75ce1c7a5": "Local keeps today's desktop behavior. Saved servers route supported client calls through the remote runtime.",
+          "orcaVersion": "Orca v{{value0}}",
+          "orcaVersionLastSeen": "Orca v{{value0}} (last seen)",
+          "removeActiveServerBlocked": "This server is the default host for new projects. Choose another one in Advanced before removing it.",
+          "removeActiveServerDescription": "This server is the default host for new projects. Choose another one in Advanced before removing it. Existing host sessions are left alone.",
+          "reviewServerUpdates": "Check for Server Updates",
+          "serverDetails": "Server details",
+          "shareWorkflow": "Share this host",
+          "shareWorkflowHelp": "Other devices join this machine",
+          "troubleshootDescription": "A link that uses 127.0.0.1 points back to the device opening it, not the computer that created it.",
+          "troubleshootStepAddress": "Choose Another device and select its Tailscale or LAN address.",
+          "troubleshootStepRegenerate": "Generate a new access link and use only the newest link here.",
+          "troubleshootStepShare": "On the other computer, open Share this host.",
+          "troubleshootTitle": "Create a new link on the other host",
+          "troubleshootTunnel": "Using an SSH local forward? Return to Connect to a host, paste the loopback link, then enable “I am using an SSH tunnel” under Advanced.",
+          "troubleshootWorkflow": "Connection troubleshooting",
+          "updateAvailableOne": "1 update available",
+          "updatesAvailable": "{{value0}} updates available",
+          "versionUnavailable": "Orca version unavailable",
+          "workflow": "Remote server workflow"
+        },
+        "RuntimeHostAccessForm": {
+          "addHost": "Add host",
+          "addWithTunnel": "Add host using tunnel",
+          "advanced": "Advanced",
+          "connectionDetails": "Connection details",
+          "endpointKind": "Endpoint kind",
+          "getLink": "Get an access link from the other host",
+          "headlessHelp": "Using headless orca serve? Run orca serve --pairing-address <reachable-host> on the other computer.",
+          "loopbackRecovery": "On the other computer, create a new link using Another device and choose its Tailscale or LAN address.",
+          "name": "Name in Orca",
+          "nameHelp": "This only changes how the computer appears in Orca.",
+          "networkConnection": "Network connection",
+          "notAttempted": "Not attempted",
+          "sshTunnel": "I am using an SSH tunnel to this local address",
+          "stepChooseAddress": "Choose Another device and select a reachable address.",
+          "stepCopyLink": "Generate the link, then copy the “Pair another Orca client” link.",
+          "stepOpenShare": "Open Settings → Remote Orca Servers → Share this host."
+        },
+        "RuntimePairingUrlGenerator": {
+          "279e0dcb57": "127.0.0.1 only works on this computer. Use a LAN, Tailscale, or custom address for another device.",
+          "2e5c4e3c93": "Pair another Orca client",
+          "6b9ca3e69b": "Open in browser",
+          "849825e829": "Paste this pairing URL into another Orca client.",
+          "8de0f84fff": "Generate Access Link",
+          "add-custom": "Add custom address…",
+          "b91e36a986": "web",
+          "de6d5cff95": "This computer (",
+          "intentQuestion": "Where will this link be opened?",
+          "localOnly": "This computer only",
+          "pairedRunsAsYou": "A paired client can run commands as you on this computer.",
+          "recommended": "Recommended",
+          "staleAddress": "The connection address changed. Generate a new link for {{address}}."
+        },
+        "RuntimeRepairDialog": {
+          "description": "{{name}} no longer accepts this computer. On {{name}}, open Settings → Remote Orca Servers → Share this host, create a link for another Orca client, then paste it here."
+        },
+        "SettingsFormControls": {
+          "3119c012a5": "string",
+          "fac59213fc": "Search builtin themes"
+        },
+        "SourceControlAiActionRecipeDefaults": {
+          "2cb4bb7e5d": "CLI arguments",
+          "a9359c8aa9": "Unknown error"
+        },
+        "SparsePresetSettingsSection": {
+          "2d7d45e991": "Cancel",
+          "3b6f1abd3e": "e.g. web-only",
+          "3dfa765ca7": "{{value0}} directories will be saved.",
+          "623b4cf910": "Edit Preset",
+          "68bbcd864a": "new",
+          "694cc55ecb": "Saved directories are used when creating sparse worktrees for this repository.",
+          "a05bc9183f": "Save Preset",
+          "a6fcdd9e3c": "Name",
+          "b532b9c17d": "1 directory will be saved.",
+          "b9922ec194": "Cancel preset edit",
+          "c240a16f25": "Use repo-relative paths like packages/web or apps/api.",
+          "caf33029cc": "Directories",
+          "fde7ff2cc3": "packages/web shared/ui"
+        },
+        "SshTargetCard": {
+          "0e53e9f8e8": "Test",
+          "3d21a22d0e": "Removing target",
+          "3d8af2949f": "Edit target",
+          "47e94bd6ba": "connected",
+          "7f7b3d7ab4": "Remove target",
+          "f0871e6bfb": "connect"
+        },
+        "SshTargetForm": {
+          "137e88ce8d": "Remote terminals keep running after Orca disconnects from this host.",
+          "29af933cd5": "New SSH Target",
+          "4a342f44c1": "Advanced Connection",
+          "92f80edbfd": "Remote Terminal Persistence",
+          "9518545cb6": "Add Target",
+          "e9609ddca6": "Proxy, jump host, and connection reuse",
+          "f2331ce599": "Edit SSH Target"
+        },
+        "SshTargetList": {
+          "selectGroup": "Select all in this group"
+        },
+        "TerminalAppearanceSection": {
+          "16c471ee03": "on",
+          "1b79379d4f": "Control inactive pane dimming and split divider thickness.",
+          "36af8ad94c": "Controls the terminal text font weight.",
+          "70beb1bbc7": "Preview",
+          "711e589f18": "Default terminal typography for new panes and live updates.",
+          "7233d594bf": "Render programming ligatures (e.g. =>, !=, ===) for fonts that ship them. \"Auto\" enables ligatures only for known ligature fonts (Fira Code, JetBrains Mono, Cascadia Code, Iosevka, etc.).",
+          "bafc80efbc": "Controls the terminal line height multiplier.",
+          "e90afcc44f": "off",
+          "f04b17a50e": "Default terminal font family for new panes and live updates.",
+          "typographyAdvanced": "Typography"
+        },
+        "TerminalPane": {
+          "003df129fe": "Split Horizontally",
+          "05efc0bada": "true",
+          "1158f8fd55": "New Tab",
+          "219aaa59f4": "WSL Distribution",
+          "21f8da2078": "Workspace Setup Script",
+          "2503f1e86b": "Used for new WSL terminal panes and local agent detection when the active workspace is not already inside WSL.",
+          "29154326bb": "on",
+          "332e8a2872": "Split Vertically",
+          "348246b06f": "false",
+          "34a0dfa06e": "Where the repository setup script runs when a new workspace is created.",
+          "5936387ddd": "auto",
+          "5fe79a5e56": "Choose which WSL distribution new WSL terminals and local agent scans use.",
+          "623e62df99": "Split horizontally",
+          "691ce810e0": "Split vertically",
+          "6c6a054a1c": "Run in a new tab",
+          "a9d47451d1": "\"New Tab\" opens the setup command in a background tab titled \"Setup\" without stealing focus.",
+          "ab20575a8a": "off",
+          "ab3a1f9068": "wsl.exe",
+          "adbafefe56": "custom",
+          "ask_before_closing_running_terminals_description": "Show a confirmation before closing a terminal that has a running command or agent.",
+          "ask_before_closing_running_terminals_title": "Ask Before Closing Running Terminals",
+          "cc8c5ca224": "Windows default",
+          "d23b43c5be": "Setup Script Location",
+          "d78fc4fdef": "Loading distributions"
+        },
+        "TerminalSettingsPreview": {
+          "d06664e889": "dark"
+        },
+        "TerminalThemeSections": {
+          "catalog_description": "Choose terminal themes and divider colors for dark and light mode.",
+          "f012172e21": "Choose the theme used for terminal panes in dark mode.",
+          "target_label": "Theme Mode"
+        },
+        "VoicePane": {
+          "901985625d": "toggle",
+          "b6536a1d12": "extracting"
+        },
+        "WslCliRegistration": {
+          "41a1480d3e": "install",
+          "7c3bb36706": "remove",
+          "e2b0ee267f": "stale"
+        },
+        "ZcodePlanAccountsSection": {
+          "keyRequired": "GLM Coding Plan API key is required."
+        },
+        "accounts": {
+          "search": {
+            "d1d2ae383c": "Paste your opencode.ai session cookie for rate limit fetching."
+          }
+        },
+        "artifacts": {
+          "account": "Orca account",
+          "connected": "Connected",
+          "enable": "Enable Artifacts",
+          "enableDescription": "Add Artifacts to the sidebar so you can open and delete shared files.",
+          "openArtifactsDescription": "View and delete links shared through your account.",
+          "signInRequired": "Sign in is required to upload and manage artifacts."
+        },
+        "auto": {
+          "rename": {
+            "branch": {
+              "search": {
+                "427f2cd1eb": "Auto-Rename Branch"
+              }
+            }
+          }
+        },
+        "bitbucket": {
+          "credentials": {
+            "dialog": {
+              "remoteRuntime": "Bitbucket credentials saved here are stored on this local machine only. Set ORCA_BITBUCKET_* environment variables on the remote runtime instead."
+            }
+          }
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "This device"
+        },
+        "experimental": {
+          "search": {
+            "10b52f79c1": "worktrees",
+            "244a0ecd3d": "activity",
+            "3021571c30": "shared",
+            "3028f0bd3a": "link",
+            "44c7f209d5": "node_modules",
+            "4ad605f222": "env",
+            "4d63251595": "Threaded left-sidebar feed for agent completions and blocking states.",
+            "603d29ed74": "Automatically materialize configured files or folders into newly created worktrees using APFS clone-copy on macOS when possible, otherwise symlinks.",
+            "78c2a8dc74": "Shared paths on worktrees",
+            "92a9357d1f": "agents view",
+            "bff1ff7768": "symlinks",
+            "c387565812": "symlink",
+            "ca5d1f3f46": "timeline",
+            "ccc5548ac5": "Agents View",
+            "d01b3882ba": "notifications",
+            "d23ae13990": "worktree",
+            "f082788cfe": "links",
+            "fa72e71f05": "agents",
+            "fe5688b761": "sidebar",
+            "nativeChat": {
+              "description": "Open supported new agents in Chat UI.",
+              "queue": "queue"
+            }
+          }
+        },
+        "general": {
+          "search": {
+            "27d9b996ba": "codex",
+            "3c30fe2d51": "gemini",
+            "41c2f9a025": "default",
+            "5baf51c4d9": "open claude",
+            "5d9ba08673": "copilot",
+            "5fdf1dc2d1": "omp",
+            "8436ff6f8e": "Proxy Bypass Rules",
+            "882c4896fd": "opencode",
+            "8ea37a05bc": "agent",
+            "9b0bc30160": "pi",
+            "9da6c875e5": "dock",
+            "aea7d2cccb": "openclaude",
+            "c29f23ab57": "HTTP Proxy",
+            "c61b14be7c": "grok",
+            "db11502270": "Default Agent",
+            "e2da948f59": "Pre-select an AI coding agent in the new-workspace composer.",
+            "e3b1d42f95": "Proxy URL for Orca network requests and local terminal children.",
+            "e55d62dfa4": "launchpad",
+            "eb8946b2c9": "Hosts that should bypass the configured HTTP proxy.",
+            "f472e97440": "aider"
+          }
+        },
+        "integrations": {
+          "search": {
+            "c97d58a0f3": "Bitbucket Cloud authentication via API token environment variables."
+          }
+        },
+        "jira": {
+          "integration": {
+            "card": {
+              "09742875cd": "Jira",
+              "09d310e42d": "you@example.com",
+              "1666f8d562": "Create an Atlassian API token",
+              "1ab7f551f3": "Atlassian API token",
+              "255bfe98ec": "Test",
+              "27dae4ab60": "https://example.atlassian.net",
+              "2e8bb790fd": "Connect",
+              "33a8b261ee": "Update credentials",
+              "3df81cb0ac": "ok",
+              "5936977fcd": "Cancel",
+              "5fb1562315": "error",
+              "74f3063026": "{{value0}} site{{value1}} connected",
+              "8ff73fef62": "Jira tokens are encrypted by the active runtime and stored locally. Re-entering the same site URL and email replaces that site's API token.",
+              "9046a20d4c": "Disconnect {{value0}}",
+              "9a9f8d4910": "Connect Jira Cloud to browse, create, and link issues.",
+              "9bb34706ca": "Connected",
+              "a28f417220": "Connect Jira",
+              "ab350991b8": "Verified",
+              "cec06a0f79": "Testing…",
+              "d5c5b47bb9": "update",
+              "d914d7ab70": "Verifying…",
+              "eaffa454e9": "Update",
+              "efaab83c5d": "Add site",
+              "fb854902d9": "connecting"
+            }
+          }
+        },
+        "managedServers": {
+          "access": {
+            "link": "Use SSH",
+            "linked": "{{name}} via SSH",
+            "target": "Reach through SSH host",
+            "title": "SSH access for paired servers"
+          },
+          "deploy": {
+            "hostPlaceholder": "Choose an empty SSH host",
+            "running": "Deploying…",
+            "submit": "Deploy server"
+          },
+          "outcome": {
+            "activeServer": "Not done: this server is the default host for new projects. Choose another one in Advanced before stopping it."
+          },
+          "title": "Orca on your SSH hosts"
+        },
+        "mobile": {
+          "settings": {
+            "search": {
+              "b730ff7049": "experimental"
+            }
+          }
+        },
+        "providerAccountScope": {
+          "localCredentials": "Credentials and account checks for this provider are owned by this desktop client. To use a server, change Settings > Remote Orca Servers > Advanced > Default host for new projects.",
+          "localMac": "Local Mac",
+          "remoteServerCredentials": "Credentials and account checks for this provider are owned by this remote server. To use another host, change Settings > Remote Orca Servers > Advanced > Default host for new projects."
+        },
+        "repository": {
+          "search": {
+            "availableHosts": "Available Hosts",
+            "availableHostsDescription": "Hosts where this project is set up.",
+            "host": "host",
+            "remote": "remote",
+            "ssh": "ssh",
+            "vm": "vm"
+          }
+        },
+        "runtime": {
+          "environments": {
+            "search": {
+              "4575341c77": "Add a saved remote Orca server, generate a pairing URL, or choose the default host for new projects."
+            }
+          }
+        },
+        "settingOwnership": {
+          "clientDefaultProjectScopes": "Client default + project scopes",
+          "terminalQuickCommands": "Commands are saved on this client, then scoped globally or to a project setup so they run from the selected terminal context."
+        },
+        "shareSkills": {
+          "refreshLinks": "Refresh",
+          "showButton": "Show Skills button"
+        },
+        "ssh": {
+          "search": {
+            "62826efbe9": "Add a new remote SSH target.",
+            "74c6d90d78": "Manage remote SSH targets."
+          }
+        },
+        "sshManagedHostRemove": {
+          "description": "Orca runs on {{label}}. Under Orca on your SSH hosts, use Stop… to remove Orca from the host, or Forget… if the host is gone. Then you can remove this SSH host.",
+          "open": "Open Orca on your SSH hosts"
+        },
+        "terminal": {
+          "search": {
+            "2610ee3b56": "Where the repository setup script runs when a new workspace is created: a vertical split (default), a horizontal split, or a background tab titled 'Setup'.",
+            "4529806908": "setup",
+            "5be2d67678": "Setup Script Location",
+            "6b659fff2a": "script",
+            "7a48c7715b": "workspace",
+            "b872de3926": "location",
+            "c047f398cc": "launch",
+            "de7bc1d5f5": "split",
+            "f44643328e": "tab",
+            "fd6c24313d": "new"
+          },
+          "windows": {
+            "search": {
+              "02c772582a": "linux",
+              "1f402b3651": "WSL Distribution",
+              "2b4a340ce0": "distribution",
+              "4ee2579c32": "ubuntu",
+              "5074ad8b5f": "distro",
+              "6e3adf4cba": "wsl",
+              "978457945b": "Choose which WSL distribution new WSL terminals and local agent scans use.",
+              "fc564eadaf": "debian"
+            }
+          }
+        },
+        "wslHosts": {
+          "remove": "Remove"
         }
       },
       "sidebar": {
@@ -1226,6 +2036,435 @@
             }
           }
         }
+      },
+      "CodexRestartChip": {
+        "9263e75f49": "Codex is using the previous account"
+      },
+      "JiraIssueWorkspace": {
+        "2a829a2f00": "priority",
+        "54649eaeab": "+ Assignee",
+        "693be070d0": "transition",
+        "9ebee71962": "labels",
+        "b8e2079d96": "assignee",
+        "def3d0e824": "title"
+      },
+      "Landing": {
+        "16e9e3df89": "starred",
+        "ce44fad849": "Missing dependencies",
+        "f05d237049": "Add a project first"
+      },
+      "LinearIssueTextEditor": {
+        "00fa439dc7": "title",
+        "75294b07d1": "description"
+      },
+      "LinearIssueWorkspace": {
+        "9e3c49beb8": "Copy issue identifier",
+        "af6e02c44a": "page",
+        "f5a6b38a14": "sheet"
+      },
+      "NewWorkspaceComposerCard": {
+        "0e587e31fb": "yaml",
+        "2132b670da": "both",
+        "7711ad5122": "Local setup command",
+        "addHostHint": "Register another machine or Orca server",
+        "cloneDestinationPlaceholder": "/parent/directory/on/host",
+        "cloneHostSetup": "Clone",
+        "cloneProjectOnHost": "Clone project",
+        "cloneUrlPlaceholder": "https://github.com/owner/repo.git",
+        "cloningHostSetup": "Cloning...",
+        "connectSourceLookup": "Connect",
+        "e5db1b0419": "Combined setup command",
+        "importExistingFolderOnHost": "Import existing folder",
+        "importHostSetup": "Import",
+        "importingHostSetup": "Importing...",
+        "reconnectSourceLookup": "Reconnect",
+        "setupHostExistingFolderHelp": "Link a checkout that already exists there, then create this workspace on that host.",
+        "setupHostExistingFolderPlaceholder": "/path/to/project/on/host",
+        "setupHostExistingFolderTitle": "Set up {{value0}}",
+        "setupKindFolder": "Folder",
+        "setupKindGit": "Git repo"
+      },
+      "StarNagCard": {
+        "68a41bc3aa": "Could not star with",
+        "73dfd4eb8d": "Don't ask again",
+        "92b0f9d921": "is authenticated and try again.",
+        "996bf76e46": "Open GitHub to finish in your browser.",
+        "cd8c34aac1": "gh",
+        "cf82170065": "Could not star the repo. Make sure"
+      },
+      "Terminal": {
+        "cdc9ac4b2d": "editor"
+      },
+      "UpdateCard": {
+        "522df222b9": "spinner",
+        "7ffc08506e": "check",
+        "d5253b54af": "error"
+      },
+      "artifacts": {
+        "ArtifactsPage": {
+          "openArtifact": "Open artifact",
+          "signInCopy": "Sign in to view and manage artifacts shared through your account.",
+          "signInHeading": "Sign in to Orca"
+        },
+        "artifact-publish-flow": {
+          "5cb4f5ec36": "Copy link"
+        }
+      },
+      "browser": {
+        "pane": {
+          "BrowserPane": {
+            "1c78adc73d": "Open Externally",
+            "26615e116b": "error",
+            "31375046b7": "Download from {{value0}}",
+            "3c085f638d": "Copy failed page URL",
+            "5f66313863": "annotation",
+            "8aec5bc044": "idle",
+            "8b6fab9ffa": "Save",
+            "93be92f8d1": "Copy Address",
+            "a3508d7e6e": "{{value0}} annotation{{value1}} ready. Select another element or copy all feedback.",
+            "a5dcd0fd1d": "confirming",
+            "b2856516e2": "Can't load this page",
+            "c6be71329e": "Refresh",
+            "c8bc7f1f9e": "requested",
+            "da68d35f7b": "Open failed page in default browser",
+            "db325a7eeb": "Can't reach {{value0}}",
+            "e72dfa268a": "annotate",
+            "e7ca5a098c": "success"
+          },
+          "BrowserToolbarMenu": {
+            "6aa42813e4": "Imported {{value0}} cookies from {{value1}}{{value2}}."
+          }
+        },
+        "profile": {
+          "user": {
+            "agent": {
+              "option": {
+                "04af3dc12b": "Use unmodified user agent",
+                "5bf47a3c91": "May improve Google sign-in, but can reduce compatibility with bot-protected sites."
+              }
+            }
+          }
+        }
+      },
+      "contextual": {
+        "tours": {
+          "ContextualTourControl": {
+            "02e8373219": "Auto-generates a new name when you leave this text box empty."
+          },
+          "ContextualTourOverlaySurface": {
+            "ffa4412b66": "next"
+          }
+        }
+      },
+      "crash": {
+        "report": {
+          "CrashReportDialog": {
+            "56a3dfa283": "Failed to send crash report.",
+            "835037edc9": "· Orca",
+            "b175e90213": "No crash report is available.",
+            "b2e36f53a1": "Failed to send crash report. Diagnostic ticket {{value0}} was uploaded but not linked."
+          }
+        }
+      },
+      "emulator": {
+        "pane": {
+          "emulator": {
+            "device": {
+              "frame": {
+                "0022420df0": "phone"
+              }
+            },
+            "unavailable": {
+              "pane": {
+                "b2c268a0b9": "Mobile Emulator is macOS only",
+                "f630b9ca9f": "Mobile Emulator requires a Mac with Xcode and the iOS Simulator runtime. On Linux or Windows, use a physical device or a remote Mac build host."
+              }
+            }
+          }
+        }
+      },
+      "feature": {
+        "tips": {
+          "CmdJPaletteFeatureTipVisual": {
+            "0418f9becc": "open",
+            "379d776971": "typing",
+            "d20ccf1e61": "done"
+          }
+        },
+        "wall": {
+          "ComputerUseAnimatedVisual": {
+            "1719b28a81": "found \"Approve\"",
+            "2adb561b44": "Claude Code session started",
+            "3cc2df3671": "Done",
+            "6804cb356f": "click sent",
+            "79445f7512": "approve the note in my app",
+            "94787f01f8": "Claude Code",
+            "9634d870d1": "Approve",
+            "99a8624bcb": ">",
+            "9cddfe96b2": "Local app",
+            "bdd5312213": "Pending",
+            "c11dda000b": "Approved",
+            "d8401975b1": "approved",
+            "f27676a92c": "status:"
+          },
+          "FeatureWallSetupChecklist": {
+            "b1f1981c5e": "See tasks"
+          },
+          "ReviewAnimatedVisual": {
+            "8ab622e4d6": "notes",
+            "8df4d52b68": "pr-view"
+          },
+          "TasksAnimatedVisual": {
+            "72f9e516a3": "pressing"
+          },
+          "agents": {
+            "orchestration": {
+              "orchestration": {
+                "cards": {
+                  "da6f1f97c9": "working"
+                }
+              },
+              "steps": {
+                "description": "Enable agents to manage and coordinate Orca workspaces to execute larger tasks.",
+                "name": "Orchestration",
+                "subtitle": "Orchestration"
+              },
+              "types": {
+                "claudeBeat1": "Wiring withSession middleware…",
+                "claudeInitial": "Sketching withSession middleware…",
+                "codexBeat1": "Adding the email_verified column…",
+                "codexInitial": "Writing the users table migration…",
+                "coordinatorBeat1": "PR 1/2 ready",
+                "coordinatorBeat2": "PR 2/2 ready",
+                "coordinatorInitial": "Splitting auth rewrite into 2 PRs…"
+              }
+            }
+          }
+        }
+      },
+      "floating": {
+        "terminal": {
+          "FloatingTerminalPanel": {
+            "25d7817f79": "terminal"
+          },
+          "FloatingTerminalWindowControls": {
+            "1e502f1284": "Open"
+          }
+        }
+      },
+      "linear-issue-attribute-filter-dropdowns": {
+        "optionsFromTeam": "Options from {{team}}"
+      },
+      "mobile": {
+        "MobileHero": {
+          "79d2f480da": "Network interface to advertise",
+          "7af266b80d": "Install QR code",
+          "bb0074ce11": "Pairing QR code",
+          "ca85e595a7": "No interfaces found",
+          "relayDegradedNotice": "Relay couldn’t be reached — this code only works on your LAN or Tailscale."
+        },
+        "MobilePage": {
+          "1b4509a8a1": "paired",
+          "c5909374cf": "intro"
+        },
+        "MobilePageToolbar": {
+          "a4f8c2d91e": "Hide from sidebar",
+          "b7e3d1c84a": "Show in sidebar"
+        },
+        "mobile": {
+          "platform": {
+            "copy": {
+              "2a532d6fd7": "Scan with your Android camera to download the latest APK from GitHub Releases.",
+              "432db52b73": "Scan with your iPhone camera to open the App Store."
+            }
+          }
+        },
+        "slides": {
+          "WorktreeListSlide": {
+            "c5ad56786d": "spinner"
+          }
+        }
+      },
+      "new": {
+        "workspace": {
+          "SmartWorkspaceNameField": {
+            "69ce292138": "linear",
+            "9c004911c3": "gitlab"
+          }
+        }
+      },
+      "shared": {
+        "useDaemonActions": {
+          "28c8e53176": "This force-quits every running terminal pane across all workspaces. Any unsaved work in those sessions is lost. The daemon itself keeps running, and new terminals can be opened immediately. This can't be undone.",
+          "2b4efdc162": "Couldn’t kill sessions.",
+          "63520148e2": "{{value0}} session refused to exit.",
+          "87412c2a68": "Killed {{value0}} session.",
+          "a2f040ac1c": "Killed {{value0}} sessions.",
+          "baad8cd651": "No sessions running.",
+          "cc0a26cb14": "{{value0}} sessions refused to exit.",
+          "d18f3005c2": "{{value0}} session{{value1}} refused to exit.",
+          "d6372cc797": "Killed {{value0}} session{{value1}}.",
+          "fe2ab66d45": "Killed {{value0}} of {{value1}} sessions. {{value2}} refused to exit."
+        }
+      },
+      "sparse": {
+        "SparseCheckoutPresetSelect": {
+          "064c1e2d12": "Renderer UI",
+          "0e9ad9c798": "Directories",
+          "14952d451e": "{{value0}} directories",
+          "69c020eddc": "Edit preset",
+          "7c3275d307": "Edit {{value0}}",
+          "8b12c0850a": "Save",
+          "b3a500c623": "Name",
+          "bd6cec2056": "new",
+          "c7f9b3f0c1": "Off",
+          "ddbcaef7be": "src/renderer packages/ui",
+          "de8fce5854": "Cancel",
+          "e9283eb171": "1 directory"
+        }
+      },
+      "tab": {
+        "bar": {
+          "BrowserTab": {
+            "2186a8407c": "Split Down",
+            "7e8106899f": "Split Left",
+            "96354ed249": "Split Up",
+            "966feb9ad5": "Split Right"
+          },
+          "EditorFileTabCloseButton": {
+            "a768f428f1": "Close tab"
+          },
+          "EditorFileTabContextMenu": {
+            "1d04b1630b": "Split Down",
+            "6b3efb106e": "Split Up",
+            "e3ff145b98": "Split Left",
+            "f7c3d7d5af": "Split Right"
+          },
+          "QuickLaunchButton": {
+            "chatLoading": "Checking chat support…",
+            "hostUnreachable": "Can’t reach this workspace’s host to list its agents",
+            "needsServerUpdate": "Update Orca on this server to list this workspace’s agents"
+          },
+          "SortableTabContextMenu": {
+            "0ce4bae39d": "Split Left",
+            "21132389e9": "Split Right",
+            "591f9b12c1": "Split Up",
+            "af80ed83c1": "Split Down"
+          },
+          "TabBar": {
+            "ab589350e5": "Could not build launch command for {{value0}}."
+          },
+          "TabBarQuickCommandsButton": {
+            "c781f992e4": "destructive"
+          },
+          "shell": {
+            "icons": {
+              "d4ceaa227c": "Git"
+            }
+          },
+          "tab": {
+            "create": {
+              "entry": {
+                "classifier": {
+                  "42e6262ae9": "No action available.",
+                  "5553b283ce": "Enter a URL or file path."
+                }
+              }
+            }
+          }
+        },
+        "group": {
+          "AiVaultSessionDropLayer": {
+            "localSessionSshWorkspaceUnsupported": "This session's history is stored on this machine, so it can't resume in an SSH workspace. Drop it onto a local workspace instead.",
+            "localWorkspacesOnly": "Resume from history is only available in local workspaces.",
+            "openLocalWorkspace": "Open a local workspace before resuming a session."
+          },
+          "TabGroupPanel": {
+            "0db2081805": "Split Up",
+            "1bce81dba6": "simulator",
+            "1ff1c77616": "browser",
+            "30137df7d0": "Split Left",
+            "4df2a06d36": "Split Down",
+            "586d2ac445": "terminal",
+            "ab1e2bff04": "Split Right",
+            "addSplitPane": "Add split pane",
+            "f7d6ce445e": "Close Group"
+          }
+        }
+      },
+      "ui": {
+        "repo": {
+          "multi": {
+            "combobox": {
+              "286ce70256": "SSH"
+            }
+          }
+        }
+      },
+      "workspace": {
+        "cleanup": {
+          "WorkspaceCleanupDialog": {
+            "06cf78521e": "Select all in {{value0}}",
+            "0a2e3c7cba": "Review",
+            "0c6672f5e3": "Ignored cleanup suggestions",
+            "0f00612b6d": "Removed {{value0}} workspace{{value1}}",
+            "1b18868569": "need review",
+            "1bffc07ba7": "View {{value0}}",
+            "2b31bf68de": "inactive",
+            "2ddbd6fe8a": "checked",
+            "37ab28277e": "not suggested",
+            "3d957ff117": "No workspaces match these filters.",
+            "41d594d01e": "{{value0}} workspace{{value1}} could not be removed",
+            "4719327c9c": "All cleanup suggestions are ignored.",
+            "4b93a235d8": "Suggested",
+            "592fbab446": "Sorted by oldest activity",
+            "5bf2e88480": "{{value0}}/{{value1}} {{value2}} scanned",
+            "73690b0031": "Unselect all in {{value0}}",
+            "8b74d4ea6e": "Scanning worktrees and git state, then combining open tab, terminal, live agent, and remote availability signals before suggesting deletions.",
+            "93b7381d50": "Filters",
+            "97c772c4fe": "No inactive workspaces found in checked repositories.",
+            "9a3be9f2df": "Scanning workspaces. New rows appear here as they finish. You can close this and come back.",
+            "a19040cd67": "No inactive workspaces match the selected repos.",
+            "a615e24679": "Sort",
+            "aaee139eab": "Restore ignored suggestions",
+            "ac5ba84cc1": "selected",
+            "ageFilter": "Age",
+            "b299f201b9": "safe to remove",
+            "bc43c37faf": "hidden",
+            "c4f4782c02": "Not suggested",
+            "cbf2f664e2": "Delete",
+            "contextFilter": "Context",
+            "d1094dd529": "Needs review",
+            "d3eef9463d": "No inactive workspaces to delete.",
+            "dba753e94f": "to delete",
+            "e0b5a4deaa": "Review inactive workspaces before deleting their local files and Orca state.",
+            "e94b1f8bb4": "Clear filters",
+            "ee81adfcef": "View",
+            "efb3843e75": "Filter and sort workspaces",
+            "f637f63882": "Resource Manager counts {{value0}}; this list found {{value1}}. That counter reads Orca's activity record alone, while this scan also checks each workspace's git history and skips disconnected remotes.",
+            "f68d538c63": "No workspaces in this cleanup set.",
+            "fc49f79434": "mixed",
+            "gitFilter": "Git",
+            "readyStatus": "Ready",
+            "reviewFilter": "Review",
+            "searchPlaceholder": "Search workspaces",
+            "sortBy": "Sort by",
+            "sortDirection": "Direction"
+          },
+          "backgroundRemoval": {
+            "removed": "Removed workspaces: {{value0}}"
+          },
+          "candidateRow": {
+            "contextCount": "Context: {{value0}}"
+          }
+        },
+        "space": {
+          "WorkspaceSpacePage": {
+            "45f6302dbc": "Space",
+            "8d0048e1cb": "Workspace disk usage and reclaimable worktree storage.",
+            "e8d6ba11ab": "Beta"
+          }
+        }
       }
     },
     "hooks": {
@@ -1256,6 +2495,37 @@
     "runtime": {
       "githubCheckDetailsTimeout": {
         "timedOut": "Timed out loading check details."
+      }
+    },
+    "App": {
+      "1b9d9d065f": "settings",
+      "332dbfa497": "Workspace uploaded",
+      "3443924e91": "automations",
+      "4f08ae8311": "tasks",
+      "62ca9895a7": "space",
+      "844eb0f4f4": "activity",
+      "9f0152563e": "mobile",
+      "ca6c6eece7": "skills",
+      "d54e66004c": "terminal"
+    },
+    "store": {
+      "slices": {
+        "settings": {
+          "faa8fb83dd": "Save or close unsaved editor tabs before switching servers."
+        },
+        "worktrees": {
+          "19db0085fb": "Local branch deleted",
+          "2b0afc7f14": "Could not keep local {{value0}} up to date",
+          "34a03a6565": "Keep {{value0}} up to date",
+          "4a18052018": "Local {{value0}} is behind {{value1}}",
+          "4e6496f3d2": "{{value0}} deleted, branch kept",
+          "5a58e03a26": "Deleted \"{{value0}}\".",
+          "670864ab52": "Keeping local {{value0}} up to date",
+          "889487d8bb": "Dismiss",
+          "d1d78a7baa": "Git could not safely delete branch \"{{value0}}\"{{value1}}, so Orca kept it to avoid losing local commits.",
+          "f4503ca505": "Open Settings > Git and try again.",
+          "fa9299a66f": "Your new worktree is current, but local {{value0}} is {{value1}} {{value2}} behind. AI diffs may miss recent commits."
+        }
       }
     }
   },
@@ -1511,7 +2781,8 @@
         "workflow": "Background workflow"
       },
       "composer": {
-        "placeholder": "Ask anything, @ to mention files, / for commands"
+        "placeholder": "Ask anything, @ to mention files, / for commands",
+        "imageUnsupported": "Image paste is not supported for this agent."
       },
       "composerErrors": {
         "commandTakesNoArguments": "Use /{{name}} without arguments.",
@@ -1633,7 +2904,9 @@
         "usageLimitWindowSession": "session",
         "usageLimitWindowWeekly": "weekly",
         "usageLimitWindowWeeklyModel": "weekly model",
-        "writeFailed": "Orca couldn't hand this message to the agent, so it was not sent."
+        "writeFailed": "Orca couldn't hand this message to the agent, so it was not sent.",
+        "claudeAccountUnknown": "That Claude account is no longer saved. Choose another account.",
+        "claudeAccountWslUnsupported": "That Claude account is in WSL and can't run here. Choose another account."
       },
       "goalControl": {
         "pauseUnconfirmed": "Codex stopped running, but its goal pause was not confirmed. Check the goal before continuing.",
@@ -1881,6 +3154,12 @@
         "waitForStart": "Wait for the agent to finish starting.",
         "waitForTurn": "Wait for the agent to finish responding, or stop it.",
         "waitMoment": "Wait a moment."
+      },
+      "question": {
+        "other": "Other…"
+      },
+      "resumeInNewChat": {
+        "cannotResume": "This {{agent}} conversation can't be resumed in a native chat."
       }
     },
     "onboarding": {
@@ -2120,7 +3399,10 @@
       "permissionOverridesFollow_one": "{{count}} agent now follows {{mode}}",
       "permissionOverridesFollow_other": "{{count}} agents now follow {{mode}}",
       "permissionOverridesKept_one": "{{count}} agent still uses their own permission setting:",
-      "permissionOverridesKept_other": "{{count}} agents still use their own permission setting:"
+      "permissionOverridesKept_other": "{{count}} agents still use their own permission setting:",
+      "loadingHost": "Loading agent settings…",
+      "permissionChoiceDescription": "Applies where each agent supports this mode. Change one agent below.",
+      "permissionEachOwnDescription": "Orca adds nothing; each CLI uses its own config"
     },
     "diagnostics": {
       "errors": {
@@ -2171,6 +3453,24 @@
         "modifierOnly": "Press a key, not only a modifier.",
         "modifierRequired": "Include at least one modifier key.",
         "stringArrayRequired": "Use a string array."
+      }
+    },
+    "browser": {
+      "clientHostedRemote": {
+        "description": "Render remote workspace pages on this desktop; network traffic still goes through the remote host. Applies to new pages only.",
+        "title": "Host remote browser pages on this device"
+      },
+      "sshWorkspaceRouting": {
+        "description": "Browser pages in SSH workspaces send their traffic through the workspace's SSH host, with DNS resolved there. Off means pages browse from this machine.",
+        "enableHost": "Route again",
+        "probeAgain": "Check again",
+        "probeSkippedHosts": "Hosts routed without the connection check (Try anyway):",
+        "title": "Browse through SSH workspace hosts"
+      }
+    },
+    "sourceControl": {
+      "actionModel": {
+        "permissionsDefaultHint": "Terminals use Agent Permissions unless this action sets its own CLI arguments."
       }
     }
   },
@@ -2478,5 +3778,30 @@
       "ariaActiveCount_one": "Filter: {{count}} active.",
       "ariaActiveCount_other": "Filter: {{count}} active."
     }
+  },
+  "agentsSidebarIntro": {
+    "migrated": {
+      "action": "Open Agents"
+    },
+    "new": {
+      "action": "Try Agents",
+      "description": "See what your agents are working on, what is done, and where you need to step in.",
+      "hiddenToast": "Agents tab hidden. Re-enable it in Settings → Experimental.",
+      "hide": "Hide Agents",
+      "title": "Meet your Agents tab"
+    }
+  },
+  "fileExplorer": {
+    "root": {
+      "omittedFiles": "Files omitted by sparse checkout are not searched.",
+      "viewOnly": "Sparse checkout · View changes do not change checked-out files.",
+      "viewing": "Viewing: {{path}}"
+    }
+  },
+  "sparsePreset": {
+    "description": "Choose the folders a new workspace checks out.",
+    "findPath": "Find a folder…",
+    "finishEditing": "Save or cancel the preset to continue creating your workspace.",
+    "pathHelp": "One repository-relative directory per line. Spaces within a path are preserved."
   }
 }

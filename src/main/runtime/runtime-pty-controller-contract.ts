@@ -96,6 +96,10 @@ export type RuntimePtyController = {
     isNewSession?: boolean
     /** No renderer view exists at spawn; main owns delivery and query replies until one mounts. */
     initiallyHidden?: boolean
+    /** Replace this live PTY in the same pane (stop it, swap the binding), as the renderer's restart does. */
+    replacesPtyId?: string
+    /** Run a Claude launch on this managed account instead of the selected one (the session mover's resume). */
+    claudeAccountId?: string
     persistHostSessionBinding?: boolean
     expectedSourceBinding?: PtyBindingSourceExpectation
     placement?: TerminalPanePlacement

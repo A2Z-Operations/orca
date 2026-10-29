@@ -40,6 +40,11 @@ import {
 import { getWslAccountTarget } from './account-wsl-location'
 import { addDataAccount, listDataAccounts, mutateDataAccount } from './data-account-commands'
 import { formatAccountsBlock, formatDataAccounts } from './account-list-format'
+import { setClaudeAuthProxy } from './account-auth-proxy'
+import { setClaudeAutoSwitch } from './account-auto-switch'
+import { printClaudeAccountMoves } from './account-moves'
+import { setClaudeAccountPool } from './account-pool'
+import { setClaudeSessionMover } from './account-session-mover'
 
 type AccountsListSnapshot = {
   opencode?: ManagedDataAccountsState
@@ -298,5 +303,10 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
   'account rm': async (ctx) => {
     rejectAccountRemoteSelectionFlags(ctx, 'orca account rm')
     await mutateDataAccount(ctx, 'remove')
-  }
+  },
+  'account auth-proxy': setClaudeAuthProxy,
+  'account auto-switch': setClaudeAutoSwitch,
+  'account moves': printClaudeAccountMoves,
+  'account pool': setClaudeAccountPool,
+  'account session-mover': setClaudeSessionMover
 }

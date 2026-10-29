@@ -11,6 +11,7 @@ import {
   type PluginJsonValue
 } from '../../../shared/plugins/workers/plugin-host-api'
 import { shortPluginBranchName } from '../../../shared/plugins/events/plugin-events'
+import type { PluginClaudeAccountView } from '../../../shared/plugins/plugin-claude-account-contract'
 
 export type PluginWorktreeContext = {
   worktreeId: string
@@ -56,6 +57,9 @@ export type PluginHostServices = {
       value: PluginJsonValue
     ): { ok: true } | { ok: false; error: string }
   }
+  listClaudeAccounts():
+    | { accounts: PluginClaudeAccountView[] }
+    | Promise<{ accounts: PluginClaudeAccountView[] }>
 }
 
 type PluginHostMethodContext = { pluginId: string; services: PluginHostServices }
@@ -171,6 +175,10 @@ const HANDLERS: Record<PluginHostMethodName, BoundPluginHostMethod> = {
   })),
   'settings.set': bind(api['settings.set'], async ({ key, value }, { pluginId, services }) =>
     okOrThrow(services.settings.set(pluginId, key, value))
+  ),
+  'accounts.listClaudeAccounts': bind(
+    api['accounts.listClaudeAccounts'],
+    async (_params, { services }) => services.listClaudeAccounts()
   )
 }
 
