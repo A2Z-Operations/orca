@@ -11,4 +11,6 @@ export type ClaudeAccountSwitchSettings = {
   claudeSessionMover?: ClaudeSessionMoverSetting
   /** Absent means on. `!== false` keeps older persisted settings on the proxy. */
   claudeAuthProxy?: boolean
+  /** Absent means off. When on, a new Claude launch uses the account with the most room. */
+  claudeAccountPool?: 'off' | 'on'
 }

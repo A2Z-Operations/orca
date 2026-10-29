@@ -162,6 +162,15 @@ describe('ClaudeAccountService', () => {
     expect(f.notifiedWrites).toContainEqual({ claudeAutoSwitchEnabled: true })
   })
 
+  it('turns the account pool on where the accounts live, and reports it with the accounts', () => {
+    const f = fixture()
+    expect(f.service.listAccounts().pool).toBe('off')
+
+    expect(f.service.setAccountPool(true)).toMatchObject({ pool: 'on' })
+    expect(f.settings().claudeAccountPool).toBe('on')
+    expect(f.service.setAccountPool(false).pool).toBe('off')
+  })
+
   it("reports System default's login from the user's own folder", () => {
     const f = fixture()
     mkdirSync(join(f.root, 'personal'))

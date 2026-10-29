@@ -134,10 +134,35 @@ export type ClaudeRateLimitAccountsState = {
   sessionMover?: ClaudeSessionMoverSetting
   /** Whether launches bill through the local auth proxy; absent from older hosts. */
   authProxy?: 'on' | 'off'
+  /** Whether new Claude launches spread across accounts; absent from older hosts. Absent means off. */
+  pool?: 'on' | 'off'
+  /** Live sessions billed to each account. Absent from older hosts. */
+  assignedSessions?: { accountId: string; count: number }[]
+  /** Every live pane and the account it bills. The tab badge reads this snapshot. */
+  paneAccounts?: ClaudePaneAccountSnapshot[]
   /** Panes whose billed account differs from the folder they were spawned in. */
   paneAssignments?: { ptyId: string; accountId: string }[]
   /** The mover's last decision per live session, newest first. */
   sessionMoves?: ClaudeSessionMoveSummary[]
+}
+
+/** One live Claude pane and the account its next request bills. */
+export type ClaudePaneAccountSnapshot = {
+  ptyId: string
+  paneKey: string | null
+  accountId: string
+  /** Email local-part, or `local@domain` when two accounts share a local-part. */
+  label: string
+  email: string
+}
+
+/** Pushed when a pane's billed account changes, including when the pane is gone (`accountId` null). */
+export type ClaudePaneAssignedEvent = {
+  ptyId: string
+  paneKey: string | null
+  accountId: string | null
+  label: string
+  email: string
 }
 
 /** The session mover's last decision for a live Claude session (`orca account list --json`). */
@@ -151,6 +176,8 @@ export type ClaudeSessionMoveSummary = {
   line: number | null
   reason: string
   at: number
+  /** How a move of this pane would land. Absent from hosts that predate the pool surface. */
+  strategy?: 'resume' | 'proxy'
 }
 
 /** Orca moved Claude to another account before a usage limit, so running sessions can follow. */

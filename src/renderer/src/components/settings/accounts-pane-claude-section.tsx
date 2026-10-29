@@ -9,6 +9,7 @@ import { ClaudeIcon } from '../status-bar/icons'
 import { SearchableSetting } from './SearchableSetting'
 import { renderClaudeAutoSwitchSetting } from './accounts-pane-claude-auto-switch'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
+import { ClaudeAccountPoolSetting } from './claude-account-pool-setting'
 import { ClaudeAuthProxySetting } from './claude-auth-proxy-setting'
 import { ClaudeSessionMoverSetting } from './claude-session-mover-setting'
 import {
@@ -392,6 +393,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
         <>
           <ClaudeRunningSessionSwitchSetting settings={settings} updateSettings={updateSettings} />
           <ClaudeSessionMoverSetting settings={settings} updateSettings={updateSettings} />
+          <ClaudeAccountPoolSetting settings={settings} updateSettings={updateSettings} />
           <ClaudeAuthProxySetting settings={settings} updateSettings={updateSettings} />
         </>
       )}

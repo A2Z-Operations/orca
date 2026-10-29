@@ -150,6 +150,10 @@ export class ClaudeAccountService {
     return this.selection.setAuthProxy(enabled)
   }
 
+  setAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.selection.setAccountPool(enabled)
+  }
+
   setSessionMovesProvider(provider: (() => ClaudeSessionMoveSummary[]) | null): void {
     this.selection.setSessionMovesProvider(provider)
   }

@@ -35,6 +35,8 @@ export const SetClaudeSessionMoverParams = z.object({ setting: z.enum(['off', 'a
 
 export const SetClaudeAuthProxyParams = z.object({ enabled: z.boolean() })
 
+export const SetClaudeAccountPoolParams = z.object({ enabled: z.boolean() })
+
 export const SetClaudeAutoSwitchParams = z.object({ enabled: z.boolean() })
 
 export const SelectAccountParams = z.object({

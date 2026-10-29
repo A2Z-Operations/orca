@@ -41,6 +41,8 @@ import { addDataAccount, listDataAccounts, mutateDataAccount } from './data-acco
 import { formatAccountsBlock, formatDataAccounts } from './account-list-format'
 import { setClaudeAuthProxy } from './account-auth-proxy'
 import { setClaudeAutoSwitch } from './account-auto-switch'
+import { printClaudeAccountMoves } from './account-moves'
+import { setClaudeAccountPool } from './account-pool'
 import { setClaudeSessionMover } from './account-session-mover'
 
 type AccountsListSnapshot = {
@@ -297,5 +299,7 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
   },
   'account auth-proxy': setClaudeAuthProxy,
   'account auto-switch': setClaudeAutoSwitch,
+  'account moves': printClaudeAccountMoves,
+  'account pool': setClaudeAccountPool,
   'account session-mover': setClaudeSessionMover
 }

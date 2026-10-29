@@ -1,4 +1,5 @@
 import type { CommandHandler } from './dispatch'
+import { ACCOUNT_HANDLER_GROUP } from './account-handler-group'
 import { BROWSER_HANDLER_GROUPS } from './browser-handler-groups'
 import { JIRA_HANDLER_GROUP } from './jira-handler-group'
 import { LINEAR_HANDLER_GROUP } from './linear-handler-group'
@@ -33,19 +34,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     keys: ['serve service install', 'serve service status', 'serve service uninstall'],
     load: async () => (await import('./handlers/serve-service.js')).SERVE_SERVICE_HANDLERS
   },
-  {
-    name: 'account',
-    keys: [
-      'account add',
-      'account list',
-      'account select',
-      'account rm',
-      'account auth-proxy',
-      'account auto-switch',
-      'account session-mover'
-    ],
-    load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
-  },
+  ACCOUNT_HANDLER_GROUP,
   {
     name: 'artifacts',
     keys: [

@@ -20835,6 +20835,14 @@
       "nextLaunch": "{{value0}} → {{value1}}. Le prochain Claude que vous démarrez l'utilise. Les sessions en cours conservent leur compte.",
       "profileSwitching": "Le changement s'applique au prochain Claude que vous démarrez dans n'importe quel onglet. Les sessions en cours conservent leur compte.",
       "systemDefault": "Valeur par défaut du système",
+      "pool": {
+        "settingTitle": "Répartir les sessions entre les comptes",
+        "settingDescription": "Les nouvelles sessions Claude démarrent sur le compte connecté qui a le plus de marge.",
+        "sessionsOne": "1 session",
+        "sessionsOther": "{{count}} sessions",
+        "badge": "Réparti",
+        "paneBadge": "Compte Claude {{label}}"
+      },
       "unnamedAccount": "Compte Claude",
       "systemDefaultNamed": "Système par défaut : {{value0}}",
       "systemDefaultIsSaved": "Système par défaut est connecté en tant que {{value0}}, qui est aussi un compte enregistré. Une version antérieure d'Orca a peut-être copié cette connexion à cet endroit. S'il ne s'agit pas de votre propre connexion, sélectionnez Système par défaut et exécutez claude /login.",

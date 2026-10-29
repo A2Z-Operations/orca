@@ -33,7 +33,9 @@ function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
     (commandPath[0] === 'account' &&
       commandPath[1] !== 'auto-switch' &&
       commandPath[1] !== 'session-mover' &&
-      commandPath[1] !== 'auth-proxy') ||
+      commandPath[1] !== 'auth-proxy' &&
+      commandPath[1] !== 'pool' &&
+      commandPath[1] !== 'moves') ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||
     // Paired servers come from the local store; routing SSH lookup would mix two machines in one list.

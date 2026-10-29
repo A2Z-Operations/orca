@@ -428,4 +428,50 @@ describe('runtime-selector flags on locally pinned CLI commands', () => {
     expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
     expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAuthProxy', { enabled: false })
   })
+
+  it('routes `account pool --environment` to the named server too', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
+    callMock.mockImplementation(async (method: string) => {
+      if (method === 'accounts.setClaudeAccountPool') {
+        return okFixture('req_account_pool', {
+          accounts: [],
+          activeAccountId: null,
+          pool: 'on'
+        })
+      }
+      throw new Error(`unexpected ${method}`)
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    runtimeClientConstructorMock.mockClear()
+
+    await main(
+      ['account', 'pool', '--agent', 'claude', '--on', '--environment', 'm4air', '--json'],
+      '/tmp/repo'
+    )
+
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual({ pool: 'on' })
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
+    expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAccountPool', { enabled: true })
+  })
+
+  it('routes `account moves --environment` to the named server too', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
+    callMock.mockImplementation(async (method: string) => {
+      if (method === 'accounts.list') {
+        return okFixture('req_account_moves', {
+          claude: { accounts: [], activeAccountId: null, sessionMoves: [] },
+          codex: { accounts: [], activeAccountId: null }
+        })
+      }
+      throw new Error(`unexpected ${method}`)
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    runtimeClientConstructorMock.mockClear()
+
+    await main(['account', 'moves', '--environment', 'm4air', '--json'], '/tmp/repo')
+
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual([])
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
+    expect(callMock).toHaveBeenCalledWith('accounts.list', { refreshUsage: false })
+  })
 })

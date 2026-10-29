@@ -1,5 +1,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { claudeSessionCountLabel } from '@/components/tab-bar/ClaudePaneAccountBadge'
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -294,7 +296,14 @@ export function ClaudeSwitcherMenu({
       onOpenChange={handleOpenChange}
     >
       <DropdownMenuLabel>
-        {translate('auto.components.status.bar.StatusBar.d450654fa2', 'Claude Account')}
+        <span className="inline-flex items-center gap-2">
+          {translate('auto.components.status.bar.StatusBar.d450654fa2', 'Claude Account')}
+          {accounts.pool === 'on' ? (
+            <Badge variant="hostContext" className="text-3xs">
+              {translate('accounts.claude.pool.badge', 'Pool')}
+            </Badge>
+          ) : null}
+        </span>
       </DropdownMenuLabel>
       <DropdownMenuItem
         onSelect={(event) => {
@@ -327,6 +336,8 @@ export function ClaudeSwitcherMenu({
               const inactiveUsage = target.id
                 ? inactiveClaudeAccounts.find((a) => a.accountId === target.id)
                 : null
+              const sessionCount =
+                accounts.assignedSessions?.find((row) => row.accountId === target.id)?.count ?? 0
               // Why local only: the hidden sign-in runs on this device, not a remote server.
               const signInId = target.needsSignIn && !hasActiveRuntimeEnvironment ? target.id : null
 
@@ -350,6 +361,11 @@ export function ClaudeSwitcherMenu({
                   <div className="flex w-full flex-col gap-0.5">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="min-w-0 flex-1 truncate">{target.label}</span>
+                      {sessionCount > 0 ? (
+                        <span className="shrink-0 text-3xs text-muted-foreground">
+                          {claudeSessionCountLabel(sessionCount)}
+                        </span>
+                      ) : null}
                       {target.active ? (
                         <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
                           {translate('auto.components.status.bar.StatusBar.ff0fbe9311', 'Active')}

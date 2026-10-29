@@ -9,6 +9,7 @@ import {
   inferClaudeAccountIdFromTranscript,
   listClaudePaneAccounts,
   listClaudePaneAccountsByAccount,
+  onClaudePaneAssigned,
   recordClaudePaneAccount,
   rememberClaudeSessionAssignment,
   setClaudePaneProxySlotReleaser,
@@ -30,6 +31,25 @@ function record(ptyId: string, accountId: string, pinned = false): ClaudePaneAcc
 describe('claude pane account registry', () => {
   afterEach(() => {
     _internals.reset()
+  })
+
+  it('publishes when the billed account changes and when the pane is forgotten', () => {
+    const notices: { ptyId: string; accountId: string | null }[] = []
+    const stop = onClaudePaneAssigned((notice) => {
+      notices.push({ ptyId: notice.ptyId, accountId: notice.accountId })
+    })
+    recordClaudePaneAccount(record('pty-1', 'a'))
+    recordClaudePaneAccount(record('pty-1', 'a'))
+    assignClaudePaneAccount('pty-1', 'b')
+    forgetClaudePaneAccount('pty-1')
+    forgetClaudePaneAccount('missing')
+    stop()
+    recordClaudePaneAccount(record('pty-2', 'a'))
+    expect(notices).toEqual([
+      { ptyId: 'pty-1', accountId: 'a' },
+      { ptyId: 'pty-1', accountId: 'b' },
+      { ptyId: 'pty-1', accountId: null }
+    ])
   })
 
   it('records, lists and forgets the account a PTY runs on', () => {
