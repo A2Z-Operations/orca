@@ -79,6 +79,33 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['account', 'pool'],
+    summary: 'Spread new Claude sessions across signed-in accounts',
+    usage: 'orca account pool --agent claude (--on | --off) [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off'],
+    notes: [
+      'Writes the host setting behind Settings › Accounts › Claude › "Spread sessions across accounts" (accounts.setClaudeAccountPool). Default off.',
+      'On: a new Claude session starts on the signed-in account with the most room left. Off: launches use the selected account.',
+      'With --environment the setting is written on that paired Orca server. `orca account list` shows pool: on|off and sessions: <count> on each account.'
+    ],
+    examples: [
+      'orca account pool --agent claude --on',
+      'orca account pool --agent claude --off --environment macstudio'
+    ]
+  },
+  {
+    path: ['account', 'moves'],
+    summary: "Show the Claude session mover's last decision for each live session",
+    usage: 'orca account moves [--agent claude] [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent'],
+    notes: [
+      'Reads claude.sessionMoves from accounts.list on the runtime that owns the sessions.',
+      'Each line is the time, the pane (or pty when the pane key is absent), from → to, the reason, and the strategy (resume or proxy). A host that predates strategies prints -.',
+      'With --environment the decisions are read from that paired Orca server. --json prints the sessionMoves array.'
+    ],
+    examples: ['orca account moves', 'orca account moves --environment macstudio --json']
+  },
+  {
     path: ['account', 'auth-proxy'],
     summary:
       'Bill Claude through a local auth proxy so a session can change accounts without restarting',

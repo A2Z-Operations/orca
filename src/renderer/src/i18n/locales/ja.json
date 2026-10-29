@@ -20897,6 +20897,14 @@
       "nextLaunch": "{{value0}} → {{value1}}。次に起動する Claude はこれを使用します。実行中のセッションはそれぞれのアカウントを維持します。",
       "profileSwitching": "切り替えは、任意のタブで次に起動する Claude に適用されます。実行中のセッションはそれぞれのアカウントを維持します。",
       "systemDefault": "システムのデフォルト",
+      "pool": {
+        "settingTitle": "セッションをアカウントに分散",
+        "settingDescription": "新しい Claude セッションは、残りが多いアカウントで始まります。",
+        "sessionsOne": "1 セッション",
+        "sessionsOther": "{{count}} セッション",
+        "badge": "分散",
+        "paneBadge": "Claude アカウント {{label}}"
+      },
       "unnamedAccount": "Claude アカウント",
       "systemDefaultNamed": "システムのデフォルト: {{value0}}",
       "systemDefaultIsSaved": "システムのデフォルトは {{value0}} としてサインインしており、これは保存済みのアカウントでもあります。以前のバージョンの Orca がそのログインをここにコピーした可能性があります。自分のログインでない場合は、システムのデフォルトを選択して claude /login を実行してください。",

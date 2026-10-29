@@ -42,6 +42,28 @@ const records = new Map<string, ClaudePaneAccountRecord>()
 const sessionAssignments = new Map<string, string>()
 let releaseProxySlot: ((slot: string) => void) | null = null
 
+export type ClaudePaneAssignedNotice = {
+  ptyId: string
+  paneKey: string | null
+  /** Null when the pane left the registry. */
+  accountId: string | null
+}
+
+const paneAssignedListeners = new Set<(notice: ClaudePaneAssignedNotice) => void>()
+
+export function onClaudePaneAssigned(
+  listener: (notice: ClaudePaneAssignedNotice) => void
+): () => void {
+  paneAssignedListeners.add(listener)
+  return () => paneAssignedListeners.delete(listener)
+}
+
+function publishPaneAssigned(notice: ClaudePaneAssignedNotice): void {
+  for (const listener of paneAssignedListeners) {
+    listener(notice)
+  }
+}
+
 export function setClaudePaneProxySlotReleaser(release: ((slot: string) => void) | null): void {
   releaseProxySlot = release
 }
@@ -52,15 +74,32 @@ export function claudeBillingAccountId(record: ClaudePaneAccountRecord): string 
 }
 
 export function recordClaudePaneAccount(record: ClaudePaneAccountRecord): void {
+  const previous = records.get(record.ptyId)
   records.set(record.ptyId, record)
+  const nextAccountId = claudeBillingAccountId(record)
+  if (
+    !previous ||
+    claudeBillingAccountId(previous) !== nextAccountId ||
+    previous.paneKey !== record.paneKey
+  ) {
+    publishPaneAssigned({
+      ptyId: record.ptyId,
+      paneKey: record.paneKey,
+      accountId: nextAccountId
+    })
+  }
 }
 
 export function forgetClaudePaneAccount(ptyId: string): void {
   const record = records.get(ptyId)
-  if (record?.proxySlot) {
+  if (!record) {
+    return
+  }
+  if (record.proxySlot) {
     releaseProxySlot?.(record.proxySlot)
   }
   records.delete(ptyId)
+  publishPaneAssigned({ ptyId, paneKey: record.paneKey, accountId: null })
 }
 
 /** In-place so a mover view holding this record sees the account the proxy just flipped to. */
@@ -73,9 +112,13 @@ export function assignClaudePaneAccount(
   if (!record) {
     return false
   }
+  const previousAccountId = claudeBillingAccountId(record)
   record.assignedAccountId = accountId
   if (providerSessionId) {
     record.providerSessionId = providerSessionId
+  }
+  if (previousAccountId !== accountId) {
+    publishPaneAssigned({ ptyId, paneKey: record.paneKey, accountId })
   }
   return true
 }
@@ -150,5 +193,6 @@ export const _internals = {
     records.clear()
     sessionAssignments.clear()
     releaseProxySlot = null
+    paneAssignedListeners.clear()
   }
 }

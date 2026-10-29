@@ -16,6 +16,7 @@ import {
   RemoveAccountParams,
   SelectAccountParams,
   SelectCodexAccountForTargetParams,
+  SetClaudeAccountPoolParams,
   SetClaudeAuthProxyParams,
   ClaudeAuthProxyStatusParams,
   SetClaudeAutoSwitchParams,
@@ -159,6 +160,12 @@ export const ACCOUNT_METHODS = [
     permission: 'accounts-admin',
     params: ClaudeAuthProxyStatusParams,
     handler: async (_params, { runtime }) => runtime.claudeAuthProxyStatus()
+  }),
+  defineMethod({
+    name: 'accounts.setClaudeAccountPool',
+    permission: 'accounts-admin',
+    params: SetClaudeAccountPoolParams,
+    handler: async (params, { runtime }) => runtime.setClaudeAccountPool(params.enabled)
   }),
   defineMethod({
     name: 'accounts.setClaudeAutoSwitch',

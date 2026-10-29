@@ -21373,6 +21373,14 @@
       "authProxy": {
         "settingTitle": "Bill Claude through a local auth proxy",
         "settingDescription": "A running Claude session can change accounts without restarting. The next request uses the new account."
+      },
+      "pool": {
+        "settingTitle": "Spread sessions across accounts",
+        "settingDescription": "New Claude sessions start on the signed-in account with the most room left.",
+        "sessionsOne": "1 session",
+        "sessionsOther": "{{count}} sessions",
+        "badge": "Pool",
+        "paneBadge": "Claude account {{label}}"
       }
     },
     "managedData": {

@@ -19,7 +19,15 @@ import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent
 import { createAgentModelCatalogSettingsExpiry } from '../native-chat/agent-model-catalog/agent-model-catalog-account-expiry'
 import { getRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
 import { translateMain } from '../i18n/main-i18n'
-import type { ClaudeAutoSwitchedEvent } from '../../shared/managed-account-types'
+import type {
+  ClaudeAutoSwitchedEvent,
+  ClaudePaneAssignedEvent
+} from '../../shared/managed-account-types'
+import { claudeAccountShortLabel } from '../claude-accounts/claude-account-short-label'
+import {
+  onClaudePaneAssigned,
+  type ClaudePaneAssignedNotice
+} from '../claude-accounts/claude-pane-account-registry'
 import {
   startClaudeAuthProxy,
   stopClaudeAuthProxy
@@ -132,7 +140,31 @@ export function initializeMainProcessAccountServices(): void {
     }
   })
   void startClaudeAuthProxy()
+  const paneAssignedEvent = (notice: ClaudePaneAssignedNotice): ClaudePaneAssignedEvent => {
+    const accounts = store.getSettings().claudeManagedAccounts
+    const emails = accounts.map((account) => account.email)
+    const account = notice.accountId
+      ? accounts.find((candidate) => candidate.id === notice.accountId)
+      : undefined
+    const email = account?.email ?? ''
+    return {
+      ptyId: notice.ptyId,
+      paneKey: notice.paneKey,
+      accountId: notice.accountId,
+      email,
+      label:
+        notice.accountId === null
+          ? ''
+          : email
+            ? claudeAccountShortLabel(email, emails)
+            : notice.accountId.slice(0, 8)
+    }
+  }
+  const stopPaneAssigned = onClaudePaneAssigned((notice) => {
+    state.mainWindow?.webContents.send('claudeAccounts:paneAssigned', paneAssignedEvent(notice))
+  })
   state.stopClaudeSessionMover = () => {
+    stopPaneAssigned()
     services.sessionMover?.stop()
     void stopClaudeAuthProxy()
   }

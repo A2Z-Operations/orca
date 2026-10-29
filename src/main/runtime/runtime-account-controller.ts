@@ -224,6 +224,10 @@ export class RuntimeAccountController {
     return readClaudeAuthProxyStatus()
   }
 
+  setClaudeAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setAccountPool(enabled)
+  }
+
   selectCodex(accountId: string | null): Promise<CodexRateLimitAccountsState> {
     return this.requireServices().codexAccounts.selectAccount(accountId)
   }

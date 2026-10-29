@@ -1,7 +1,4 @@
-import type {
-  ClaudeAccountPoolSetting,
-  ClaudeSessionMoverSetting
-} from '../../shared/claude-account-switch-settings'
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeManagedAccount,
   ClaudeManagedAccountSummary,
@@ -13,6 +10,7 @@ import type { RateLimitService } from '../rate-limits/service'
 import { claudeStateFile, readClaudeFolderLogin } from './claude-account-folder'
 import { savedWslClaudeAccountHome } from './claude-profile-wsl-paths'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
+import { claudeListedPaneAccounts } from './claude-listed-pane-accounts'
 import { listClaudePaneAccounts } from './claude-pane-account-registry'
 import {
   getClaudeSelectionTargetForAccount,
@@ -93,8 +91,8 @@ export class ClaudeAccountSelection {
     return this.list()
   }
 
-  setAccountPool(setting: ClaudeAccountPoolSetting): ClaudeRateLimitAccountsState {
-    this.saveSettings({ claudeAccountPool: setting })
+  setAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
+    this.saveSettings({ claudeAccountPool: enabled ? 'on' : 'off' })
     return this.list()
   }
 
@@ -112,7 +110,9 @@ export class ClaudeAccountSelection {
         }
       })
       .sort((a, b) => b.updatedAt - a.updatedAt)
-    const paneAssignments = listClaudePaneAccounts().flatMap((record) =>
+    const paneRecords = listClaudePaneAccounts()
+    const { paneAccounts, assignedSessions } = claudeListedPaneAccounts(accounts, paneRecords)
+    const paneAssignments = paneRecords.flatMap((record) =>
       record.assignedAccountId && record.assignedAccountId !== record.accountId
         ? [{ ptyId: record.ptyId, accountId: record.assignedAccountId }]
         : []
@@ -129,6 +129,9 @@ export class ClaudeAccountSelection {
       sessionMover: settings.claudeSessionMover ?? 'ask',
       authProxy: settings.claudeAuthProxy === false ? 'off' : 'on',
       accountPool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
+      pool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
+      assignedSessions,
+      paneAccounts,
       sessionMoves: this.sessionMovesProvider?.() ?? [],
       ...(paneAssignments.length > 0 ? { paneAssignments } : {}),
       ...(accounts.length > 0

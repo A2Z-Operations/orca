@@ -1,7 +1,4 @@
-import type {
-  ClaudeAccountPoolSetting,
-  ClaudeSessionMoverSetting
-} from '../../shared/claude-account-switch-settings'
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeAccountSignIn,
   ClaudeSessionMoveSummary,
@@ -153,8 +150,8 @@ export class ClaudeAccountService {
     return this.selection.setAuthProxy(enabled)
   }
 
-  setAccountPool(setting: ClaudeAccountPoolSetting): ClaudeRateLimitAccountsState {
-    return this.selection.setAccountPool(setting)
+  setAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.selection.setAccountPool(enabled)
   }
 
   setSessionMovesProvider(provider: (() => ClaudeSessionMoveSummary[]) | null): void {

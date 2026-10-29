@@ -13,6 +13,10 @@ type AccountsBlock = {
   sessionMover?: 'off' | 'ask' | 'move'
   /** Claude only: the mover's last decision per live session. JSON carries the same records. */
   sessionMoves?: readonly { ptyId: string; reason: string }[]
+  /** Claude only: whether new launches spread across accounts (absent from older hosts). */
+  pool?: 'on' | 'off'
+  /** Claude only: live sessions billed to each account (absent from older hosts). */
+  assignedSessions?: readonly { accountId: string; count: number }[]
   /** Claude only: whether the host bills requests through the local auth proxy (absent from older hosts). */
   authProxy?: 'on' | 'off'
   /** Claude only: panes whose billed account differs from the folder they launched in. */
@@ -41,17 +45,26 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
     block.activeAccountIdsByRuntime?.host,
     ...Object.values(block.activeAccountIdsByRuntime?.wsl ?? {})
   ])
-  const lines = block.accounts.map(
-    (account) =>
-      `  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
-        account.needsSignIn ? ' (sign in again in Orca Settings > AI Provider Accounts)' : ''
-      }`
+  const sessionCountByAccount = new Map(
+    (block.assignedSessions ?? []).map((row) => [row.accountId, row.count])
   )
+  const lines = block.accounts.map((account) => {
+    const sessions =
+      block.assignedSessions !== undefined
+        ? `  sessions: ${sessionCountByAccount.get(account.id) ?? 0}`
+        : ''
+    return `  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
+      account.needsSignIn ? ' (sign in again in Orca Settings > AI Provider Accounts)' : ''
+    }${sessions}`
+  })
   if (block.autoSwitchEnabled !== undefined) {
     lines.push(`  auto-switch: ${block.autoSwitchEnabled ? 'on' : 'off'}`)
   }
   if (block.sessionMover !== undefined) {
     lines.push(`  session-mover: ${block.sessionMover}`)
+  }
+  if (block.pool !== undefined) {
+    lines.push(`  pool: ${block.pool}`)
   }
   for (const move of block.sessionMoves ?? []) {
     lines.push(`  session ${move.ptyId}: ${move.reason}`)

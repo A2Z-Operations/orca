@@ -46,7 +46,8 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
       percent: window?.percent ?? null,
       line: window?.line ?? null,
       reason,
-      at: now
+      at: now,
+      strategy: view.record.proxySlot ? 'proxy' : 'resume'
     }
     // Why once per reason: the service publishes every 15 s; a repeated "stay" is not news.
     if (lastDecision.get(view.record.ptyId)?.reason !== reason) {

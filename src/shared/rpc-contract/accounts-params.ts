@@ -37,6 +37,8 @@ export const SetClaudeAuthProxyParams = z.object({ enabled: z.boolean() })
 
 export const ClaudeAuthProxyStatusParams = z.object({}).strict()
 
+export const SetClaudeAccountPoolParams = z.object({ enabled: z.boolean() })
+
 export const SetClaudeAutoSwitchParams = z.object({ enabled: z.boolean() })
 
 export const SelectAccountParams = z.object({
