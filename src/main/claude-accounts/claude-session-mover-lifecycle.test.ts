@@ -11,11 +11,14 @@ import {
 } from './claude-session-move-strategy'
 import { CLAUDE_SESSION_MOVE_HANDOFF_TIMEOUT_MS } from './claude-session-move-handoff'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setup, state, limits, PANE_1 } from './claude-session-mover-test-fixture'
+import { account, setup, state, limits, PANE_1, PANE_2 } from './claude-session-mover-test-fixture'
+import { makePaneKey } from '../../shared/stable-pane-id'
 import {
+  CLAUDE_POOL_REBALANCE_COOLDOWN_MS,
   CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS,
   CLAUDE_SESSION_MOVE_COOLDOWN_MS,
-  CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS
+  CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS,
+  CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS
 } from './claude-session-mover-policy'
 
 describe('session mover lifecycle and metadata', () => {
@@ -266,6 +269,89 @@ function handoffRig(screen: () => string | null) {
   })
   return { snapshots, write, serializeBuffer, spawn, strategy }
 }
+
+const PANE_3 = makePaneKey('tab-3', '55555555-5555-4555-8555-555555555555')
+
+describe('pool rebalance lifecycle', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-19T12:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('moves one of three panes on a hot account per claim cooldown until they sit on the freer one', async () => {
+    const moved: string[] = []
+    const registry: { records: ReturnType<typeof setup>['records'] } = { records: [] }
+    const f = setup({
+      pool: 'on',
+      accounts: [account('b'), account('c')],
+      proxyStrategy: {
+        async move(request) {
+          moved.push(request.ptyId)
+          const index = registry.records.findIndex((entry) => entry.ptyId === request.ptyId)
+          const previous = registry.records[index]
+          if (previous) {
+            registry.records.splice(index, 1, {
+              ...previous,
+              accountId: request.toAccountId,
+              assignedAccountId: request.toAccountId
+            })
+          }
+          return { kind: 'moved', newPtyId: request.ptyId }
+        }
+      }
+    })
+    registry.records = f.records
+    f.session('pty-1', PANE_1, 'b')
+    f.session('pty-2', PANE_2, 'b')
+    f.session('pty-3', PANE_3, 'b')
+    for (const record of f.records) {
+      record.proxySlot = `slot-${record.ptyId}`
+    }
+    f.mover.start()
+    const reading = () => state(40, { b: limits(60), c: limits(5) })
+    f.publish(reading())
+    await vi.runAllTimersAsync()
+    expect(moved).toEqual(['pty-1'])
+    expect(f.notices).toEqual([
+      expect.objectContaining({
+        kind: 'moved',
+        balance: true,
+        restartless: true,
+        ptyId: 'pty-1',
+        to: expect.objectContaining({ id: 'c' })
+      })
+    ])
+    expect(f.mover.lastDecisions().find((decision) => decision.ptyId === 'pty-1')?.reason).toBe(
+      'rebalance'
+    )
+    expect(f.records.filter((record) => record.accountId === 'c')).toHaveLength(1)
+
+    f.publish(reading())
+    await vi.runAllTimersAsync()
+    expect(moved).toEqual(['pty-1'])
+
+    vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS)
+    f.publish(reading())
+    await vi.runAllTimersAsync()
+    expect(moved).toEqual(['pty-1', 'pty-2'])
+
+    vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS)
+    f.publish(reading())
+    await vi.runAllTimersAsync()
+    expect(moved).toEqual(['pty-1', 'pty-2', 'pty-3'])
+    expect(f.records.map((record) => record.accountId)).toEqual(['c', 'c', 'c'])
+
+    vi.setSystemTime(Date.now() + CLAUDE_POOL_REBALANCE_COOLDOWN_MS)
+    f.publish(reading())
+    await vi.runAllTimersAsync()
+    expect(moved).toEqual(['pty-1', 'pty-2', 'pty-3'])
+    expect(f.mover.lastDecisions().every((decision) => decision.reason === 'stay')).toBe(true)
+    expect(f.move).not.toHaveBeenCalled()
+  })
+})
 
 describe('session mover handoff note', () => {
   beforeEach(() => {

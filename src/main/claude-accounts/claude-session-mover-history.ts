@@ -62,7 +62,8 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
       view: ClaudeMoverSessionView,
       from: ClaudeManagedAccountSummary,
       to: ClaudeManagedAccountSummary,
-      usage: ProviderRateLimits | null
+      usage: ProviderRateLimits | null,
+      balance: boolean
     ) =>
     (kind: ClaudeSessionMoveNotice['kind'], detail: string): void => {
       const now = Date.now()
@@ -77,7 +78,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         kind === 'moved' ? { ...view, record: { ...view.record, ptyId: detail } } : view,
         from,
         kind === 'moved' ? to : null,
-        kind,
+        kind === 'moved' && balance ? 'rebalance' : kind,
         usage,
         now,
         detail
@@ -88,7 +89,8 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         from,
         to: kind === 'moved' ? to : null,
         detail: claudeSessionMoveNoticeDetail(detail, kind === 'moved' && view.paneBackgroundWork),
-        ...(kind === 'moved' && detail === view.record.ptyId ? { restartless: true as const } : {})
+        ...(kind === 'moved' && detail === view.record.ptyId ? { restartless: true as const } : {}),
+        ...(kind === 'moved' && balance ? { balance: true as const } : {})
       })
     }
 

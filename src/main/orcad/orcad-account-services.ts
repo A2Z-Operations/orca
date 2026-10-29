@@ -85,9 +85,11 @@ export function createOrcadAccountServices(args: {
           type: 'notification',
           source: 'plugin',
           title: 'Claude session mover',
-          body: notice.restartless
-            ? `${notice.from.email} continues on ${notice.to?.email ?? ''} without a restart`
-            : `${notice.kind}: session ${notice.ptyId} on ${notice.from.email}${notice.to ? ` → ${notice.to.email}` : ''} (${notice.detail})`
+          body: notice.balance
+            ? `${notice.from.email} continues on ${notice.to?.email ?? ''} to balance your accounts`
+            : notice.restartless
+              ? `${notice.from.email} continues on ${notice.to?.email ?? ''} without a restart`
+              : `${notice.kind}: session ${notice.ptyId} on ${notice.from.email}${notice.to ? ` → ${notice.to.email}` : ''} (${notice.detail})`
         })
     }
   })

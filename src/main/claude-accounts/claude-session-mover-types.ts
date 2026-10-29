@@ -21,6 +21,7 @@ export type ClaudeSessionMoveReason =
   | 'pinned'
   | 'off'
   | 'ask'
+  | 'rebalance'
   | 'skipped'
 
 export type ClaudeSessionMoveNotice = {
@@ -31,6 +32,8 @@ export type ClaudeSessionMoveNotice = {
   detail: string
   /** Set when the PTY did not change: the session kept running and the next request uses the new account. */
   restartless?: true
+  /** The move evens out the pool. The notice says the session continues in order to balance accounts. */
+  balance?: true
 }
 
 export type ClaudeSessionMoverDeps = {
@@ -40,7 +43,13 @@ export type ClaudeSessionMoverDeps = {
     | 'activeClaudeManagedAccountId'
     | 'activeClaudeManagedAccountIdsByRuntime'
     | 'claudeManagedAccounts'
-  >
+  > & {
+    /**
+     * Task 1 owns this setting on GlobalSettings. Absent means the pool is off, so running
+     * sessions keep the 95/90 lines.
+     */
+    claudeAccountPool?: 'off' | 'on'
+  }
   rateLimits: Pick<
     RateLimitService,
     'onStateChange' | 'getState' | 'fetchInactiveClaudeAccountsOnOpen'

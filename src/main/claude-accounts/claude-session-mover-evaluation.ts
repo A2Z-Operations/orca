@@ -24,7 +24,8 @@ export function evaluateClaudeMoverSessions(
   selectedId: string | null,
   now: number,
   effective: 'off' | 'ask' | 'move',
-  lastUsageReadAt: number
+  lastUsageReadAt: number,
+  poolEnabled: boolean
 ): boolean {
   const {
     lastMoveAt,
@@ -74,7 +75,9 @@ export function evaluateClaudeMoverSessions(
       lastMoveAt: lastMoveAt.get(ptyId) ?? 0,
       lastFailureAt: lastFailureAt.get(ptyId) ?? 0,
       targetClaims,
-      allowMidTurn: proxyMove
+      allowMidTurn: proxyMove,
+      pool: { enabled: poolEnabled, spreadLine: proxyMove },
+      ...(view.turnEndedAt !== undefined ? { turnEndedAt: view.turnEndedAt } : {})
     })
     if (
       decision.kind === 'wait' &&
@@ -104,7 +107,8 @@ export function evaluateClaudeMoverSessions(
     if (!to) {
       continue
     }
-    const settled = settle(view, from, to, own?.rateLimits ?? null)
+    const balance = decision.reason === 'rebalance'
+    const settled = settle(view, from, to, own?.rateLimits ?? null, balance)
     if (!view.providerSession) {
       settled('skipped', 'no-provider-session')
       continue
@@ -121,7 +125,8 @@ export function evaluateClaudeMoverSessions(
           detail: claudeSessionMoveNoticeDetail(
             `${decision.window.name} ${decision.window.percent}%`,
             view.paneBackgroundWork
-          )
+          ),
+          ...(balance ? { balance: true as const } : {})
         })
       }
       continue
@@ -139,7 +144,7 @@ export function evaluateClaudeMoverSessions(
     inflight.add(ptyId)
     // Publication can expose the replacement PTY before this move settles.
     inflightPanes.add(paneKey)
-    remember(view, from, to, 'moving', own?.rateLimits ?? null, now)
+    remember(view, from, to, balance ? 'rebalance' : 'moving', own?.rateLimits ?? null, now)
     const strategy = proxyMove && deps.proxyStrategy ? deps.proxyStrategy : deps.strategy
     void strategy
       .move({

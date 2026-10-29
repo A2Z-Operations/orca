@@ -75,4 +75,23 @@ describe('collectClaudeMoverSessions', () => {
     expect(view(status('working', 'done', true))?.paneState).toBe('done')
     expect(view(status('done'))?.paneBackgroundWork).toBe(false)
   })
+
+  it('carries the hook turn end so a rebalance can leave a warm cache alone', () => {
+    const ended = status('done')
+    ended.turnEndedAt = 50
+    const view = collectClaudeMoverSessions({
+      records: [record()],
+      statuses: [ended],
+      providerSessions: [],
+      resolveProviderSession: () => null,
+      resolvePaneKey: () => PANE,
+      resolvePtyIdForPaneKey: () => null,
+      resolveWorktreeId: () => null,
+      accounts: [],
+      recordInferred: () => {},
+      now: 1
+    })[0]
+    expect(view?.turnEndedAt).toBe(50)
+    expect(view?.paneState).toBe('done')
+  })
 })

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { InactiveAccountUsage, ProviderRateLimits } from '../../shared/rate-limit-types'
 import {
+  CLAUDE_POOL_REBALANCE_COOLDOWN_MS,
+  CLAUDE_POOL_REBALANCE_MIN_TARGET_HEADROOM,
+  CLAUDE_POOL_REBALANCE_QUIET_MS,
   CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS,
   CLAUDE_SESSION_MOVE_COOLDOWN_MS,
   CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS,
@@ -215,5 +218,185 @@ describe('decideClaudeSessionMove', () => {
     expect(
       decideClaudeSessionMove(inputs({ candidates: [candidate('b', 90), candidate('c', 88)] }))
     ).toEqual({ kind: 'stay', reason: 'no-target' })
+  })
+})
+
+/** Session window only: headroom is 95 minus used percent. 60% used leaves 35; 5% used leaves 90. */
+function spread(overrides: Partial<ClaudeSessionMoveInputs> = {}): ClaudeSessionMoveInputs {
+  return inputs({
+    usage: limits(60),
+    candidates: [candidate('b', 50), candidate('c', 5)],
+    pool: { enabled: true, spreadLine: true },
+    paneState: 'done',
+    turnEndedAt: NOW - CLAUDE_POOL_REBALANCE_QUIET_MS,
+    ...overrides
+  })
+}
+
+describe('decideClaudeSessionMove pool rebalance', () => {
+  it('moves a proxy session before the 95/90 lines when the pool is spread and the gap is wide', () => {
+    expect(decideClaudeSessionMove(spread())).toEqual({
+      kind: 'move',
+      to: 'c',
+      window: { name: 'session', percent: 60, line: 95 },
+      reason: 'rebalance'
+    })
+  })
+
+  it('keeps the 95/90 lines when the pool is off, the session would restart, or it is pinned', () => {
+    expect(decideClaudeSessionMove(spread({ pool: { enabled: false, spreadLine: true } }))).toEqual(
+      { kind: 'stay', reason: 'under-line' }
+    )
+    expect(decideClaudeSessionMove(spread({ pool: { enabled: true, spreadLine: false } }))).toEqual(
+      { kind: 'stay', reason: 'under-line' }
+    )
+    expect(decideClaudeSessionMove(spread({ pool: undefined }))).toEqual({
+      kind: 'stay',
+      reason: 'under-line'
+    })
+    expect(decideClaudeSessionMove(spread({ pinned: true }))).toEqual({
+      kind: 'stay',
+      reason: 'under-line'
+    })
+    expect(decideClaudeSessionMove(spread({ pinned: true, usage: limits(100) })).kind).toBe('move')
+    expect(
+      decideClaudeSessionMove(spread({ pinned: true, usage: limits(100) }))
+    ).not.toHaveProperty('reason', 'rebalance')
+  })
+
+  it('stays when the gap is not wider than 25 points or the best account has under 30 points of room', () => {
+    // 30% used → headroom 65, which is not under 90 - 25.
+    expect(decideClaudeSessionMove(spread({ usage: limits(30) }))).toEqual({
+      kind: 'stay',
+      reason: 'under-line'
+    })
+    const tight = 95 - (CLAUDE_POOL_REBALANCE_MIN_TARGET_HEADROOM - 1)
+    expect(
+      decideClaudeSessionMove(
+        spread({ usage: limits(92), candidates: [candidate('b', tight), candidate('c', tight)] })
+      )
+    ).toEqual({ kind: 'stay', reason: 'under-line' })
+    // Best headroom is exactly 30 (used 65) and own headroom is 4 (used 91): 4 < 30 - 25.
+    expect(
+      decideClaudeSessionMove(
+        spread({
+          usage: limits(91),
+          candidates: [candidate('b', 80), candidate('c', 65)],
+          candidateCount: 2
+        })
+      )
+    ).toMatchObject({ kind: 'move', to: 'c', reason: 'rebalance' })
+  })
+
+  it('does not rebalance during a turn or within two minutes of one, unless the hard line is already crossed', () => {
+    expect(decideClaudeSessionMove(spread({ paneState: 'working', allowMidTurn: true }))).toEqual({
+      kind: 'stay',
+      reason: 'under-line'
+    })
+    expect(decideClaudeSessionMove(spread({ paneState: null, allowMidTurn: true }))).toEqual({
+      kind: 'stay',
+      reason: 'under-line'
+    })
+    expect(
+      decideClaudeSessionMove(spread({ turnEndedAt: NOW - CLAUDE_POOL_REBALANCE_QUIET_MS + 1 }))
+    ).toEqual({ kind: 'stay', reason: 'prompt-cache' })
+    expect(decideClaudeSessionMove(spread({ turnEndedAt: undefined }))).toMatchObject({
+      kind: 'move',
+      reason: 'rebalance'
+    })
+    expect(
+      decideClaudeSessionMove(
+        spread({
+          usage: limits(96),
+          paneState: 'working',
+          allowMidTurn: true,
+          turnEndedAt: NOW - 1_000
+        })
+      )
+    ).toEqual({
+      kind: 'move',
+      to: 'c',
+      window: { name: 'session', percent: 96, line: 95 }
+    })
+    expect(
+      decideClaudeSessionMove(
+        spread({ usage: limits(96), paneState: 'done', turnEndedAt: NOW - 1_000 })
+      ).kind
+    ).toBe('move')
+  })
+
+  it('rate-limits a rebalance to 15 minutes and still moves at the hard line on the shorter cooldown', () => {
+    expect(
+      decideClaudeSessionMove(spread({ lastMoveAt: NOW - CLAUDE_POOL_REBALANCE_COOLDOWN_MS + 1 }))
+    ).toEqual({ kind: 'stay', reason: 'cooldown' })
+    expect(
+      decideClaudeSessionMove(spread({ lastMoveAt: NOW - CLAUDE_POOL_REBALANCE_COOLDOWN_MS })).kind
+    ).toBe('move')
+    expect(
+      decideClaudeSessionMove(
+        spread({
+          usage: limits(96),
+          lastMoveAt: NOW - CLAUDE_SESSION_MOVE_COOLDOWN_MS,
+          turnEndedAt: NOW - 1_000
+        })
+      ).kind
+    ).toBe('move')
+    expect(
+      decideClaudeSessionMove(
+        spread({
+          usage: limits(96),
+          lastMoveAt: NOW - CLAUDE_SESSION_MOVE_COOLDOWN_MS + 1
+        })
+      )
+    ).toEqual({ kind: 'stay', reason: 'cooldown' })
+    expect(
+      decideClaudeSessionMove(
+        spread({ usage: limits(100), lastMoveAt: NOW - 1_000, allowMidTurn: true })
+      ).kind
+    ).toBe('move')
+  })
+
+  it('holds a rebalance after a failure and still debits or skips a claimed target', () => {
+    expect(
+      decideClaudeSessionMove(
+        spread({ lastFailureAt: NOW - CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS + 1 })
+      )
+    ).toEqual({ kind: 'stay', reason: 'failed-recently' })
+    const claimed = new Map([['c', { at: NOW - 1_000, debit: 5 }]])
+    expect(decideClaudeSessionMove(spread({ targetClaims: claimed }))).toEqual({
+      kind: 'stay',
+      reason: 'under-line'
+    })
+    expect(
+      decideClaudeSessionMove(
+        spread({
+          targetClaims: claimed,
+          candidates: [candidate('b', 5), candidate('c', 5)]
+        })
+      )
+    ).toMatchObject({ kind: 'move', to: 'b', reason: 'rebalance' })
+    // c at 5% plus a 40 point debit has headroom 50. Own headroom 35 is not 25 behind that.
+    const debited = new Map([
+      ['c', { at: NOW - CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS, debit: 40 }]
+    ])
+    expect(decideClaudeSessionMove(spread({ targetClaims: debited }))).toEqual({
+      kind: 'stay',
+      reason: 'under-line'
+    })
+  })
+
+  it('asks for a candidate reading before rebalancing, and does not while the cache is still warm', () => {
+    expect(
+      decideClaudeSessionMove(spread({ candidates: [candidate('c', 5)], candidateCount: 2 }))
+    ).toEqual({ kind: 'read-usage' })
+    expect(
+      decideClaudeSessionMove(
+        spread({
+          candidates: [candidate('c', 5, NOW - 16 * 60_000)],
+          candidateCount: 1,
+          turnEndedAt: NOW - 1_000
+        })
+      )
+    ).toEqual({ kind: 'stay', reason: 'prompt-cache' })
   })
 })

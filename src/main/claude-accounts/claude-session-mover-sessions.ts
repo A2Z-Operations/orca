@@ -19,6 +19,8 @@ export type ClaudeMoverSessionView = {
   paneState: AgentStatusState | null
   /** True when a shell, cron, or monitor is still alive on this pane. */
   paneBackgroundWork: boolean
+  /** When this pane's last turn ended, if the hook status published one. */
+  turnEndedAt?: number
   providerSession: AgentProviderSessionMetadata | null
   worktreeId: string | null
 }
@@ -84,11 +86,13 @@ export function collectClaudeMoverSessions(args: {
   return [...known.values()].map((record) => {
     const paneKey = record.paneKey ?? args.resolvePaneKey(record.ptyId)
     const identity = paneKey ? identityByPane.get(paneKey) : undefined
+    const status = paneKey ? statusByPane.get(paneKey) : undefined
     return {
       record,
       paneKey,
-      paneState: paneKey ? moverPaneState(statusByPane.get(paneKey)) : null,
-      paneBackgroundWork: paneKey ? moverPaneBackgroundWork(statusByPane.get(paneKey)) : false,
+      paneState: moverPaneState(status),
+      paneBackgroundWork: moverPaneBackgroundWork(status),
+      ...(status?.turnEndedAt !== undefined ? { turnEndedAt: status.turnEndedAt } : {}),
       providerSession: identity
         ? (args.resolveProviderSession(identity.paneKey, identity.sessionId) ?? {
             key: 'session_id',
