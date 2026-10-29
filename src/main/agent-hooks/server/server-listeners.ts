@@ -271,6 +271,9 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
         statuses.push({
           paneKey,
           state: enriched.payload.state,
+          ...(enriched.payload.mainAgent
+            ? { mainAgentState: enriched.payload.mainAgent.state }
+            : {}),
           receivedAt: enriched.receivedAt,
           observedInCurrentRuntime:
             Boolean(enriched.structuredHost) || this.runtimeObservedStatusPaneKeys.has(paneKey)
