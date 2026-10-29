@@ -122,6 +122,16 @@ export function addOrcaWslInteropEnv(env: Record<string, string>): void {
     ...(env.ORCA_CLAUDE_AGENT_VIEW_PLUGIN_DIR?.startsWith('/')
       ? ['ORCA_CLAUDE_AGENT_VIEW_PLUGIN_DIR/u', 'ORCA_CLAUDE_CONFIG_DIR/u']
       : []),
+    // Durable-job plugin dirs are host paths unless a guest relay already translated them.
+    // PATH is not listed: appendWindowsPath carries the waiter bin, and rewriting PATH via WSLENV is unsafe.
+    ...(env.CLAUDE_CODE_PLUGIN_DIRS
+      ? [`CLAUDE_CODE_PLUGIN_DIRS/${env.CLAUDE_CODE_PLUGIN_DIRS.startsWith('/') ? 'u' : 'pl'}`]
+      : []),
+    ...(env.ORCA_DURABLE_JOB_PLUGIN_DIR
+      ? [
+          `ORCA_DURABLE_JOB_PLUGIN_DIR/${env.ORCA_DURABLE_JOB_PLUGIN_DIR.startsWith('/') ? 'u' : 'p'}`
+        ]
+      : []),
     // Forward only Orca's clipboard marker; a host SSH session must not leak into bare guest shells.
     ...(env.SSH_CONNECTION === CODEX_REMOTE_VIEWER_SSH_CONNECTION ? ['SSH_CONNECTION/u'] : []),
     `${PI_CLIPBOARD_OSC52_ENV}/u`,

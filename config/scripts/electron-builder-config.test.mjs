@@ -17,7 +17,11 @@ const { copyFiles, FileMatcher } = require('app-builder-lib/out/fileMatcher')
 describe('electron-builder config', () => {
   it('ships the durable-job scripts in every platform extraResources', () => {
     for (const platform of ['mac', 'linux', 'win']) {
-      for (const name of ['durable-background-job.mjs', 'durable-background-job-hook.mjs']) {
+      for (const name of [
+        'durable-background-job.mjs',
+        'durable-background-job-hook.mjs',
+        'durable-background-job-plan.mjs'
+      ]) {
         expect(electronBuilderConfig[platform].extraResources).toContainEqual({
           from: `src/main/claude/${name}`,
           to: `durable-jobs/${name}`

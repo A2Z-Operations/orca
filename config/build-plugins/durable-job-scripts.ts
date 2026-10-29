@@ -4,7 +4,8 @@ import type { Plugin } from 'vite'
 
 const DURABLE_JOB_SCRIPT_NAMES = [
   'durable-background-job.mjs',
-  'durable-background-job-hook.mjs'
+  'durable-background-job-hook.mjs',
+  'durable-background-job-plan.mjs'
 ] as const
 
 /** Claude executes the hook and waiter as real node files, so they cannot live only inside the bundle. */

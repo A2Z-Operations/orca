@@ -23,6 +23,7 @@ type Plan = {
     hookSpecificOutput: {
       hookEventName: string
       permissionDecision?: string
+      permissionDecisionReason?: string
       additionalContext: string
       updatedInput: { command: string; run_in_background: boolean; description?: string }
     }
@@ -41,8 +42,24 @@ type Job = {
 
 type Api = {
   DURABLE_JOB_ALLOW_RULE: string
+  WAITER_FORWARDED_SIGNALS: string[]
   shellQuote: (value: string) => string
   planBackgroundBashRewrite: (input: Record<string, unknown>) => Plan | null
+  detachLaunchPlan: (input: Record<string, unknown>) => {
+    kind: string
+    command: string
+    args: string[]
+    detached: boolean
+    windowsHide: boolean
+    runnerBody?: string
+    launchBody?: string
+  }
+  jobStopPlan: (
+    pid: number,
+    platform?: string
+  ) => { kind: string; command?: string; args?: string[] } | null
+  isWslGuest: (env: NodeJS.ProcessEnv, platform: string) => boolean
+  powershellLaunchBody: (runnerPath: string, exitPath: string) => string
   createJobRequest: (request: Plan['request'], env?: NodeJS.ProcessEnv) => string
   formatSurvivingJobNote: (jobs: { state: string; id: string; logPath: string }[]) => string
   startJob: (input: { command: string; cwd?: string }, env?: NodeJS.ProcessEnv) => Promise<Job>
@@ -150,7 +167,10 @@ describe('planBackgroundBashRewrite', () => {
     })
     const output = plan?.response.hookSpecificOutput
     expect(output?.hookEventName).toBe('PreToolUse')
-    expect(output?.permissionDecision).toBeUndefined()
+    expect(output?.permissionDecision).toBe('allow')
+    expect(output?.permissionDecisionReason).toBe(
+      'Orca rewrote this background command to the durable waiter.'
+    )
     expect(output?.updatedInput.run_in_background).toBe(true)
     expect(output?.updatedInput.description).toBe('durable job proof')
     expect(output?.updatedInput.command).toBe('orca-durable-job run --id dj_0123456789abcdef')
@@ -182,15 +202,24 @@ describe('planBackgroundBashRewrite', () => {
     ).toBeNull()
   })
 
-  it('leaves non-bash tools, Windows, and the escape hatch alone', () => {
+  it('leaves non-bash tools, Monitor, and the escape hatch alone', () => {
     const base = {
       toolInput,
       runnerPath,
       nodePath: process.execPath
     }
     expect(api.planBackgroundBashRewrite({ ...base, toolName: 'Read' })).toBeNull()
+    expect(api.planBackgroundBashRewrite({ ...base, toolName: 'Monitor' })).toBeNull()
     expect(
-      api.planBackgroundBashRewrite({ ...base, toolName: 'Bash', platform: 'win32' })
+      api.planBackgroundBashRewrite({
+        ...base,
+        toolName: 'Monitor',
+        toolInput: {
+          command: 'tail -f /tmp/build.log',
+          description: 'watch the build',
+          persistent: true
+        }
+      })
     ).toBeNull()
     expect(
       api.planBackgroundBashRewrite({
@@ -199,6 +228,21 @@ describe('planBackgroundBashRewrite', () => {
         env: { ORCA_DURABLE_JOBS: '0' }
       })
     ).toBeNull()
+  })
+
+  it('allows the rewritten waiter on Windows too', () => {
+    const plan = api.planBackgroundBashRewrite({
+      toolName: 'Bash',
+      toolInput,
+      runnerPath,
+      nodePath: process.execPath,
+      platform: 'win32',
+      id: 'dj_0123456789abcdef'
+    })
+    expect(plan?.response.hookSpecificOutput.permissionDecision).toBe('allow')
+    expect(plan?.response.hookSpecificOutput.updatedInput.command).toBe(
+      'orca-durable-job run --id dj_0123456789abcdef'
+    )
   })
 
   it('quotes paths that contain spaces and apostrophes', () => {
@@ -256,7 +300,7 @@ describe('durable job hook', () => {
     expect(code).toBe(0)
     const response = JSON.parse(stdout) as Plan['response']
     expect(response.hookSpecificOutput.updatedInput.run_in_background).toBe(true)
-    expect(response.hookSpecificOutput.permissionDecision).toBeUndefined()
+    expect(response.hookSpecificOutput.permissionDecision).toBe('allow')
     expect(response.hookSpecificOutput.updatedInput.command).toMatch(
       /^orca-durable-job run --id dj_[a-f0-9]{16}$/
     )
@@ -282,6 +326,92 @@ describe('durable job hook', () => {
     )
     expect(code).toBe(0)
     expect(stdout).toBe('')
+  })
+})
+
+describe('platform detach plan', () => {
+  const paths = {
+    cwd: '/work/project',
+    commandPath: '/jobs/dj_0123456789abcdef/command.sh',
+    exitPath: '/jobs/dj_0123456789abcdef/exit',
+    logPath: '/jobs/dj_0123456789abcdef/output.log',
+    runnerPath: '/jobs/dj_0123456789abcdef/runner.sh',
+    launchPath: '/jobs/dj_0123456789abcdef/launch.ps1'
+  }
+
+  it.each(['darwin', 'linux'] as const)('detaches with node setsid on %s', (platform) => {
+    const plan = api.detachLaunchPlan({ platform, guest: false, ...paths })
+    expect(plan.kind).toBe('bash')
+    expect(plan.command).toBe('/bin/bash')
+    expect(plan.detached).toBe(true)
+    expect(plan.args[0]).toBe('-c')
+    expect(plan.args[1]).toContain(paths.commandPath)
+    expect(plan.launchBody).toBeUndefined()
+  })
+
+  it('uses a hidden powershell -File launcher on Windows and keeps the user command out of it', () => {
+    const plan = api.detachLaunchPlan({ platform: 'win32', guest: false, ...paths })
+    expect(plan).toMatchObject({
+      kind: 'powershell',
+      command: 'powershell.exe',
+      detached: true,
+      windowsHide: true,
+      args: ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-File', paths.launchPath]
+    })
+    expect(plan.launchBody).toContain(paths.runnerPath)
+    expect(plan.launchBody).not.toContain('sleep 120')
+    expect(plan.launchBody).not.toMatch(/EncodedCommand|ExecutionPolicy|cmd\.exe/)
+    expect(plan.args.join(' ')).not.toMatch(/EncodedCommand|ExecutionPolicy|-Command/)
+    expect(plan.runnerBody).toContain(paths.commandPath)
+    expect(plan.runnerBody).toContain(paths.logPath)
+  })
+
+  it('uses setsid inside a WSL guest and falls back when setsid is missing', () => {
+    const withSetsid = api.detachLaunchPlan({
+      platform: 'linux',
+      guest: true,
+      setsidPath: '/usr/bin/setsid',
+      ...paths
+    })
+    expect(withSetsid).toMatchObject({
+      kind: 'setsid',
+      command: '/usr/bin/setsid',
+      detached: false,
+      args: ['bash', '-c', expect.stringContaining(paths.commandPath)]
+    })
+    expect(withSetsid.args).not.toContain('--fork')
+    const fallback = api.detachLaunchPlan({
+      platform: 'linux',
+      guest: true,
+      ...paths
+    })
+    expect(fallback.kind).toBe('bash')
+    expect(fallback.detached).toBe(true)
+    expect(api.isWslGuest({ WSL_DISTRO_NAME: 'Ubuntu' }, 'linux')).toBe(true)
+    expect(api.isWslGuest({ WSL_INTEROP: '/run/WSL/1_interop' }, 'linux')).toBe(true)
+    expect(api.isWslGuest({ WSL_DISTRO_NAME: 'Ubuntu' }, 'darwin')).toBe(false)
+    expect(api.isWslGuest({}, 'linux')).toBe(false)
+  })
+
+  it.each(['darwin', 'linux', 'win32'] as const)('stops a running pid on %s', (platform) => {
+    expect(api.jobStopPlan(1, platform)).toBeNull()
+    const plan = api.jobStopPlan(4242, platform)
+    if (platform === 'win32') {
+      expect(plan).toEqual({
+        kind: 'taskkill',
+        command: 'taskkill.exe',
+        args: ['/PID', '4242', '/T', '/F']
+      })
+      return
+    }
+    expect(plan).toEqual({ kind: 'group', signal: 'SIGTERM', pid: 4242 })
+  })
+
+  it('forwards only catchable stop signals', () => {
+    expect(api.WAITER_FORWARDED_SIGNALS).toEqual(['SIGTERM', 'SIGINT'])
+    expect(api.powershellLaunchBody("/jobs/O'Brien/runner.sh", '/jobs/exit')).toContain(
+      "'/jobs/O''Brien/runner.sh'"
+    )
   })
 })
 
@@ -320,6 +450,64 @@ describe('detached jobs', () => {
       expect(api.readJob(job.id, root)?.state).toBe('running')
       expect(ppidOf(job.pid!)).toBe(1)
 
+      expect(api.stopJob(job.id, root).stopped).toBe(true)
+      await waitForJob(job.id, root, 'lost')
+    },
+    20000
+  )
+
+  async function bannerWaiter(
+    env: NodeJS.ProcessEnv,
+    id: string,
+    logPath: string
+  ): Promise<ReturnType<typeof spawn>> {
+    const waiter = spawn(process.execPath, [runnerPath, 'run', '--id', id], {
+      env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    let banner = ''
+    waiter.stdout?.setEncoding('utf8')
+    waiter.stdout?.on('data', (chunk) => {
+      banner += chunk
+    })
+    // ast-grep-ignore: test-no-wall-clock -- the waiter banner arrives from a real child process
+    const bannerDeadline = Date.now() + 4000
+    // ast-grep-ignore: test-no-wall-clock -- stop waiting when the real waiter has had long enough
+    while (!banner.includes(`id=${id}`) && Date.now() < bannerDeadline) {
+      await yieldMs(20)
+    }
+    expect(banner).toContain(logPath)
+    return waiter
+  }
+
+  it.skipIf(process.platform === 'win32')(
+    'forwards SIGTERM from the waiter to the job process group',
+    async () => {
+      const root = jobRoot()
+      const env = envFor(root)
+      const job = await api.startJob({ command: 'sleep 30', cwd: tmpdir() }, env)
+      expect(job.pid).toBeGreaterThan(1)
+      const waiter = await bannerWaiter(env, job.id, job.logPath)
+      process.kill(waiter.pid!, 'SIGTERM')
+      const waiterCode = await new Promise<number>((resolve) =>
+        waiter.on('exit', (status) => resolve(status ?? 1))
+      )
+      expect(waiterCode).toBe(143)
+      await waitForJob(job.id, root, 'lost')
+    },
+    20000
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'does not forward SIGHUP, so a session restart leaves the job running',
+    async () => {
+      const root = jobRoot()
+      const env = envFor(root)
+      const job = await api.startJob({ command: 'sleep 30', cwd: tmpdir() }, env)
+      const waiter = await bannerWaiter(env, job.id, job.logPath)
+      process.kill(waiter.pid!, 'SIGHUP')
+      await new Promise((resolve) => waiter.on('exit', resolve))
+      expect(api.readJob(job.id, root)?.state).toBe('running')
       expect(api.stopJob(job.id, root).stopped).toBe(true)
       await waitForJob(job.id, root, 'lost')
     },
