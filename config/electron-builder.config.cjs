@@ -740,13 +740,17 @@ module.exports = {
   // Dual-arch builds need target node-pty rebuilds or Intel Macs get arm64 binaries and posix_spawnp failure.
   // beforeBuild performs targeted rebuild then returns false to skip optional cpu-features.
   npmRebuild: true,
-  publish: {
-    provider: 'github',
-    owner: 'stablyai',
-    repo: devChannelRepo ?? 'orca',
-    // Keep main-repo releases draft until release-cut verifies all assets; early --publish always would expose missing Windows installers.
-    releaseType: devChannelRepo ? 'prerelease' : 'draft'
-  }
+  // Self-built bundles omit the update manifest.
+  publish:
+    process.env.ORCA_NO_PUBLISH === '1'
+      ? null
+      : {
+          provider: 'github',
+          owner: 'stablyai',
+          repo: devChannelRepo ?? 'orca',
+          // Keep main-repo releases draft until release-cut verifies all assets; early --publish always would expose missing Windows installers.
+          releaseType: devChannelRepo ? 'prerelease' : 'draft'
+        }
 }
 
 // Stamp the effective channel version where node-mode CLI code can read it.
