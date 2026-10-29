@@ -15,6 +15,7 @@ import {
   pluginIdSchema,
   pluginRelativePathSchema
 } from './plugin-manifest-fields'
+import { PLUGIN_ACCOUNT_EVENT_NAMES } from './plugin-account-event-names'
 import { validatePluginManifestContributions } from './plugin-manifest-contribution-validation'
 
 /** Shared orca-plugin.json validation keeps desktop, serve, relay and CLI behavior aligned. Contribution names mirror
@@ -52,7 +53,8 @@ const commandContributionSchema = z.object({
 export const PLUGIN_EVENT_NAMES = [
   'worktree.created',
   'worktree.removed',
-  'agent.status.changed'
+  'agent.status.changed',
+  ...PLUGIN_ACCOUNT_EVENT_NAMES
 ] as const
 export const PLUGIN_EVENT_SUBSCRIPTION_LIMIT = PLUGIN_EVENT_NAMES.length
 

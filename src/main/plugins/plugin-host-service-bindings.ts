@@ -1,4 +1,6 @@
+import type { PluginClaudeAccountView } from '../../shared/plugins/plugin-claude-account-contract'
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
+import { readPluginClaudeAccounts } from './plugin-claude-account-events'
 import { PLUGIN_WORKSPACE_TERMINAL_LIMIT } from '../../shared/plugins/plugin-host-api'
 import type { PluginHostServices } from './plugin-host-methods'
 import { PluginSecretsStore } from './plugin-secrets-store'
@@ -33,6 +35,9 @@ export function bindPluginHostServices(input: {
   delegate: PluginRuntimeDelegate
   pluginsDataDir: string
   subscribeEvents: (pluginKey: string, events: PluginEventName[]) => PluginEventName[]
+  listClaudeAccounts?: () =>
+    | { accounts: PluginClaudeAccountView[] }
+    | Promise<{ accounts: PluginClaudeAccountView[] }>
 }): PluginHostServices {
   const { delegate, pluginsDataDir, subscribeEvents } = input
   return {
@@ -81,6 +86,7 @@ export function bindPluginHostServices(input: {
       set: (key, itemKey, value) =>
         new PluginKvStore(pluginsDataDir, key, 'settings.json').set(itemKey, value)
     },
-    subscribeEvents
+    subscribeEvents,
+    listClaudeAccounts: input.listClaudeAccounts ?? (() => readPluginClaudeAccounts())
   }
 }

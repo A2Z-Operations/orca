@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import {
+  pluginClaudeSessionMovedPayloadSchema,
+  pluginClaudeUsageChangedPayloadSchema
+} from './plugin-claude-account-contract'
 import type { PluginEventName } from './plugin-manifest'
 
 /** Publish bounded worktree/agent projections, never raw runtime objects, to avoid leaking unrelated paths, remotes or credentials. */
@@ -43,7 +47,9 @@ export const agentStatusChangedPayloadSchema = z.object({
 export const PLUGIN_EVENT_PAYLOAD_SCHEMAS: Record<PluginEventName, z.ZodTypeAny> = {
   'worktree.created': worktreeCreatedPayloadSchema,
   'worktree.removed': worktreeRemovedPayloadSchema,
-  'agent.status.changed': agentStatusChangedPayloadSchema
+  'agent.status.changed': agentStatusChangedPayloadSchema,
+  'accounts.usage.changed': pluginClaudeUsageChangedPayloadSchema,
+  'accounts.session.moved': pluginClaudeSessionMovedPayloadSchema
 }
 
 export type PluginWorktreeCreatedPayload = z.infer<typeof worktreeCreatedPayloadSchema>

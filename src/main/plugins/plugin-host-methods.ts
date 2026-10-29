@@ -1,4 +1,5 @@
 import { getBoundPluginHostMethod, type PluginHostServices } from './plugin-host-method-bindings'
+import { isPluginAccountEventName } from '../../shared/plugins/plugin-account-event-names'
 import { isQualifiedPluginKey } from '../../shared/plugins/plugin-manifest'
 import { gatePluginHostCall as decidePluginHostCall } from '../../shared/plugins/plugin-capability-gate'
 import type { PluginCapabilityKind } from '../../shared/plugins/plugin-capabilities'
@@ -46,6 +47,18 @@ export async function executePluginHostCall(
       ok: false,
       code: 'invalid_params',
       error: `${path}: ${issue?.message ?? 'invalid params'}`
+    }
+  }
+  // Account events are not covered by events:subscribe. Deny the whole subscription.
+  if (
+    input.method === 'events.subscribe' &&
+    subscribesToAccountEvent(parsedParams.data) &&
+    !input.grantedCapabilities?.includes('accounts.read')
+  ) {
+    return {
+      ok: false,
+      code: 'capability_denied',
+      error: 'plugin does not have the "accounts.read" capability'
     }
   }
   if (!input.services) {
@@ -106,6 +119,17 @@ export async function executePluginHostCall(
       error: error instanceof Error ? error.message : String(error)
     }
   }
+}
+
+function subscribesToAccountEvent(params: unknown): boolean {
+  if (typeof params !== 'object' || params === null || !('events' in params)) {
+    return false
+  }
+  const events = params.events
+  return (
+    Array.isArray(events) &&
+    events.some((event) => typeof event === 'string' && isPluginAccountEventName(event))
+  )
 }
 
 function summarizeParams(method: string, params: unknown): string {

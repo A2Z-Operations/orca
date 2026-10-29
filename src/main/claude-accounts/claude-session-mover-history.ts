@@ -3,6 +3,7 @@ import type {
   ClaudeSessionMoveSummary
 } from '../../shared/managed-account-types'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
+import { publishClaudeAccountSessionMoved } from './claude-account-plugin-publish'
 import {
   claudeSessionMoveNoticeDetail,
   worstClaudeWindow,
@@ -71,6 +72,13 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         lastMoveAt.set(view.record.ptyId, now)
         lastMoveAt.set(detail, now)
         lastDecision.delete(view.record.ptyId)
+        // Raw pty id, before the notice suffix, so plugins do not parse display text.
+        publishClaudeAccountSessionMoved({
+          ptyId: detail,
+          fromAccountId: from.id,
+          toAccountId: to.id,
+          ...(detail !== view.record.ptyId ? { previousPtyId: view.record.ptyId } : {})
+        })
       } else {
         lastFailureAt.set(view.record.ptyId, now)
       }

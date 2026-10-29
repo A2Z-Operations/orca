@@ -1,3 +1,4 @@
+import { isPluginAccountEventName } from '../../shared/plugins/plugin-account-event-names'
 import type { PluginEventName } from '../../shared/plugins/plugin-manifest'
 import {
   isInvalidDiscoveredPlugin,
@@ -22,6 +23,13 @@ export function deliverPluginEvent(options: {
   }
   for (const plugin of options.plugins) {
     if (isInvalidDiscoveredPlugin(plugin) || !options.isRuntimeApproved(plugin)) {
+      continue
+    }
+    // Manifest and dynamic subscribers both need accounts.read. events:subscribe is not enough.
+    if (
+      isPluginAccountEventName(options.event) &&
+      !plugin.manifest.capabilities.some((capability) => capability.kind === 'accounts.read')
+    ) {
       continue
     }
     const manifestSubscribed = plugin.manifest.contributes.events.some(
