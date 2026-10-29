@@ -4,11 +4,11 @@ Date: 2026-10-29. Branch `blowzer/session-mover` in the main checkout. Not pushe
 
 ## Commits
 
-| Commit                                            | What                                                                                                                                   |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `4f18a1cefa47381a11bd85367bd6000f954a5d7b`        | Merge `d5786ce36679bf5fbda345c5270e60d400a91c13` (pool-surface, Task 3)                                                                |
-| `ceacc11b624b851afbddecb61e0e714f9adcc441`        | Merge `28e1d83a663e7af38c34902135f0fd9d798194e4` (proxy-remote-hosts)                                                                  |
-| parent `ceacc11b624b851afbddecb61e0e714f9adcc441` | Locale strings, orcad CJS `import.meta`, launch-parity facts, PTY login-shell warm, operation-key read. This report is in that commit. |
+| Commit                                     | What                                                                                                                                                       |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `4f18a1cefa47381a11bd85367bd6000f954a5d7b` | Merge `d5786ce36679bf5fbda345c5270e60d400a91c13` (pool-surface, Task 3)                                                                                    |
+| `ceacc11b624b851afbddecb61e0e714f9adcc441` | Merge `28e1d83a663e7af38c34902135f0fd9d798194e4` (proxy-remote-hosts)                                                                                      |
+| `33d16c5111859a8537a7e1fe45c4d02c9ce59b37` | Locale strings, orcad CJS `import.meta`, launch-parity facts, PTY login-shell warm, operation-key read. Parent `ceacc11b624b851afbddecb61e0e714f9adcc441`. |
 
 Already on the branch before this task: pool-policy `bd264cf571d`, pool-rebalancer `fbe6ffda2e4`, proxy-robustness `07de9254d39`, durable-jobs-platforms `8911244b618`, plugin-accounts-api `07e548ad90a`.
 
