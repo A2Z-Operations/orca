@@ -33,6 +33,7 @@ import { runAfterFirstWindowShown } from './first-window-deferral'
 import { logStartupMilestone } from './startup-diagnostics'
 import { refreshInstalledOpenCodeStatusPlugins } from '../opencode/opencode-status-plugin-startup-refresh'
 import { pruneDesktopOrcadArtifactCache } from '../orcad/orcad-artifact-cache-retention'
+import { sweepDurableJobResidueAtStartup } from '../claude/durable-background-job-plugin'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../shared/layout-owner-switch'
 import { repairDuplicatePtyPanesOnStart } from '../runtime/moved-pane-owner-rekey'
 import { WslUsageReporter } from '../telemetry/wsl-usage-reporter'
@@ -44,6 +45,9 @@ export async function initializeReadyRuntimeServices(): Promise<void> {
   const store = state.store
   if (!store) {
     throw new Error('Store must be initialized before ready services')
+  }
+  if (process.env.VITEST !== 'true') {
+    sweepDurableJobResidueAtStartup(app.getPath('userData'))
   }
   // Load interrupted deletion records before listings so first paint shows Deleting.
   await loadWorktreeRemovalRecordsForStore(store)

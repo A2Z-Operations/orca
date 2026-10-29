@@ -21356,7 +21356,7 @@
         "failedBody": "A session on {{from}} could not be moved: {{detail}}",
         "handoff": {
           "moved": "Orca moved this session from {{from}} to {{to}} because {{detail}}.",
-          "ended": "The restart ended any background jobs and subagents of the previous process ({{known}}).",
+          "ended": "The restart ended subagents of the previous process ({{known}}).",
           "continue": "Re-run what is still needed, then continue.",
           "monitoring": "monitoring",
           "backgroundTask": "a background task was still running",

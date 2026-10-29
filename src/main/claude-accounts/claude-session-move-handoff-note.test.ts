@@ -6,6 +6,7 @@ import {
   claudeResumeHooksReady,
   claudeResumeScreenAcceptsHandoff,
   claudeResumeScreenIsShellPrompt,
+  detachedJobsForSession,
   type ClaudeSessionMoveHandoffTranslate
 } from './claude-session-move-handoff-note'
 
@@ -32,8 +33,9 @@ describe('buildClaudeSessionMoveHandoffNote', () => {
     expect(note).toBe(
       [
         'Orca moved this session from from@example.com to to@example.com because session 96%.',
-        'The restart ended any background jobs and subagents of the previous process',
+        'The restart ended subagents of the previous process',
         '(monitoring; a background task was still running; explore child-1 (working); idle-1 (idle)).',
+        'No detached Orca jobs were still running.',
         'Re-run what is still needed, then continue.'
       ].join(' ')
     )
@@ -101,6 +103,48 @@ describe('buildClaudeSessionMoveHandoffNote', () => {
       PASSTHROUGH
     )
     expect(note).toContain('(none reported).')
+    expect(note).toContain('No detached Orca jobs were still running.')
+  })
+
+  it('names running jobs passed in and skips exited ones', () => {
+    const note = buildClaudeSessionMoveHandoffNote(
+      {
+        fromEmail: 'from@example.com',
+        toEmail: 'to@example.com',
+        detail: 'session 96%',
+        endedWork: { subagents: [] },
+        detachedJobs: [
+          {
+            state: 'running',
+            id: 'dj_0123456789abcdef',
+            logPath: '/tmp/job/output.log',
+            sessionId: 'sess-1'
+          },
+          {
+            state: 'exited',
+            id: 'dj_abcdef0123456789',
+            logPath: '/tmp/other/output.log',
+            sessionId: 'sess-1'
+          }
+        ]
+      },
+      PASSTHROUGH
+    )
+    expect(note).toContain(
+      'Detached Orca jobs still running after this restart: dj_0123456789abcdef log=/tmp/job/output.log.'
+    )
+    expect(note).toContain('The restart ended subagents of the previous process (none reported).')
+    expect(note.match(/dj_[a-f0-9]{16}/g)).toEqual(['dj_0123456789abcdef'])
+  })
+
+  it('keeps every job whose request names this session', () => {
+    expect(
+      detachedJobsForSession('sess-1', [
+        { state: 'running', id: 'dj_0123456789abcdef', logPath: '/a', sessionId: 'sess-1' },
+        { state: 'running', id: 'dj_abcdef0123456789', logPath: '/b', sessionId: 'sess-2' },
+        { state: 'exited', id: 'dj_0000000000000001', logPath: '/c', sessionId: 'sess-1' }
+      ]).map((job) => job.id)
+    ).toEqual(['dj_0123456789abcdef', 'dj_0000000000000001'])
   })
 })
 

@@ -121,6 +121,9 @@ async function startOrcadRuntime(
   const { resolvePushGatewayOrigin } = await import('../runtime/push/push-gateway-origin')
 
   const runtimeUserDataPath = getAppEnvironment().getPath('userData')
+  const { sweepDurableJobResidueAtStartup } =
+    await import('../claude/durable-background-job-plugin')
+  sweepDurableJobResidueAtStartup(runtimeUserDataPath)
   const { startEventLoopDelayProbe } = await import('../diagnostics/event-loop-delay-probe')
   startEventLoopDelayProbe('orcad', runtimeUserDataPath)
   await prepareOrcadCliLauncher().catch((error: unknown) => {

@@ -1,6 +1,9 @@
 import { delimiter } from 'node:path'
 import { getAgentLaunchExecutableName } from '../../../../shared/agent-command-line-intent'
-import { ensureDurableBackgroundJobPlugin } from '../../../claude/durable-background-job-plugin'
+import {
+  durableJobBinDir,
+  ensureDurableBackgroundJobPlugin
+} from '../../../claude/durable-background-job-plugin'
 import type { BuildPtyHostEnvOptions } from './types'
 
 function launchesClaude(opts: BuildPtyHostEnvOptions): boolean {
@@ -23,12 +26,34 @@ function stripPluginDir(env: Record<string, string>, pluginDir: string | undefin
     .join(delimiter)
 }
 
+function withoutBinDir(env: Record<string, string>, binDir: string): void {
+  const pathKey = 'PATH'
+  const current = env[pathKey]
+  if (!current?.split(delimiter).includes(binDir)) {
+    return
+  }
+  env[pathKey] = current
+    .split(delimiter)
+    .filter((entry) => entry !== binDir)
+    .join(delimiter)
+}
+
+function prependBinDir(env: Record<string, string>, binDir: string): void {
+  const pathKey = 'PATH'
+  const inherited = (env[pathKey] ?? '')
+    .split(delimiter)
+    .filter((entry) => entry.length > 0 && entry !== binDir)
+  env[pathKey] = [binDir, ...inherited].join(delimiter)
+}
+
 export function applyDurableBackgroundJobEnv(
   env: Record<string, string>,
   opts: BuildPtyHostEnvOptions
 ): void {
   stripPluginDir(env, env.ORCA_DURABLE_JOB_PLUGIN_DIR)
   delete env.ORCA_DURABLE_JOB_PLUGIN_DIR
+  const binDir = durableJobBinDir(opts.userDataPath)
+  withoutBinDir(env, binDir)
   if (
     process.platform === 'win32' ||
     opts.isWsl ||
@@ -50,4 +75,5 @@ export function applyDurableBackgroundJobEnv(
   }
   env.CLAUDE_CODE_PLUGIN_DIRS = paths.join(delimiter)
   env.ORCA_DURABLE_JOB_PLUGIN_DIR = pluginDir
+  prependBinDir(env, binDir)
 }

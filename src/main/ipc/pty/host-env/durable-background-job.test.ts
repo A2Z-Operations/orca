@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -29,12 +29,21 @@ afterEach(() => {
 
 describe('applyDurableBackgroundJobEnv', () => {
   it('installs the plugin for a Claude launch and appends its directory', () => {
-    const env: Record<string, string> = { CLAUDE_CODE_PLUGIN_DIRS: '/user/plugin' }
-    applyDurableBackgroundJobEnv(env, options({ launchAgent: 'claude' }))
+    const opts = options({ launchAgent: 'claude' })
+    const env: Record<string, string> = {
+      CLAUDE_CODE_PLUGIN_DIRS: '/user/plugin',
+      PATH: '/usr/bin'
+    }
+    applyDurableBackgroundJobEnv(env, opts)
+    const binDir = join(opts.userDataPath, 'claude-durable-jobs', 'bin')
     expect(env.ORCA_DURABLE_JOB_PLUGIN_DIR).toContain('orca-durable-jobs')
     expect(env.CLAUDE_CODE_PLUGIN_DIRS).toBe(
       `/user/plugin${delimiter}${env.ORCA_DURABLE_JOB_PLUGIN_DIR}`
     )
+    expect(env.PATH.split(delimiter)[0]).toBe(binDir)
+    const waiter = join(binDir, 'orca-durable-job')
+    expect(lstatSync(waiter).isSymbolicLink()).toBe(true)
+    expect(readlinkSync(waiter)).toContain('durable-background-job.mjs')
     const hooks = JSON.parse(
       readFileSync(join(env.ORCA_DURABLE_JOB_PLUGIN_DIR!, 'hooks', 'hooks.json'), 'utf8')
     ) as {
@@ -57,20 +66,25 @@ describe('applyDurableBackgroundJobEnv', () => {
     { launchCommand: 'codex' },
     { isWsl: true, launchAgent: 'claude' as const }
   ])('leaves non-Claude launches unchanged: %j', (overrides) => {
+    const opts = options(overrides)
+    const binDir = join(opts.userDataPath, 'claude-durable-jobs', 'bin')
     const env: Record<string, string> = {
       CLAUDE_CODE_PLUGIN_DIRS: '/user/plugin',
-      ORCA_DURABLE_JOB_PLUGIN_DIR: '/stale/plugin'
+      ORCA_DURABLE_JOB_PLUGIN_DIR: '/stale/plugin',
+      PATH: `${binDir}${delimiter}/usr/bin`
     }
-    applyDurableBackgroundJobEnv(env, options(overrides))
+    applyDurableBackgroundJobEnv(env, opts)
     expect(env.ORCA_DURABLE_JOB_PLUGIN_DIR).toBeUndefined()
     expect(env.CLAUDE_CODE_PLUGIN_DIRS).toBe('/user/plugin')
+    expect(env.PATH).toBe('/usr/bin')
   })
 
   it('stays out of the way when durable jobs are disabled', () => {
     vi.stubEnv('ORCA_DURABLE_JOBS', '0')
-    const env: Record<string, string> = {}
+    const env: Record<string, string> = { PATH: '/usr/bin' }
     applyDurableBackgroundJobEnv(env, options({ launchAgent: 'claude' }))
     expect(env.ORCA_DURABLE_JOB_PLUGIN_DIR).toBeUndefined()
+    expect(env.PATH).toBe('/usr/bin')
   })
 
   it('skips injection when the plugin cannot be written', () => {

@@ -1,7 +1,23 @@
 import type { AgentSubagentSnapshot } from '../../shared/agent-status-subagent-snapshot'
 import type { AgentWorkingMode } from '../../shared/agent-status-types'
+import { formatSurvivingJobNote } from '../claude/durable-background-job.mjs'
 import { createDraftPasteReadyScanner } from '../../shared/draft-paste-ready-scanner'
 import { stripTerminalControl } from '../../shared/terminal-control-stripping'
+
+export type ClaudeSessionDetachedJob = {
+  state: string
+  id: string
+  logPath: string
+  sessionId?: string
+}
+
+/** Jobs whose request.json names this Claude session. */
+export function detachedJobsForSession(
+  sessionId: string,
+  jobs: readonly ClaudeSessionDetachedJob[]
+): ClaudeSessionDetachedJob[] {
+  return jobs.filter((job) => job.sessionId === sessionId)
+}
 
 /** What the pre-move hook row knew about work the restart will kill. */
 export type ClaudeSessionMoveEndedWork = {
@@ -134,6 +150,7 @@ export function buildClaudeSessionMoveHandoffNote(
     toEmail: string
     detail: string
     endedWork: ClaudeSessionMoveEndedWork
+    detachedJobs?: readonly ClaudeSessionDetachedJob[]
   },
   translate: ClaudeSessionMoveHandoffTranslate
 ): string {
@@ -141,6 +158,7 @@ export function buildClaudeSessionMoveHandoffNote(
     input.detail.trim() ||
     text(translate, 'accounts.claude.sessionMover.handoff.detailFallback', 'its usage limit')
   const known = describeEndedWork(input.endedWork, translate)
+  const surviving = formatSurvivingJobNote(input.detachedJobs ?? [])
   return [
     text(
       translate,
@@ -151,9 +169,10 @@ export function buildClaudeSessionMoveHandoffNote(
     text(
       translate,
       'accounts.claude.sessionMover.handoff.ended',
-      'The restart ended any background jobs and subagents of the previous process ({{known}}).',
+      'The restart ended subagents of the previous process ({{known}}).',
       { known }
     ),
+    surviving,
     text(
       translate,
       'accounts.claude.sessionMover.handoff.continue',

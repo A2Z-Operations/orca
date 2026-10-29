@@ -1,5 +1,14 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,6 +40,7 @@ type Job = {
 }
 
 type Api = {
+  DURABLE_JOB_ALLOW_RULE: string
   shellQuote: (value: string) => string
   planBackgroundBashRewrite: (input: Record<string, unknown>) => Plan | null
   createJobRequest: (request: Plan['request'], env?: NodeJS.ProcessEnv) => string
@@ -39,6 +49,12 @@ type Api = {
   readJob: (id: string, root?: string) => Job | undefined
   stopJob: (id: string, root?: string) => { stopped: boolean }
   listJobs: (root?: string) => Job[]
+  sweepDurableJobs: (options?: {
+    root?: string
+    now?: number
+    pendingMaxAgeMs?: number
+    exitedMaxAgeMs?: number
+  }) => { pending: string[]; exited: string[] }
 }
 
 let api: Api
@@ -67,14 +83,21 @@ function pgidOf(pid: number): number {
   return Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(pid)], { encoding: 'utf8' }).trim())
 }
 
+function yieldMs(ms: number): Promise<void> {
+  // ast-grep-ignore: test-no-real-time-wait -- detached processes and waiter stdout are outside fake timers
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function waitForJob(id: string, root: string, state: string): Promise<Job> {
+  // ast-grep-ignore: test-no-wall-clock -- a real detached process is not advanced by fake timers
   const deadline = Date.now() + 8000
+  // ast-grep-ignore: test-no-wall-clock -- the deadline is the real process, not the test clock
   while (Date.now() < deadline) {
     const job = api.readJob(id, root)
     if (job?.state === state) {
       return job
     }
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await yieldMs(50)
   }
   throw new Error(`job ${id} did not reach ${state}`)
 }
@@ -130,8 +153,9 @@ describe('planBackgroundBashRewrite', () => {
     expect(output?.permissionDecision).toBeUndefined()
     expect(output?.updatedInput.run_in_background).toBe(true)
     expect(output?.updatedInput.description).toBe('durable job proof')
-    expect(output?.updatedInput.command).toContain('run --id dj_0123456789abcdef')
-    expect(output?.updatedInput.command).toContain(runnerPath)
+    expect(output?.updatedInput.command).toBe('orca-durable-job run --id dj_0123456789abcdef')
+    expect(api.DURABLE_JOB_ALLOW_RULE).toBe('Bash(orca-durable-job run --id:*)')
+    expect(output?.additionalContext).toContain('orca-durable-job logs --id dj_0123456789abcdef')
     expect(output?.additionalContext).toContain(join(root, 'dj_0123456789abcdef', 'output.log'))
   })
 
@@ -142,6 +166,10 @@ describe('planBackgroundBashRewrite', () => {
     [
       'already detached',
       { command: 'node durable-background-job.mjs run --id dj_x', run_in_background: true }
+    ],
+    [
+      'stable waiter',
+      { command: 'orca-durable-job run --id dj_0123456789abcdef', run_in_background: true }
     ]
   ])('leaves %s bash alone', (_label, overrides) => {
     expect(
@@ -228,7 +256,13 @@ describe('durable job hook', () => {
     expect(code).toBe(0)
     const response = JSON.parse(stdout) as Plan['response']
     expect(response.hookSpecificOutput.updatedInput.run_in_background).toBe(true)
-    expect(response.hookSpecificOutput.updatedInput.command).toContain('run --id dj_')
+    expect(response.hookSpecificOutput.permissionDecision).toBeUndefined()
+    expect(response.hookSpecificOutput.updatedInput.command).toMatch(
+      /^orca-durable-job run --id dj_[a-f0-9]{16}$/
+    )
+    expect(response.hookSpecificOutput.additionalContext).toContain(
+      'orca-durable-job logs --id dj_'
+    )
     expect(api.listJobs(root)).toHaveLength(1)
   })
 
@@ -274,9 +308,11 @@ describe('detached jobs', () => {
       waiter.stdout.on('data', (chunk) => {
         banner += chunk
       })
+      // ast-grep-ignore: test-no-wall-clock -- the waiter banner arrives from a real child process
       const bannerDeadline = Date.now() + 4000
+      // ast-grep-ignore: test-no-wall-clock -- stop waiting when the real waiter has had long enough
       while (!banner.includes(`id=${job.id}`) && Date.now() < bannerDeadline) {
-        await new Promise((resolve) => setTimeout(resolve, 20))
+        await yieldMs(20)
       }
       expect(banner).toContain(job.logPath)
       process.kill(waiter.pid!, 'SIGKILL')
@@ -314,7 +350,7 @@ describe('detached jobs', () => {
         env,
         stdio: 'ignore'
       })
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await yieldMs(300)
       expect(api.readJob(job.id, root)?.pid).toBe(job.pid)
       process.kill(child.pid!, 'SIGKILL')
       api.stopJob(job.id, root)
@@ -333,5 +369,87 @@ describe('formatSurvivingJobNote', () => {
       'Detached Orca jobs still running after this restart: dj_0123456789abcdef log=/tmp/job/output.log.'
     )
     expect(api.formatSurvivingJobNote([])).toBe('No detached Orca jobs were still running.')
+  })
+})
+
+describe('sweepDurableJobs', () => {
+  const hour = 60 * 60 * 1000
+  const day = 24 * hour
+  const now = Date.parse('2026-10-29T12:00:00.000Z')
+
+  function request(id: string, createdAt?: string): Plan['request'] {
+    return {
+      id,
+      command: 'echo sweep',
+      ...(createdAt ? { createdAt } : {})
+    }
+  }
+
+  it('drops pending requests older than an hour', () => {
+    const root = jobRoot()
+    const env = envFor(root)
+    const stale = 'dj_aaaaaaaaaaaaaaaa'
+    const fresh = 'dj_bbbbbbbbbbbbbbbb'
+    const mtimeOnly = 'dj_cccccccccccccccc'
+    const createdWins = 'dj_dddddddddddddddd'
+    api.createJobRequest(request(stale, new Date(now - 2 * hour).toISOString()), env)
+    api.createJobRequest(request(fresh, new Date(now - 30 * 60 * 1000).toISOString()), env)
+    const mtimeDir = api.createJobRequest(request(mtimeOnly), env)
+    const createdDir = api.createJobRequest(
+      request(createdWins, new Date(now - 10 * 60 * 1000).toISOString()),
+      env
+    )
+    const ancient = new Date(now - 3 * hour)
+    utimesSync(join(mtimeDir, 'request.json'), ancient, ancient)
+    utimesSync(join(createdDir, 'request.json'), ancient, ancient)
+
+    const removed = api.sweepDurableJobs({ root, now })
+
+    expect(removed.pending).toEqual([stale, mtimeOnly])
+    expect(removed.exited).toEqual([])
+    expect(api.listJobs(root).map((job) => job.id)).toEqual([fresh, createdWins])
+  })
+
+  it('drops exited jobs by exit-file age and keeps a recent exit with an old request', () => {
+    const root = jobRoot()
+    const env = envFor(root)
+    const oldExit = 'dj_1111111111111111'
+    const youngExit = 'dj_2222222222222222'
+    api.createJobRequest(request(oldExit, new Date(now - hour).toISOString()), env)
+    api.createJobRequest(request(youngExit, new Date(now - 30 * day).toISOString()), env)
+    writeFileSync(join(root, oldExit, 'exit'), '0')
+    writeFileSync(join(root, youngExit, 'exit'), '0')
+    const old = new Date(now - 8 * day)
+    utimesSync(join(root, oldExit, 'exit'), old, old)
+    utimesSync(join(root, youngExit, 'exit'), new Date(now - day), new Date(now - day))
+
+    const removed = api.sweepDurableJobs({ root, now })
+
+    expect(removed).toEqual({ pending: [], exited: [oldExit] })
+    expect(api.listJobs(root).map((job) => job.id)).toEqual([youngExit])
+  })
+
+  it('keeps a live job, a lost job, and directories that are not jobs', () => {
+    const root = jobRoot()
+    const env = envFor(root)
+    const running = 'dj_3333333333333333'
+    const lost = 'dj_4444444444444444'
+    api.createJobRequest(request(running, new Date(now - 30 * day).toISOString()), env)
+    api.createJobRequest(request(lost, new Date(now - 30 * day).toISOString()), env)
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+      stdio: 'ignore'
+    })
+    writeFileSync(join(root, running, 'meta.json'), `${JSON.stringify({ pid: child.pid })}\n`)
+    writeFileSync(join(root, lost, 'meta.json'), `${JSON.stringify({ pid: 4_000_000_000 })}\n`)
+    mkdirSync(join(root, 'not-a-job'))
+
+    try {
+      const removed = api.sweepDurableJobs({ root, now })
+      expect(removed).toEqual({ pending: [], exited: [] })
+      expect(api.listJobs(root).map((job) => job.state)).toEqual(['running', 'lost'])
+      expect(existsSync(join(root, 'not-a-job'))).toBe(true)
+    } finally {
+      child.kill()
+    }
   })
 })

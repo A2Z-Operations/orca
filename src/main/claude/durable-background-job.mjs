@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import {
   closeSync,
@@ -9,6 +9,7 @@ import {
   readdirSync,
   readFileSync,
   readSync,
+  rmSync,
   statSync,
   realpathSync,
   writeFileSync
@@ -19,6 +20,11 @@ import { pathToFileURL } from 'node:url'
 
 const JOB_ID = /^dj_[a-f0-9]{16}$/
 const RUNNER_PATH = import.meta.filename
+const PENDING_MAX_AGE_MS = 60 * 60 * 1000
+const EXITED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** One settings.json allow entry. The waiter is always `orca-durable-job run --id dj_…`. */
+export const DURABLE_JOB_ALLOW_RULE = 'Bash(orca-durable-job run --id:*)'
 
 export function shellQuote(value) {
   return `'${String(value).replaceAll("'", `'\\''`)}'`
@@ -103,6 +109,7 @@ export function readJob(id, root = jobRoot()) {
     state,
     command: request.command,
     description: typeof request.description === 'string' ? request.description : '',
+    createdAt: typeof request.createdAt === 'string' ? request.createdAt : undefined,
     sessionId: typeof request.sessionId === 'string' ? request.sessionId : undefined,
     cwd: typeof meta?.cwd === 'string' ? meta.cwd : request.cwd,
     pid,
@@ -132,6 +139,48 @@ export function formatSurvivingJobNote(jobs) {
   return `Detached Orca jobs still running after this restart: ${details}.`
 }
 
+function ageMs(iso, path, now) {
+  const parsed = Date.parse(iso ?? '')
+  if (Number.isFinite(parsed)) {
+    return now - parsed
+  }
+  try {
+    return now - statSync(path).mtimeMs
+  } catch {
+    return 0
+  }
+}
+
+function fileAgeMs(path, now) {
+  try {
+    return now - statSync(path).mtimeMs
+  } catch {
+    return 0
+  }
+}
+
+/** Drop denied requests and finished jobs. Running and lost jobs stay. */
+export function sweepDurableJobs(options = {}) {
+  const root = options.root ?? jobRoot(options.env)
+  const now = options.now ?? Date.now()
+  const pendingMaxAgeMs = options.pendingMaxAgeMs ?? PENDING_MAX_AGE_MS
+  const exitedMaxAgeMs = options.exitedMaxAgeMs ?? EXITED_MAX_AGE_MS
+  const removed = { pending: [], exited: [] }
+  for (const job of listJobs(root)) {
+    if (
+      job.state === 'pending' &&
+      ageMs(job.createdAt, join(job.dir, 'request.json'), now) > pendingMaxAgeMs
+    ) {
+      rmSync(job.dir, { recursive: true, force: true })
+      removed.pending.push(job.id)
+    } else if (job.state === 'exited' && fileAgeMs(join(job.dir, 'exit'), now) > exitedMaxAgeMs) {
+      rmSync(job.dir, { recursive: true, force: true })
+      removed.exited.push(job.id)
+    }
+  }
+  return removed
+}
+
 export function planBackgroundBashRewrite({
   toolName,
   toolInput,
@@ -159,7 +208,10 @@ export function planBackgroundBashRewrite({
   if (typeof toolInput.command !== 'string' || toolInput.command.trim() === '') {
     return null
   }
-  if (toolInput.command.includes('durable-background-job.mjs')) {
+  if (
+    toolInput.command.includes('durable-background-job.mjs') ||
+    toolInput.command.includes('orca-durable-job')
+  ) {
     return null
   }
   if (typeof runnerPath !== 'string' || typeof nodePath !== 'string') {
@@ -177,13 +229,13 @@ export function planBackgroundBashRewrite({
     ...(typeof sessionId === 'string' && sessionId ? { sessionId } : {}),
     ...(typeof cwd === 'string' && isAbsolute(cwd) ? { cwd } : {})
   }
-  const command = `${shellQuote(nodePath)} ${shellQuote(runnerPath)} run --id ${id}`
+  const command = `orca-durable-job run --id ${id}`
   return {
     request,
     response: {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
-        additionalContext: `Orca detached this background command as job ${id}. It keeps running if Claude restarts. Log: ${logPath}. Read it with ${shellQuote(nodePath)} ${shellQuote(runnerPath)} logs --id ${id}.`,
+        additionalContext: `Orca detached this background command as job ${id}. It keeps running if Claude restarts. Log: ${logPath}. Read it with orca-durable-job logs --id ${id}.`,
         updatedInput: { ...toolInput, command, run_in_background: true }
       }
     }
@@ -325,12 +377,22 @@ function copyNewOutput(logPath, offset) {
 
 function runInline(request) {
   process.stderr.write('orca-durable-job: detach failed, running in this process\n')
-  const result = spawnSync('/bin/bash', ['-c', request.command], {
+  const child = spawn('/bin/bash', ['-c', request.command], {
     cwd: process.cwd(),
     env: process.env,
     stdio: 'inherit'
   })
-  process.exit(result.status ?? 1)
+  // Detach failed, so this process is the job. Exit with the child's status and do not return.
+  let finished = false
+  const finish = (status) => {
+    if (finished) {
+      return
+    }
+    finished = true
+    process.exit(status ?? 1)
+  }
+  child.once('error', () => finish(1))
+  child.once('exit', (status) => finish(status))
 }
 
 async function follow(job, root) {
@@ -380,6 +442,7 @@ export async function runJob(id, env = process.env) {
   if (!meta) {
     if (claimed) {
       runInline(request)
+      return
     }
     throw new Error(`Durable job ${id} did not start`)
   }
@@ -540,7 +603,8 @@ export async function main(argv = process.argv.slice(2)) {
 
 function invokedDirectly() {
   const entry = process.argv[1]
-  if (!entry) {
+  // A bundled import's filename is the app chunk. Only the real script may run main().
+  if (!entry || !RUNNER_PATH.endsWith('durable-background-job.mjs')) {
     return false
   }
   try {

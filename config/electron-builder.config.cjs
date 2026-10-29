@@ -138,6 +138,13 @@ const emojiShortcodeDatasetResource = {
   from: 'node_modules/emojibase-data/en/shortcodes/emojibase.json',
   to: 'node_modules/emojibase-data/en/shortcodes/emojibase.json'
 }
+const durableJobScriptResources = [
+  'durable-background-job.mjs',
+  'durable-background-job-hook.mjs'
+].map((name) => ({
+  from: `src/main/claude/${name}`,
+  to: `durable-jobs/${name}`
+}))
 const commonExtraResources = [
   relayExtraResource,
   orcadTemplateExtraResource,
@@ -147,7 +154,8 @@ const commonExtraResources = [
   skillFreshnessResources,
   ...agentBrowserSkillResources,
   nativeChatVisualsResource,
-  emojiShortcodeDatasetResource
+  emojiShortcodeDatasetResource,
+  ...durableJobScriptResources
 ]
 // Native speech addons need real disk paths; copy only the artifact target’s variant.
 const macSpeechNativeResource = {
@@ -732,13 +740,16 @@ module.exports = {
   // beforeBuild performs targeted rebuild then returns false to skip optional cpu-features.
   npmRebuild: true,
   // Self-built bundles omit the update manifest.
-  publish: process.env.ORCA_NO_PUBLISH === '1' ? null : {
-    provider: 'github',
-    owner: 'stablyai',
-    repo: devChannelRepo ?? 'orca',
-    // Keep main-repo releases draft until release-cut verifies all assets; early --publish always would expose missing Windows installers.
-    releaseType: devChannelRepo ? 'prerelease' : 'draft'
-  }
+  publish:
+    process.env.ORCA_NO_PUBLISH === '1'
+      ? null
+      : {
+          provider: 'github',
+          owner: 'stablyai',
+          repo: devChannelRepo ?? 'orca',
+          // Keep main-repo releases draft until release-cut verifies all assets; early --publish always would expose missing Windows installers.
+          releaseType: devChannelRepo ? 'prerelease' : 'draft'
+        }
 }
 
 // Stamp the effective channel version where node-mode CLI code can read it.

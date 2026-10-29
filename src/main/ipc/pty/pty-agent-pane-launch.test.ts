@@ -138,6 +138,16 @@ describe('a pane that starts its own agent launch', () => {
   }
 
   it("starts the host's planned command once, at the pane's size, and says it started", async () => {
+    // The assertion is the planned command. Durable-job injection would append --plugin-dir.
+    const previousDurableJobs = process.env.ORCA_DURABLE_JOBS
+    process.env.ORCA_DURABLE_JOBS = '0'
+    onTestFinished(() => {
+      if (previousDurableJobs === undefined) {
+        delete process.env.ORCA_DURABLE_JOBS
+      } else {
+        process.env.ORCA_DURABLE_JOBS = previousDurableJobs
+      }
+    })
     const providerSpawn = vi.fn(async () => ({ id: 'pty-agent' }))
     const runtime = register(providerSpawn)
 

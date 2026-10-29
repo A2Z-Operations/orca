@@ -3,12 +3,15 @@ import {
   buildAgentPromptPasteBytes
 } from '../../shared/agent-prompt-injection'
 import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
+import { listJobs } from '../claude/durable-background-job.mjs'
 import {
   buildClaudeSessionMoveHandoffNote,
   claudeResumeHookBaseline,
   claudeResumeHooksReady,
   claudeResumeScreenAcceptsHandoff,
   claudeResumeScreenIsShellPrompt,
+  detachedJobsForSession,
+  type ClaudeSessionDetachedJob,
   type ClaudeSessionMoveEndedWork,
   type ClaudeSessionMoveHandoffTranslate
 } from './claude-session-move-handoff-note'
@@ -46,6 +49,8 @@ export async function deliverClaudeSessionMoveHandoff(args: {
   baselineReceivedAt?: number
   handoff: ClaudeSessionMoveHandoff
   translate: ClaudeSessionMoveHandoffTranslate
+  /** Job directory. The default is the host durable-job root. */
+  jobRoot?: string
   timeoutMs?: number
   sleep?: (ms: number) => Promise<void>
 }): Promise<'sent' | 'unsent'> {
@@ -73,13 +78,39 @@ export async function deliverClaudeSessionMoveHandoff(args: {
   if (!readyByHooks && (screen === null || !claudeResumeScreenAcceptsHandoff(screen))) {
     return 'unsent'
   }
-  const note = buildClaudeSessionMoveHandoffNote(args.handoff, args.translate)
+  const listed: unknown = listJobs(args.jobRoot)
+  const jobs = Array.isArray(listed) ? listed.filter(isDetachedJob) : []
+  const note = buildClaudeSessionMoveHandoffNote(
+    {
+      ...args.handoff,
+      detachedJobs: detachedJobsForSession(args.sessionId, jobs)
+    },
+    args.translate
+  )
   const wrote = args.controller.write(
     args.ptyId,
     `${buildAgentPromptPasteBytes(note)}${AGENT_PROMPT_SUBMIT}`,
     'orchestration'
   )
   return wrote ? 'sent' : 'unsent'
+}
+
+function isDetachedJob(value: unknown): value is ClaudeSessionDetachedJob {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  if (!('id' in value) || typeof value.id !== 'string') {
+    return false
+  }
+  if (!('state' in value) || typeof value.state !== 'string') {
+    return false
+  }
+  if (!('logPath' in value) || typeof value.logPath !== 'string') {
+    return false
+  }
+  return (
+    !('sessionId' in value) || value.sessionId === undefined || typeof value.sessionId === 'string'
+  )
 }
 
 function hooksReady(
