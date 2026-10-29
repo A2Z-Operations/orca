@@ -140,7 +140,8 @@ const emojiShortcodeDatasetResource = {
 }
 const durableJobScriptResources = [
   'durable-background-job.mjs',
-  'durable-background-job-hook.mjs'
+  'durable-background-job-hook.mjs',
+  'durable-background-job-plan.mjs'
 ].map((name) => ({
   from: `src/main/claude/${name}`,
   to: `durable-jobs/${name}`

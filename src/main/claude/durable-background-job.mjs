@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
 import {
   closeSync,
   existsSync,
@@ -14,42 +13,39 @@ import {
   realpathSync,
   writeFileSync
 } from 'node:fs'
-import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import {
+  JOB_ID,
+  assertJobId,
+  detachLaunchPlan,
+  findSetsid,
+  isWslGuest,
+  jobRoot,
+  jobStopPlan,
+  newJobId,
+  waitUntilSessionLeader
+} from './durable-background-job-plan.mjs'
 
-const JOB_ID = /^dj_[a-f0-9]{16}$/
+export {
+  assertJobId,
+  detachLaunchPlan,
+  isWslGuest,
+  jobRoot,
+  jobStopPlan,
+  newJobId,
+  planBackgroundBashRewrite,
+  powershellLaunchBody,
+  shellQuote,
+  WAITER_FORWARDED_SIGNALS
+} from './durable-background-job-plan.mjs'
+
 const RUNNER_PATH = import.meta.filename
 const PENDING_MAX_AGE_MS = 60 * 60 * 1000
 const EXITED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 /** One settings.json allow entry. The waiter is always `orca-durable-job run --id dj_…`. */
 export const DURABLE_JOB_ALLOW_RULE = 'Bash(orca-durable-job run --id:*)'
-
-export function shellQuote(value) {
-  return `'${String(value).replaceAll("'", `'\\''`)}'`
-}
-
-export function jobRoot(env = process.env, platform = process.platform) {
-  if (typeof env.ORCA_DURABLE_JOB_ROOT === 'string' && env.ORCA_DURABLE_JOB_ROOT.length > 0) {
-    return env.ORCA_DURABLE_JOB_ROOT
-  }
-  if (platform === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'orca', 'durable-jobs')
-  }
-  return join(homedir(), '.orca', 'durable-jobs')
-}
-
-export function assertJobId(id) {
-  if (typeof id !== 'string' || !JOB_ID.test(id)) {
-    throw new Error('Invalid durable job id')
-  }
-  return id
-}
-
-export function newJobId() {
-  return `dj_${randomBytes(8).toString('hex')}`
-}
 
 function jobDir(id, root = jobRoot()) {
   assertJobId(id)
@@ -181,67 +177,6 @@ export function sweepDurableJobs(options = {}) {
   return removed
 }
 
-export function planBackgroundBashRewrite({
-  toolName,
-  toolInput,
-  runnerPath,
-  nodePath,
-  sessionId,
-  cwd,
-  platform = process.platform,
-  env = process.env,
-  id = newJobId(),
-  now = new Date().toISOString()
-}) {
-  if (platform === 'win32' || env.ORCA_DURABLE_JOBS === '0') {
-    return null
-  }
-  if (toolName !== 'Bash') {
-    return null
-  }
-  if (!toolInput || typeof toolInput !== 'object' || Array.isArray(toolInput)) {
-    return null
-  }
-  if (toolInput.run_in_background !== true) {
-    return null
-  }
-  if (typeof toolInput.command !== 'string' || toolInput.command.trim() === '') {
-    return null
-  }
-  if (
-    toolInput.command.includes('durable-background-job.mjs') ||
-    toolInput.command.includes('orca-durable-job')
-  ) {
-    return null
-  }
-  if (typeof runnerPath !== 'string' || typeof nodePath !== 'string') {
-    return null
-  }
-  assertJobId(id)
-  const root = jobRoot(env, platform)
-  const logPath = join(root, id, 'output.log')
-  const description = typeof toolInput.description === 'string' ? toolInput.description : ''
-  const request = {
-    id,
-    command: toolInput.command,
-    description,
-    createdAt: now,
-    ...(typeof sessionId === 'string' && sessionId ? { sessionId } : {}),
-    ...(typeof cwd === 'string' && isAbsolute(cwd) ? { cwd } : {})
-  }
-  const command = `orca-durable-job run --id ${id}`
-  return {
-    request,
-    response: {
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        additionalContext: `Orca detached this background command as job ${id}. It keeps running if Claude restarts. Log: ${logPath}. Read it with orca-durable-job logs --id ${id}.`,
-        updatedInput: { ...toolInput, command, run_in_background: true }
-      }
-    }
-  }
-}
-
 export function createJobRequest(request, env = process.env) {
   assertJobId(request.id)
   if (typeof request.command !== 'string' || request.command.length === 0) {
@@ -281,17 +216,68 @@ async function waitFor(read, timeoutMs) {
   return read()
 }
 
-export function detachJob(id, env = process.env) {
-  if (process.platform === 'win32') {
-    throw new Error('Durable jobs are not available on Windows')
+function signalJob(pid, signal, platform = process.platform) {
+  const plan = jobStopPlan(pid, platform)
+  if (!plan) {
+    return false
   }
-  const dir = jobDir(id, jobRoot(env))
+  if (plan.kind === 'taskkill') {
+    const killer = spawn(plan.command, plan.args, {
+      detached: true,
+      windowsHide: true,
+      stdio: 'ignore'
+    })
+    killer.unref()
+    return true
+  }
+  const mapped = signal === 'SIGINT' ? 'SIGINT' : 'SIGTERM'
+  try {
+    process.kill(-pid, mapped)
+    return true
+  } catch {
+    try {
+      process.kill(pid, mapped)
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
+function armWaiterStop(dir) {
+  let stopping = false
+  const onStop = (signal) => {
+    if (stopping) {
+      return
+    }
+    stopping = true
+    try {
+      writeFileSync(join(dir, 'cancel'), signal)
+    } catch {
+      // The detach helper also checks this file; a failed write still signals a known pid.
+    }
+    const pid = readJson(join(dir, 'meta.json'))?.pid
+    if (typeof pid === 'number') {
+      signalJob(pid, signal)
+    }
+    process.exit(signal === 'SIGINT' ? 130 : 143)
+  }
+  process.once('SIGTERM', () => onStop('SIGTERM'))
+  process.once('SIGINT', () => onStop('SIGINT'))
+}
+
+export function detachJob(id, env = process.env, platform = process.platform) {
+  const dir = jobDir(id, jobRoot(env, platform))
   const request = readJson(join(dir, 'request.json'))
   if (!request || typeof request.command !== 'string') {
     throw new Error(`Durable job ${id} has no request`)
   }
   const metaPath = join(dir, 'meta.json')
   if (existsSync(metaPath)) {
+    return
+  }
+  const cancelFile = join(dir, 'cancel')
+  if (existsSync(cancelFile)) {
     return
   }
   const cwd =
@@ -303,32 +289,57 @@ export function detachJob(id, env = process.env) {
   const commandPath = join(dir, 'command.sh')
   const logPath = join(dir, 'output.log')
   const exitPath = join(dir, 'exit')
+  const runnerPath = join(dir, 'runner.sh')
+  const launchPath = join(dir, 'launch.ps1')
   writeFileSync(
     commandPath,
     request.command.endsWith('\n') ? request.command : `${request.command}\n`
   )
-  const script = [
-    'set +e',
-    `cd ${shellQuote(cwd)} || exit 97`,
-    `bash ${shellQuote(commandPath)}`,
-    '__orca_code=$?',
-    `printf '%s\\n' "$__orca_code" > ${shellQuote(exitPath)}`,
-    'exit "$__orca_code"'
-  ].join('\n')
-  const logFd = openSync(logPath, 'a')
+  const guest = isWslGuest(env, platform)
+  const plan = detachLaunchPlan({
+    platform,
+    guest,
+    setsidPath: guest ? findSetsid() : undefined,
+    cwd,
+    commandPath,
+    exitPath,
+    logPath,
+    runnerPath,
+    launchPath
+  })
+  if (plan.runnerBody) {
+    writeFileSync(runnerPath, plan.runnerBody)
+  }
+  if (plan.launchBody) {
+    writeFileSync(launchPath, plan.launchBody)
+  }
+  const logFd = plan.kind === 'powershell' ? undefined : openSync(logPath, 'a')
   let child
   try {
-    // New session, then the parent exits, so the job is reparented to pid 1 and
-    // outlives Claude's process tree. Do not forward the waiter's signals: a
-    // restart kills the waiter and must not kill the job.
-    child = spawn('/bin/bash', ['-c', script], {
+    // New session (Node detached, or setsid inside a WSL guest). The detach helper
+    // stays signal-deaf: SIGHUP from a Claude restart must not kill the job.
+    // TaskStop reaches the job only from the waiter's SIGTERM/SIGINT handler.
+    child = spawn(plan.command, plan.args, {
       cwd,
       env,
-      detached: true,
-      stdio: ['ignore', logFd, logFd]
+      detached: plan.detached,
+      windowsHide: plan.windowsHide,
+      stdio: plan.kind === 'powershell' ? 'ignore' : ['ignore', logFd, logFd]
     })
   } finally {
-    closeSync(logFd)
+    if (logFd !== undefined) {
+      closeSync(logFd)
+    }
+  }
+  if (plan.kind === 'setsid' && typeof child.pid === 'number') {
+    waitUntilSessionLeader(child.pid)
+  }
+  if (existsSync(cancelFile)) {
+    if (typeof child.pid === 'number') {
+      signalJob(child.pid, 'SIGTERM', platform)
+    }
+    child.unref()
+    return
   }
   writeFileSync(
     metaPath,
@@ -376,6 +387,10 @@ function copyNewOutput(logPath, offset) {
 }
 
 function runInline(request) {
+  if (process.platform === 'win32') {
+    process.stderr.write('orca-durable-job: detach failed\n')
+    process.exit(1)
+  }
   process.stderr.write('orca-durable-job: detach failed, running in this process\n')
   const child = spawn('/bin/bash', ['-c', request.command], {
     cwd: process.cwd(),
@@ -425,6 +440,8 @@ export async function runJob(id, env = process.env) {
   if (!request || typeof request.command !== 'string') {
     throw new Error(`Durable job ${id} has no request`)
   }
+  // TaskStop SIGTERMs this waiter. Forward it to the job group. Do not catch SIGHUP.
+  armWaiterStop(dir)
   const root = jobRoot(env)
   const existing = readJob(id, root)
   if (existing?.state === 'exited' || existing?.state === 'running' || existing?.state === 'lost') {
@@ -439,6 +456,9 @@ export async function runJob(id, env = process.env) {
     const job = readJob(id, root)
     return job && job.state !== 'pending' ? job : undefined
   }, 3000)
+  if (existsSync(join(dir, 'cancel'))) {
+    process.exit(143)
+  }
   if (!meta) {
     if (claimed) {
       runInline(request)
@@ -450,9 +470,6 @@ export async function runJob(id, env = process.env) {
 }
 
 export async function startJob({ command, cwd, sessionId, description = '' }, env = process.env) {
-  if (process.platform === 'win32') {
-    throw new Error('Durable jobs are not available on Windows')
-  }
   if (typeof command !== 'string' || command.trim() === '') {
     throw new Error('Missing command')
   }
@@ -497,7 +514,7 @@ export function readJobLog(id, root = jobRoot()) {
   }
 }
 
-export function stopJob(id, root = jobRoot()) {
+export function stopJob(id, root = jobRoot(), platform = process.platform) {
   const job = readJob(id, root)
   if (!job) {
     return { stopped: false, reason: 'missing' }
@@ -505,14 +522,8 @@ export function stopJob(id, root = jobRoot()) {
   if (job.state !== 'running' || typeof job.pid !== 'number' || job.pid <= 1) {
     return { stopped: false, reason: job.state, id }
   }
-  try {
-    process.kill(-job.pid, 'SIGTERM')
-  } catch {
-    try {
-      process.kill(job.pid, 'SIGTERM')
-    } catch {
-      return { stopped: false, reason: 'signal-failed', id }
-    }
+  if (!signalJob(job.pid, 'SIGTERM', platform)) {
+    return { stopped: false, reason: 'signal-failed', id }
   }
   return { stopped: true, id, pid: job.pid }
 }

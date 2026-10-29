@@ -10,6 +10,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { toLinuxPath } from '../../shared/wsl-paths'
 import { sweepDurableJobs } from './durable-background-job.mjs'
 
 const PLUGIN_NAME = 'orca-durable-jobs'
@@ -54,20 +55,53 @@ export function durableJobScriptPaths(
   return undefined
 }
 
-function contentVersion(runner: string, hook: string): string {
-  return createHash('sha256').update(runner).update(hook).digest('hex').slice(0, 20)
+function contentVersion(runner: string, hook: string, plan: string): string {
+  return createHash('sha256').update(runner).update(hook).update(plan).digest('hex').slice(0, 20)
 }
 
 export function durableJobBinDir(userDataPath: string): string {
   return join(userDataPath, 'claude-durable-jobs', 'bin')
 }
 
-function linkStableWaiter(runnerPath: string, userDataPath: string): void {
+export function durableJobWslBinDir(userDataPath: string): string {
+  return join(userDataPath, 'claude-durable-jobs', 'bin-wsl')
+}
+
+export function durableJobWslPluginDir(pluginDir: string): string {
+  return join(dirname(pluginDir), `${PLUGIN_NAME}-wsl`)
+}
+
+/** Bash launcher. A copy named orca-durable-job cannot pass invokedDirectly(); exec the real runner. */
+export function waiterLaunchScript(runnerPath: string): string {
+  return `#!/usr/bin/env bash\nexec node ${shellQuote(runnerPath)} "$@"\n`
+}
+
+function hookCommand(hookPath: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform === 'win32') {
+    // cmd.exe hook shells do not treat single quotes as quoting.
+    return `node "${hookPath.replaceAll('"', '')}"`
+  }
+  return shellQuote(hookPath)
+}
+
+function installWaiters(runnerPath: string, userDataPath: string): void {
   const binDir = durableJobBinDir(userDataPath)
   mkdirSync(binDir, { recursive: true })
   const linkPath = join(binDir, WAITER_NAME)
   rmSync(linkPath, { force: true })
-  symlinkSync(runnerPath, linkPath)
+  if (process.platform === 'win32') {
+    writeFileSync(linkPath, waiterLaunchScript(runnerPath))
+    chmodSync(linkPath, 0o755)
+    const cmdPath = join(binDir, `${WAITER_NAME}.cmd`)
+    writeFileSync(cmdPath, `@echo off\r\nnode "${runnerPath.replaceAll('"', '')}" %*\r\n`)
+  } else {
+    symlinkSync(runnerPath, linkPath)
+  }
+  const wslBin = durableJobWslBinDir(userDataPath)
+  mkdirSync(wslBin, { recursive: true })
+  const wslWaiter = join(wslBin, WAITER_NAME)
+  writeIfChanged(wslWaiter, waiterLaunchScript(toLinuxPath(runnerPath)))
+  chmodSync(wslWaiter, 0o755)
 }
 
 function writeIfChanged(path: string, content: string): void {
@@ -76,6 +110,30 @@ function writeIfChanged(path: string, content: string): void {
     return
   }
   writeFileSync(path, content)
+}
+
+function writePluginManifest(root: string, command: string, name: string): void {
+  writeIfChanged(
+    join(root, 'hooks', 'hooks.json'),
+    `${JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash',
+            hooks: [{ type: 'command', command, timeout: 15 }]
+          }
+        ]
+      }
+    })}\n`
+  )
+  writeIfChanged(
+    join(root, '.claude-plugin', 'plugin.json'),
+    `${JSON.stringify({
+      name,
+      version: '0.1.0',
+      description: 'Keep Claude background bash jobs alive across an Orca session restart'
+    })}\n`
+  )
 }
 
 export function ensureDurableBackgroundJobPlugin(userDataPath: string): string | undefined {
@@ -90,35 +148,24 @@ export function ensureDurableBackgroundJobPlugin(userDataPath: string): string |
   try {
     const runner = readFileSync(scripts.runner, 'utf8')
     const hook = readFileSync(scripts.hook, 'utf8')
-    const version = contentVersion(runner, hook)
+    const planPath = join(dirname(scripts.runner), 'durable-background-job-plan.mjs')
+    const plan = readFileSync(planPath, 'utf8')
+    const version = contentVersion(runner, hook, plan)
     const root = join(userDataPath, 'claude-durable-jobs', version, PLUGIN_NAME)
     const hookPath = join(root, 'hooks', 'durable-background-job-hook.mjs')
     const runnerPath = join(root, 'hooks', 'durable-background-job.mjs')
+    const installedPlanPath = join(root, 'hooks', 'durable-background-job-plan.mjs')
     writeIfChanged(runnerPath, runner)
     writeIfChanged(hookPath, hook)
+    writeIfChanged(installedPlanPath, plan)
     chmodSync(hookPath, 0o755)
     chmodSync(runnerPath, 0o755)
-    linkStableWaiter(runnerPath, userDataPath)
-    writeIfChanged(
-      join(root, 'hooks', 'hooks.json'),
-      `${JSON.stringify({
-        hooks: {
-          PreToolUse: [
-            {
-              matcher: 'Bash',
-              hooks: [{ type: 'command', command: shellQuote(hookPath), timeout: 15 }]
-            }
-          ]
-        }
-      })}\n`
-    )
-    writeIfChanged(
-      join(root, '.claude-plugin', 'plugin.json'),
-      `${JSON.stringify({
-        name: PLUGIN_NAME,
-        version: '0.1.0',
-        description: 'Keep Claude background bash jobs alive across an Orca session restart'
-      })}\n`
+    installWaiters(runnerPath, userDataPath)
+    writePluginManifest(root, hookCommand(hookPath), PLUGIN_NAME)
+    writePluginManifest(
+      durableJobWslPluginDir(root),
+      `node ${shellQuote(toLinuxPath(hookPath))}`,
+      `${PLUGIN_NAME}-wsl`
     )
     ready.set(userDataPath, root)
     return root
@@ -137,7 +184,8 @@ export function sweepOldDurableJobPlugins(userDataPath: string, resourcesPath?: 
   try {
     current = contentVersion(
       readFileSync(scripts.runner, 'utf8'),
-      readFileSync(scripts.hook, 'utf8')
+      readFileSync(scripts.hook, 'utf8'),
+      readFileSync(join(dirname(scripts.runner), 'durable-background-job-plan.mjs'), 'utf8')
     )
   } catch {
     return []

@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   readlinkSync,
   rmSync,
   writeFileSync
@@ -87,6 +88,13 @@ describe('sweepOldDurableJobPlugins', () => {
     const waiter = join(jobsRoot, 'bin', 'orca-durable-job')
     expect(lstatSync(waiter).isSymbolicLink()).toBe(true)
     expect(readlinkSync(waiter)).toBe(join(plugin!, 'hooks', 'durable-background-job.mjs'))
+    const wslWaiter = readFileSync(join(jobsRoot, 'bin-wsl', 'orca-durable-job'), 'utf8')
+    expect(wslWaiter).toContain('exec node ')
+    expect(wslWaiter).toContain('durable-background-job.mjs')
+    const wslHooks = JSON.parse(
+      readFileSync(join(plugin!, '..', 'orca-durable-jobs-wsl', 'hooks', 'hooks.json'), 'utf8')
+    ) as { hooks: { PreToolUse: { matcher: string }[] } }
+    expect(wslHooks.hooks.PreToolUse[0]?.matcher).toBe('Bash')
 
     expect(sweepOldDurableJobPlugins(userData)).toEqual([stale])
     expect(existsSync(plugin!)).toBe(true)
