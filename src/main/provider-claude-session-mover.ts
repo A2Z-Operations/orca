@@ -1,3 +1,4 @@
+import { translateMain } from './i18n/main-i18n'
 import type { RuntimePtyController } from './runtime/runtime-pty-controller-contract'
 import { agentHookServer } from './agent-hooks/server'
 import {
@@ -19,7 +20,10 @@ export type StartedClaudeSessionMover = ClaudeSessionMover & { stop: () => void 
 
 export type ProviderClaudeSessionMoverOptions = {
   headless: boolean
-  getController: () => Pick<RuntimePtyController, 'spawn' | 'getCwd' | 'getSize'> | null
+  getController: () =>
+    | (Pick<RuntimePtyController, 'spawn' | 'getCwd' | 'getSize' | 'write'> &
+        Partial<Pick<RuntimePtyController, 'serializeBuffer'>>)
+    | null
   onNotice: (notice: ClaudeSessionMoveNotice) => void
 }
 
@@ -52,7 +56,9 @@ export function createProviderClaudeSessionMover(
         strategy: createResumeMoveStrategy({
           getController: options.getController,
           getSettings: () => store.getSettings(),
-          platform: process.platform
+          platform: process.platform,
+          hooks: agentHookServer,
+          translate: translateMain
         }),
         headless: options.headless,
         onNotice: options.onNotice

@@ -1,5 +1,6 @@
 import type { ClaudeManagedAccountSummary } from '../../shared/managed-account-types'
 import type { InactiveAccountUsage, RateLimitState } from '../../shared/rate-limit-types'
+import { captureClaudeSessionMoveEndedWork } from './claude-session-move-handoff-note'
 import {
   CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT,
   CLAUDE_SESSION_MOVE_COOLDOWN_MS,
@@ -124,7 +125,13 @@ export function evaluateClaudeMoverSessions(
         worktreeId: view.worktreeId,
         connectionId: null,
         toAccountId: to.id,
-        providerSession: view.providerSession
+        providerSession: view.providerSession,
+        handoff: {
+          fromEmail: from.email,
+          toEmail: to.email,
+          detail: `${decision.window.name} ${decision.window.percent}%`,
+          endedWork: endedWorkFor(deps, view)
+        }
       })
       .then((outcome) => {
         if (outcome.kind === 'moved') {
@@ -144,4 +151,19 @@ export function evaluateClaudeMoverSessions(
       })
   }
   return readRequested
+}
+
+function endedWorkFor(deps: ClaudeSessionMoverDeps, view: ClaudeMoverSessionView) {
+  const rows = view.paneKey ? deps.hooks.getStatusSnapshotForPane(view.paneKey) : []
+  const sessionId = view.providerSession?.id
+  const row =
+    rows.find((entry) => !entry.providerSessionOnly && entry.providerSession?.id === sessionId) ??
+    rows.find((entry) => !entry.providerSessionOnly)
+  return captureClaudeSessionMoveEndedWork({
+    workingMode: row?.workingMode,
+    claudeRunningNonAgentTask: view.paneKey
+      ? deps.hooks.getClaudeRunningNonAgentTask(view.paneKey)
+      : undefined,
+    subagents: row?.subagents
+  })
 }

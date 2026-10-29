@@ -12,7 +12,8 @@ import { TEST_LEAF_1, TEST_LEAF_2 } from '../persistence/persistence-session-fix
 import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
 import type {
   ClaudeSessionMoveOutcome,
-  ClaudeSessionMoveRequest
+  ClaudeSessionMoveRequest,
+  ClaudeSessionMoveStrategy
 } from './claude-session-move-strategy'
 import { createClaudeSessionMover, type ClaudeSessionMoveNotice } from './claude-session-mover'
 
@@ -88,6 +89,8 @@ export function setup(
     headless?: boolean
     accounts?: ClaudeManagedAccountSummary[]
     getStatusSnapshotForPane?: AgentHookServer['getStatusSnapshotForPane']
+    /** When set, `move` delegates here and leaves the registry record on the old PTY. */
+    strategy?: ClaudeSessionMoveStrategy
   } = {}
 ) {
   const settings = {
@@ -106,8 +109,12 @@ export function setup(
   const stateListeners = new Set<(next: RateLimitState) => void>()
   const statusListeners = new Set<() => void>()
   const fetchInactive = vi.fn(async () => {})
+  const nonAgentTask = new Map<string, boolean>()
   const move = vi.fn<(request: ClaudeSessionMoveRequest) => Promise<ClaudeSessionMoveOutcome>>(
     async (request) => {
+      if (options.strategy) {
+        return options.strategy.move(request)
+      }
       const newPtyId = request.ptyId === 'pty-1' ? 'pty-new' : `${request.ptyId}-new`
       const index = records.findIndex((entry) => entry.ptyId === request.ptyId)
       const previous = records[index]
@@ -148,7 +155,8 @@ export function setup(
       },
       getStatusSnapshotForPane: options.getStatusSnapshotForPane ?? (() => []),
       getStatusChangeSnapshot: () => statuses,
-      getProviderSessionIdentities: () => providerSessions
+      getProviderSessionIdentities: () => providerSessions,
+      getClaudeRunningNonAgentTask: (paneKey) => nonAgentTask.get(paneKey)
     },
     registry: {
       list: () => [...records],
@@ -221,6 +229,13 @@ export function setup(
     records,
     setProviderSessions: (next: AgentHookProviderSessionIdentity[]) => {
       providerSessions = next
+    },
+    setNonAgentTask: (paneKey: string, running: boolean | undefined) => {
+      if (running === undefined) {
+        nonAgentTask.delete(paneKey)
+        return
+      }
+      nonAgentTask.set(paneKey, running)
     }
   }
 }

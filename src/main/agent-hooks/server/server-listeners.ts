@@ -221,6 +221,12 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
     return this.buildStatusChangeNotification().providerSessions
   }
 
+  /** Shell, cron, or owed-task work the child list does not show. Absent when the pane has no row. */
+  getClaudeRunningNonAgentTask(paneKey: string): boolean | undefined {
+    const running = this.state.lastStatusByPaneKey.get(paneKey)?.claudeRunningNonAgentTask
+    return typeof running === 'boolean' ? running : undefined
+  }
+
   getStatusSnapshotForPane(paneKey: string): AgentStatusIpcPayload[] {
     const legacy = this.state.lastStatusByPaneKey.get(paneKey)
     if (legacy) {
