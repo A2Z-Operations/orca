@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { InactiveAccountUsage, ProviderRateLimits } from '../../shared/rate-limit-types'
 import {
+  CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS,
   CLAUDE_SESSION_MOVE_COOLDOWN_MS,
   CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS,
   CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS,
@@ -67,11 +68,45 @@ describe('decideClaudeSessionMove', () => {
     })
   })
 
-  it('does not wait mid-turn when the main agent is done and the pane only monitors', () => {
+  it('does not wait mid-turn when the main agent is done and no background work is alive', () => {
     // paneState is the main agent's state once the session view is collected.
     const decision = decideClaudeSessionMove(inputs({ paneState: 'done' }))
     expect(decision).not.toEqual({ kind: 'wait', reason: 'mid-turn' })
     expect(decision.kind).toBe('move')
+  })
+
+  it('holds a done main agent while background work is alive, then moves', () => {
+    const waiting = {
+      paneState: 'done' as const,
+      paneBackgroundWork: true,
+      backgroundWaitStartedAt: NOW - CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS + 1
+    }
+    expect(decideClaudeSessionMove(inputs(waiting))).toEqual({
+      kind: 'wait',
+      reason: 'background-work'
+    })
+    expect(
+      decideClaudeSessionMove(
+        inputs({
+          ...waiting,
+          backgroundWaitStartedAt: NOW - CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS
+        })
+      ).kind
+    ).toBe('move')
+    expect(decideClaudeSessionMove(inputs({ ...waiting, backgroundWaitStartedAt: 0 })).kind).toBe(
+      'wait'
+    )
+    expect(
+      decideClaudeSessionMove(
+        inputs({ ...waiting, usage: limits(100), backgroundWaitStartedAt: NOW })
+      ).kind
+    ).toBe('move')
+    expect(
+      decideClaudeSessionMove(inputs({ paneState: 'done', paneBackgroundWork: false })).kind
+    ).toBe('move')
+    expect(
+      decideClaudeSessionMove(inputs({ paneState: 'working', paneBackgroundWork: true }))
+    ).toEqual({ kind: 'wait', reason: 'mid-turn' })
   })
 
   it('leaves a pinned session alone until its account is at the limit', () => {

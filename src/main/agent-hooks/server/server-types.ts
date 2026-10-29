@@ -63,6 +63,8 @@ export type AgentHookStatusChangeEntry = {
   state: AgentStatusState
   /** Main agent's own state when the hook published one. Absent on older rows; readers then use `state`. */
   mainAgentState?: AgentStatusState
+  /** A shell, cron, or monitor is still alive. Absent when nothing is running in the background. */
+  backgroundWork?: boolean
   receivedAt: number
   observedInCurrentRuntime: boolean
 }

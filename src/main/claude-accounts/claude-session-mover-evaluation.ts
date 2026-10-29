@@ -3,6 +3,7 @@ import type { InactiveAccountUsage, RateLimitState } from '../../shared/rate-lim
 import {
   CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT,
   CLAUDE_SESSION_MOVE_COOLDOWN_MS,
+  claudeSessionMoveNoticeDetail,
   decideClaudeSessionMove
 } from './claude-session-mover-policy'
 import {
@@ -28,6 +29,7 @@ export function evaluateClaudeMoverSessions(
     lastMoveAt,
     lastFailureAt,
     lastAskAt,
+    backgroundWaitAt,
     targetClaims,
     inflight,
     inflightPanes,
@@ -50,11 +52,17 @@ export function evaluateClaudeMoverSessions(
     const candidates = candidateAccounts
       .map((account) => claudeUsageForAccount(state, account, selectedId))
       .filter((usage): usage is InactiveAccountUsage => usage !== null)
+    // The clock starts at the first wait and restarts only once the shell or monitor is gone.
+    if (!view.paneBackgroundWork) {
+      backgroundWaitAt.delete(ptyId)
+    }
     const decision = decideClaudeSessionMove({
       now,
       setting: effective,
       pinned: view.record.pinned,
       paneState: view.paneState,
+      paneBackgroundWork: view.paneBackgroundWork,
+      backgroundWaitStartedAt: backgroundWaitAt.get(ptyId) ?? 0,
       usage: own?.rateLimits ?? null,
       candidates,
       candidateCount: candidateAccounts.length,
@@ -63,6 +71,13 @@ export function evaluateClaudeMoverSessions(
       lastFailureAt: lastFailureAt.get(ptyId) ?? 0,
       targetClaims
     })
+    if (
+      decision.kind === 'wait' &&
+      decision.reason === 'background-work' &&
+      !backgroundWaitAt.has(ptyId)
+    ) {
+      backgroundWaitAt.set(ptyId, now)
+    }
     if (decision.kind === 'read-usage') {
       remember(view, from, null, 'read-usage', own?.rateLimits ?? null, now)
       readRequested = true
@@ -98,7 +113,10 @@ export function evaluateClaudeMoverSessions(
           ptyId,
           from,
           to,
-          detail: `${decision.window.name} ${decision.window.percent}%`
+          detail: claudeSessionMoveNoticeDetail(
+            `${decision.window.name} ${decision.window.percent}%`,
+            view.paneBackgroundWork
+          )
         })
       }
       continue

@@ -19,12 +19,14 @@ function record(): ClaudePaneAccountRecord {
 
 function status(
   state: AgentHookStatusChangeEntry['state'],
-  mainAgentState?: AgentHookStatusChangeEntry['mainAgentState']
+  mainAgentState?: AgentHookStatusChangeEntry['mainAgentState'],
+  backgroundWork = false
 ): AgentHookStatusChangeEntry {
   return {
     paneKey: PANE,
     state,
     ...(mainAgentState ? { mainAgentState } : {}),
+    ...(backgroundWork ? { backgroundWork: true } : {}),
     receivedAt: 1,
     observedInCurrentRuntime: true
   }
@@ -53,5 +55,24 @@ describe('collectClaudeMoverSessions', () => {
     expect(paneState(status('working', 'working'))).toBe('working')
     expect(paneState(status('blocked'))).toBe('blocked')
     expect(paneState(status('waiting'))).toBe('waiting')
+  })
+
+  it('carries background work beside the main agent state', () => {
+    const view = (entry: AgentHookStatusChangeEntry) =>
+      collectClaudeMoverSessions({
+        records: [record()],
+        statuses: [entry],
+        providerSessions: [],
+        resolveProviderSession: () => null,
+        resolvePaneKey: () => PANE,
+        resolvePtyIdForPaneKey: () => null,
+        resolveWorktreeId: () => null,
+        accounts: [],
+        recordInferred: () => {},
+        now: 1
+      })[0]
+    expect(view(status('working', 'done', true))?.paneBackgroundWork).toBe(true)
+    expect(view(status('working', 'done', true))?.paneState).toBe('done')
+    expect(view(status('done'))?.paneBackgroundWork).toBe(false)
   })
 })

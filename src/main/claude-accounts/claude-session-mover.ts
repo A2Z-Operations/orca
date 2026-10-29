@@ -12,7 +12,8 @@ import { evaluateClaudeMoverSessions } from './claude-session-mover-evaluation'
 
 export function createClaudeSessionMover(deps: ClaudeSessionMoverDeps): ClaudeSessionMover {
   const history = createClaudeMoverHistory(deps)
-  const { lastMoveAt, lastFailureAt, lastAskAt, lastDecision, targetClaims } = history
+  const { lastMoveAt, lastFailureAt, lastAskAt, backgroundWaitAt, lastDecision, targetClaims } =
+    history
   let lastUsageReadAt = 0
   let headlessAskLogged = false
   let evaluating = false
@@ -52,7 +53,7 @@ export function createClaudeSessionMover(deps: ClaudeSessionMoverDeps): ClaudeSe
       now
     })
     const live = new Set(views.map((view) => view.record.ptyId))
-    for (const map of [lastMoveAt, lastFailureAt, lastAskAt, lastDecision]) {
+    for (const map of [lastMoveAt, lastFailureAt, lastAskAt, backgroundWaitAt, lastDecision]) {
       for (const ptyId of map.keys()) {
         if (!live.has(ptyId)) {
           map.delete(ptyId)

@@ -11,6 +11,8 @@ type AccountsBlock = {
   autoSwitchEnabled?: boolean
   /** Claude only: what the host does with running sessions near a usage limit (absent from older hosts). */
   sessionMover?: 'off' | 'ask' | 'move'
+  /** Claude only: the mover's last decision per live session. JSON carries the same records. */
+  sessionMoves?: readonly { ptyId: string; reason: string }[]
 }
 
 export function formatDataAccounts(label: string, state: ManagedDataAccountsState): string {
@@ -46,6 +48,9 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   }
   if (block.sessionMover !== undefined) {
     lines.push(`  session-mover: ${block.sessionMover}`)
+  }
+  for (const move of block.sessionMoves ?? []) {
+    lines.push(`  session ${move.ptyId}: ${move.reason}`)
   }
   return `Managed ${label} accounts (${block.accounts.length}):\n${lines.join('\n')}`
 }
