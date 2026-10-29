@@ -3,13 +3,15 @@ import {
   CLAUDE_PROFILE_POINTER_ENV
 } from '../../../../shared/claude-profile-routing'
 import { noteUserAnthropicBaseUrl } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-note'
+import { claudePoolAccountForLaunch } from '../../../claude-accounts/claude-account-pool-launch'
 import { getClaudeProfileRouter } from '../../../claude-accounts/claude-profile-installed-router'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import type { RuntimePtySpawnState } from './spawn-state'
 
 /**
  * Why: a session-mover resume names the account it moves to. A hand restart of a session the proxy
- * already moved relaunches on that billed account. Every other launch runs on the selected account.
+ * already moved relaunches on that billed account. Every other Orca-made launch runs on the
+ * selected account, or on the pool's choice when the pool is on.
  */
 export async function resolveRuntimeClaudeAuth(
   ctx: Pick<RuntimePtySpawnState, 'codexSelectionTarget'> & {
@@ -37,7 +39,38 @@ export async function resolveRuntimeClaudeAuth(
     }
     return router.prepareLaunchFor(assigned)
   }
-  return ctx.deps.prepareClaudeAuth ? ctx.deps.prepareClaudeAuth(ctx.codexSelectionTarget) : null
+  const pooled = claudePoolAccountForLaunch(ctx.codexSelectionTarget)
+  if (pooled?.named) {
+    const router = getClaudeProfileRouter()
+    if (router) {
+      try {
+        const preparation = await router.prepareLaunchFor(pooled.accountId)
+        return { ...preparation, pooled: true }
+      } catch (error) {
+        // A missing folder or a WSL account cannot take a host launch env. The selected account still launches.
+        console.warn(
+          '[claude-account-pool] Could not launch the pooled account; using the selected account:',
+          error
+        )
+      }
+    }
+  }
+  const selected = ctx.deps.prepareClaudeAuth
+    ? await ctx.deps.prepareClaudeAuth(ctx.codexSelectionTarget)
+    : null
+  // A named choice that failed to prepare is the selected account, so it is not recorded as pooled.
+  if (!selected || !pooled || pooled.named) {
+    return selected
+  }
+  return { ...selected, pooled: true }
+}
+
+/** An explicit account, or any pool choice, must not keep the selected account's shell pointer. */
+export function claudeLaunchPinsAccount(
+  auth: ClaudeRuntimeAuthPreparation | null,
+  claudeAccountId: string | undefined
+): boolean {
+  return claudeAccountId !== undefined || auth?.pooled === true
 }
 
 /**

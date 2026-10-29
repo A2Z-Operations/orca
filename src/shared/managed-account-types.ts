@@ -134,6 +134,8 @@ export type ClaudeRateLimitAccountsState = {
   sessionMover?: ClaudeSessionMoverSetting
   /** Whether launches bill through the local auth proxy; absent from older hosts. */
   authProxy?: 'on' | 'off'
+  /** Whether Orca-made Claude launches spread across accounts; absent from older hosts means off. */
+  accountPool?: 'off' | 'on'
   /** Panes whose billed account differs from the folder they were spawned in. */
   paneAssignments?: { ptyId: string; accountId: string }[]
   /** The mover's last decision per live session, newest first. */

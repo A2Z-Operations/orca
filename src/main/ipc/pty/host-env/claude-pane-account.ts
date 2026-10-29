@@ -94,6 +94,7 @@ export function recordClaudePaneAccountForSpawn(args: {
     return
   }
   const proxySlot = proxySlotFromBaseUrl(args.claudeAuth.envPatch)
+  const pooled = args.claudeAuth.pooled === true
   recordClaudePaneAccount({
     ptyId: args.ptyId,
     paneKey: args.paneKey,
@@ -103,7 +104,10 @@ export function recordClaudePaneAccountForSpawn(args: {
     // Why false: Orca chose this folder; a session whose shell chose its own is learned from its
     // transcript later and marked pinned there.
     pinned: false,
-    source: 'spawn',
-    ...(proxySlot ? { proxySlot, assignedAccountId: accountId } : {})
+    source: pooled ? 'pool' : 'spawn',
+    // A pooled launch records the assignment even before a proxy slot exists.
+    ...(proxySlot || pooled
+      ? { ...(proxySlot ? { proxySlot } : {}), assignedAccountId: accountId }
+      : {})
   })
 }

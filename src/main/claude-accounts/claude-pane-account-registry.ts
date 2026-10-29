@@ -10,7 +10,7 @@ import { normalizeClaudeConfigDir } from '../rate-limits/service/service-types'
  * is re-learned from the transcript path (`inferClaudeAccountIdFromTranscript`).
  */
 
-export type ClaudePaneAccountSource = 'spawn' | 'transcript'
+export type ClaudePaneAccountSource = 'spawn' | 'transcript' | 'pool'
 
 export type ClaudePaneAccountRecord = {
   ptyId: string

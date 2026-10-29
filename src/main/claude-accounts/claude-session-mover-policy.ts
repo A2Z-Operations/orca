@@ -72,8 +72,13 @@ export type ClaudeSessionMoveInputs = {
   allowMidTurn?: boolean
 }
 
-function isFresh(usage: { updatedAt: number } | null, now: number): boolean {
+/** A reading newer than one poll. Shared with the account pool, which skips anything older. */
+export function isClaudeUsageFresh(usage: { updatedAt: number } | null, now: number): boolean {
   return usage !== null && now - usage.updatedAt <= DEFAULT_POLL_MS
+}
+
+function isFresh(usage: { updatedAt: number } | null, now: number): boolean {
+  return isClaudeUsageFresh(usage, now)
 }
 
 /** The window nearest (or furthest over) its line; null when usage could not be read. */
