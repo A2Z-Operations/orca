@@ -21353,7 +21353,19 @@
         "noticeTitle": "Claude session mover",
         "movedBody": "{{from}} is near its usage limit. The session continues on {{to}}.",
         "askBody": "A session on {{from}} is near its usage limit. Set \"Move running sessions before a usage limit\" to Move to move it automatically.",
-        "failedBody": "A session on {{from}} could not be moved: {{detail}}"
+        "failedBody": "A session on {{from}} could not be moved: {{detail}}",
+        "handoff": {
+          "moved": "Orca moved this session from {{from}} to {{to}} because {{detail}}.",
+          "ended": "The restart ended any background jobs and subagents of the previous process ({{known}}).",
+          "continue": "Re-run what is still needed, then continue.",
+          "monitoring": "monitoring",
+          "backgroundTask": "a background task was still running",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})",
+          "more": "and {{count}} more",
+          "none": "none reported",
+          "detailFallback": "its usage limit"
+        }
       }
     },
     "managedData": {

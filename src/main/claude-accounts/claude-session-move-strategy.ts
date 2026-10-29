@@ -4,6 +4,15 @@ import { parsePaneKey } from '../../shared/stable-pane-id'
 import { buildAgentResumeStartupPlan } from '../../shared/tui-agent-resume-startup'
 import { resolveStartupShell } from '../../shared/tui-agent-startup-shell'
 import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
+import {
+  deliverClaudeSessionMoveHandoff,
+  type ClaudeSessionMoveHandoff
+} from './claude-session-move-handoff'
+import {
+  claudeResumeHookBaseline,
+  type ClaudeSessionMoveEndedWork,
+  type ClaudeSessionMoveHandoffTranslate
+} from './claude-session-move-handoff-note'
 
 export type ClaudeSessionMoveRequest = {
   ptyId: string
@@ -12,10 +21,17 @@ export type ClaudeSessionMoveRequest = {
   connectionId: string | null
   toAccountId: string
   providerSession: AgentProviderSessionMetadata
+  /** Pre-move hook facts. Present only when the mover is asking for the handoff note. */
+  handoff?: ClaudeSessionMoveHandoff
 }
 
 export type ClaudeSessionMoveOutcome =
-  | { kind: 'moved'; newPtyId: string }
+  | {
+      kind: 'moved'
+      newPtyId: string
+      endedWork?: ClaudeSessionMoveEndedWork
+      handoffNote?: 'sent' | 'unsent'
+    }
   | { kind: 'skipped'; reason: 'no-controller' | 'no-resume-plan' | 'no-pane' }
   | { kind: 'failed'; reason: 'owner-changed' | 'spawn-failed'; error: string }
 
@@ -24,10 +40,26 @@ export type ClaudeSessionMoveStrategy = {
   move(request: ClaudeSessionMoveRequest): Promise<ClaudeSessionMoveOutcome>
 }
 
+type MoveController = Pick<RuntimePtyController, 'spawn' | 'getCwd' | 'getSize'> &
+  Partial<Pick<RuntimePtyController, 'write' | 'serializeBuffer'>>
+
+type MoveHandoffHooks = {
+  getStatusSnapshotForPane: (paneKey: string) => readonly {
+    state: string
+    receivedAt: number
+    providerSession?: { id: string }
+    providerSessionOnly?: boolean
+  }[]
+  getProviderSessionIdentities: () => readonly { paneKey: string; sessionId: string }[]
+}
+
 export type ResumeMoveStrategyDeps = {
-  getController: () => Pick<RuntimePtyController, 'spawn' | 'getCwd' | 'getSize'> | null
+  getController: () => MoveController | null
   getSettings: () => AgentStartupSettings
   platform: NodeJS.Platform
+  /** Hook readiness for the handoff note. Absent in tests that only check the resume spawn. */
+  hooks?: MoveHandoffHooks
+  translate?: ClaudeSessionMoveHandoffTranslate
 }
 
 const FALLBACK_SIZE = { cols: 120, rows: 40 }
@@ -65,6 +97,9 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
         return { kind: 'skipped', reason: 'no-resume-plan' }
       }
       const size = controller.getSize?.(request.ptyId) ?? FALLBACK_SIZE
+      const baselineReceivedAt = deps.hooks
+        ? claudeResumeHookBaseline(deps.hooks.getStatusSnapshotForPane(request.paneKey))
+        : 0
       try {
         const result = await controller.spawn({
           ...size,
@@ -89,7 +124,20 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
           initiallyHidden: true,
           persistHostSessionBinding: true
         })
-        return { kind: 'moved', newPtyId: result.id }
+        const handoffNote = await deliverHandoffNote(
+          deps,
+          controller,
+          request,
+          result.id,
+          baselineReceivedAt
+        )
+        return {
+          kind: 'moved',
+          newPtyId: result.id,
+          ...(request.handoff
+            ? { endedWork: request.handoff.endedWork, ...(handoffNote ? { handoffNote } : {}) }
+            : {})
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return {
@@ -99,5 +147,45 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
         }
       }
     }
+  }
+}
+
+function hasPtyWrite(
+  controller: MoveController
+): controller is MoveController & Pick<RuntimePtyController, 'write'> {
+  return typeof controller.write === 'function'
+}
+
+async function deliverHandoffNote(
+  deps: ResumeMoveStrategyDeps,
+  controller: MoveController,
+  request: ClaudeSessionMoveRequest,
+  newPtyId: string,
+  baselineReceivedAt: number
+): Promise<'sent' | 'unsent' | undefined> {
+  if (!request.handoff) {
+    return undefined
+  }
+  const writer = deps.getController() ?? controller
+  if (!deps.hooks || !hasPtyWrite(writer)) {
+    return 'unsent'
+  }
+  try {
+    const handoffNote = await deliverClaudeSessionMoveHandoff({
+      controller: writer,
+      hooks: deps.hooks,
+      ptyId: newPtyId,
+      paneKey: request.paneKey,
+      sessionId: request.providerSession.id,
+      baselineReceivedAt,
+      handoff: request.handoff,
+      translate: deps.translate ?? ((_key, fallback) => fallback)
+    })
+    console.info(`[claude-session-mover] handoff note ${handoffNote} pty=${newPtyId}`)
+    return handoffNote
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[claude-session-mover] handoff note failed: ${message}`)
+    return 'unsent'
   }
 }

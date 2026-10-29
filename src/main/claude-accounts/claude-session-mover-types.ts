@@ -49,6 +49,7 @@ export type ClaudeSessionMoverDeps = {
     | 'getStatusChangeSnapshot'
     | 'getProviderSessionIdentities'
     | 'getStatusSnapshotForPane'
+    | 'getClaudeRunningNonAgentTask'
   >
   registry: {
     list: () => ClaudePaneAccountRecord[]
