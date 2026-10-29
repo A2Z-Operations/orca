@@ -3,6 +3,8 @@ import { BROWSER_HANDLER_GROUPS } from './browser-handler-groups'
 import { JIRA_HANDLER_GROUP } from './jira-handler-group'
 import { LINEAR_HANDLER_GROUP } from './linear-handler-group'
 import { REFERENCE_HANDLER_GROUP } from './reference-handler-group'
+import { JOB_HANDLER_GROUP } from './job-handler-group'
+import { SPEECH_HANDLER_GROUP } from './speech-handler-group'
 
 export type HandlerGroup = {
   name: string
@@ -235,16 +237,13 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     keys: ['profile state exports', 'profile state rollback'],
     load: async () => (await import('./handlers/profile-state.js')).PROFILE_STATE_HANDLERS
   },
+  JOB_HANDLER_GROUP,
   {
     name: 'diagnostics',
     keys: ['diagnostics memory', 'terminal-daemon status', 'terminal-daemon restart'],
     load: async () => (await import('./handlers/diagnostics.js')).DIAGNOSTICS_HANDLERS
   },
-  {
-    name: 'speech',
-    keys: ['speech openai-key status', 'speech openai-key set', 'speech openai-key clear'],
-    load: async () => (await import('./handlers/speech.js')).SPEECH_HANDLERS
-  },
+  SPEECH_HANDLER_GROUP,
   {
     name: 'introspection',
     keys: ['agent-context'],
