@@ -132,6 +132,10 @@ export type ClaudeRateLimitAccountsState = {
   autoSwitchEnabled?: boolean
   /** What this host does with running sessions near a usage limit; absent from older hosts. */
   sessionMover?: ClaudeSessionMoverSetting
+  /** Whether launches bill through the local auth proxy; absent from older hosts. */
+  authProxy?: 'on' | 'off'
+  /** Panes whose billed account differs from the folder they were spawned in. */
+  paneAssignments?: { ptyId: string; accountId: string }[]
   /** The mover's last decision per live session, newest first. */
   sessionMoves?: ClaudeSessionMoveSummary[]
 }
@@ -158,7 +162,7 @@ export type ClaudeAutoSwitchedEvent = {
   target: { runtime?: 'host' | 'wsl'; wslDistro?: string | null }
 } & Pick<
   ClaudeRateLimitAccountsState,
-  'systemDefaultHome' | 'systemDefaultEmail' | 'systemDefaultOrganizationUuid'
+  'systemDefaultHome' | 'systemDefaultEmail' | 'systemDefaultOrganizationUuid' | 'paneAssignments'
 >
 
 export type ClaudeManagedAccountRuntimeSelection = {

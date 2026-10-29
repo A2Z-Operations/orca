@@ -77,5 +77,22 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'orca account session-mover --agent claude --move',
       'orca account session-mover --agent claude --move --environment macstudio'
     ]
+  },
+  {
+    path: ['account', 'auth-proxy'],
+    summary:
+      'Bill Claude through a local auth proxy so a session can change accounts without restarting',
+    usage:
+      'orca account auth-proxy --agent claude (--on | --off) [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off'],
+    notes: [
+      'Writes the host setting behind Settings › Accounts › Claude › "Bill Claude through a local auth proxy" (accounts.setClaudeAuthProxy). Default on.',
+      "On: each Claude pane talks to a loopback proxy that sets the bearer for the account assigned to that pane. Off: today's behaviour, CLAUDE_CONFIG_DIR only.",
+      'With --environment the setting is written on that paired Orca server. A user-set ANTHROPIC_BASE_URL is left unchanged.'
+    ],
+    examples: [
+      'orca account auth-proxy --agent claude --off',
+      'orca account auth-proxy --agent claude --on --environment macstudio'
+    ]
   }
 ]

@@ -13,6 +13,10 @@ type AccountsBlock = {
   sessionMover?: 'off' | 'ask' | 'move'
   /** Claude only: the mover's last decision per live session. JSON carries the same records. */
   sessionMoves?: readonly { ptyId: string; reason: string }[]
+  /** Claude only: whether the host bills requests through the local auth proxy (absent from older hosts). */
+  authProxy?: 'on' | 'off'
+  /** Claude only: panes whose billed account differs from the folder they launched in. */
+  paneAssignments?: readonly { ptyId: string; accountId: string }[]
 }
 
 export function formatDataAccounts(label: string, state: ManagedDataAccountsState): string {
@@ -51,6 +55,12 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   }
   for (const move of block.sessionMoves ?? []) {
     lines.push(`  session ${move.ptyId}: ${move.reason}`)
+  }
+  if (block.authProxy !== undefined) {
+    lines.push(`  auth-proxy: ${block.authProxy}`)
+  }
+  for (const assignment of block.paneAssignments ?? []) {
+    lines.push(`  pane ${assignment.ptyId}: account ${assignment.accountId}`)
   }
   return `Managed ${label} accounts (${block.accounts.length}):\n${lines.join('\n')}`
 }

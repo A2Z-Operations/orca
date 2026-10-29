@@ -68,6 +68,25 @@ describe('decideClaudeSessionMove', () => {
     })
   })
 
+  it('moves during a turn when the caller says the move does not need the turn to end', () => {
+    expect(decideClaudeSessionMove(inputs({ paneState: 'working', allowMidTurn: true })).kind).toBe(
+      'move'
+    )
+    expect(decideClaudeSessionMove(inputs({ paneState: null, allowMidTurn: true })).kind).toBe(
+      'move'
+    )
+    expect(
+      decideClaudeSessionMove(
+        inputs({
+          paneState: 'done',
+          paneBackgroundWork: true,
+          backgroundWaitStartedAt: NOW,
+          allowMidTurn: true
+        })
+      ).kind
+    ).toBe('move')
+  })
+
   it('does not wait mid-turn when the main agent is done and no background work is alive', () => {
     // paneState is the main agent's state once the session view is collected.
     const decision = decideClaudeSessionMove(inputs({ paneState: 'done' }))

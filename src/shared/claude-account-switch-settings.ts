@@ -9,4 +9,6 @@ export type ClaudeAccountSwitchSettings = {
   claudeAccountSwitchRunningSessions?: ClaudeAccountSwitchRunningSessions
   /** Absent means 'ask'; a headless host treats 'ask' as 'move' because nobody can answer there. */
   claudeSessionMover?: ClaudeSessionMoverSetting
+  /** Absent means on. `!== false` keeps older persisted settings on the proxy. */
+  claudeAuthProxy?: boolean
 }

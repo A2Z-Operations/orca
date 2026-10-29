@@ -21365,7 +21365,12 @@
           "more": "and {{count}} more",
           "none": "none reported",
           "detailFallback": "its usage limit"
-        }
+        },
+        "movedRestartlessBody": "{{from}} is near its usage limit. The session continues on {{to}} without a restart."
+      },
+      "authProxy": {
+        "settingTitle": "Bill Claude through a local auth proxy",
+        "settingDescription": "A running Claude session can change accounts without restarting. The next request uses the new account."
       }
     },
     "managedData": {

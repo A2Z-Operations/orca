@@ -66,6 +66,31 @@ describe('createClaudeSessionMover', () => {
     expect(move).toHaveBeenCalledTimes(1)
   })
 
+  it('flips a proxy slot during a turn and keeps the same pty on the assigned account', async () => {
+    const proxyMove = vi.fn(async (request: { ptyId: string }) => ({
+      kind: 'moved' as const,
+      newPtyId: request.ptyId
+    }))
+    const { mover, session, publish, move, notices, records } = setup({
+      proxyStrategy: { move: proxyMove }
+    })
+    session('pty-1', PANE_1, 'a', 'working')
+    records[0]!.proxySlot = 'slot-1'
+    records[0]!.assignedAccountId = 'b'
+    mover.start()
+    publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    expect(move).not.toHaveBeenCalled()
+    expect(proxyMove).toHaveBeenCalledTimes(1)
+    expect(notices[0]).toMatchObject({ kind: 'moved', restartless: true, detail: 'pty-1' })
+    expect(mover.lastDecisions()[0]).toMatchObject({
+      ptyId: 'pty-1',
+      fromAccountId: 'b',
+      toAccountId: 'c',
+      reason: 'moved'
+    })
+  })
+
   it('lets one target take one session at a time', async () => {
     const { mover, session, publish, move } = setup()
     session('pty-1', PANE_1, 'b')

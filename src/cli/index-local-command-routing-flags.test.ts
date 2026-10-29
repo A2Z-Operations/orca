@@ -403,4 +403,29 @@ describe('runtime-selector flags on locally pinned CLI commands', () => {
     expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
     expect(callMock).toHaveBeenCalledWith('accounts.setClaudeSessionMover', { setting: 'move' })
   })
+
+  it('routes `account auth-proxy --environment` to the named server too', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
+    callMock.mockImplementation(async (method: string) => {
+      if (method === 'accounts.setClaudeAuthProxy') {
+        return okFixture('req_auth_proxy', {
+          accounts: [],
+          activeAccountId: null,
+          authProxy: 'off'
+        })
+      }
+      throw new Error(`unexpected ${method}`)
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    runtimeClientConstructorMock.mockClear()
+
+    await main(
+      ['account', 'auth-proxy', '--agent', 'claude', '--off', '--environment', 'm4air', '--json'],
+      '/tmp/repo'
+    )
+
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual({ authProxy: 'off' })
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
+    expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAuthProxy', { enabled: false })
+  })
 })

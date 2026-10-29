@@ -10,6 +10,7 @@ import type { RateLimitService } from '../rate-limits/service'
 import { claudeStateFile, readClaudeFolderLogin } from './claude-account-folder'
 import { savedWslClaudeAccountHome } from './claude-profile-wsl-paths'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
+import { listClaudePaneAccounts } from './claude-pane-account-registry'
 import {
   getClaudeSelectionTargetForAccount,
   getClaudeWslSelectionKey,
@@ -35,6 +36,7 @@ export type ClaudeAccountSettings = Pick<
   | 'activeClaudeManagedAccountIdsByRuntime'
   | 'claudeAutoSwitchEnabled'
   | 'claudeSessionMover'
+  | 'claudeAuthProxy'
 >
 
 export type ClaudeAccountStore = {
@@ -82,6 +84,11 @@ export class ClaudeAccountSelection {
     return this.list()
   }
 
+  setAuthProxy(enabled: boolean): ClaudeRateLimitAccountsState {
+    this.saveSettings({ claudeAuthProxy: enabled })
+    return this.list()
+  }
+
   list(): ClaudeRateLimitAccountsState {
     this.pruneSelection()
     const settings = this.store.getSettings()
@@ -96,6 +103,11 @@ export class ClaudeAccountSelection {
         }
       })
       .sort((a, b) => b.updatedAt - a.updatedAt)
+    const paneAssignments = listClaudePaneAccounts().flatMap((record) =>
+      record.assignedAccountId && record.assignedAccountId !== record.accountId
+        ? [{ ptyId: record.ptyId, accountId: record.assignedAccountId }]
+        : []
+    )
     const userConfigDir = this.runtimeAuth.router.userConfigDir()
     // Throttle parsing of the large, frequently rewritten personal state file.
     const systemDefault =
@@ -106,7 +118,9 @@ export class ClaudeAccountSelection {
       activeAccountIdsByRuntime: selection,
       autoSwitchEnabled: settings.claudeAutoSwitchEnabled === true,
       sessionMover: settings.claudeSessionMover ?? 'ask',
+      authProxy: settings.claudeAuthProxy === false ? 'off' : 'on',
       sessionMoves: this.sessionMovesProvider?.() ?? [],
+      ...(paneAssignments.length > 0 ? { paneAssignments } : {}),
       ...(accounts.length > 0
         ? { systemDefaultHome: this.runtimeAuth.router.systemDefaultHome() }
         : {}),

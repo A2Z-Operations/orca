@@ -33,6 +33,8 @@ export const CodexSelectionTarget = z.discriminatedUnion('runtime', [
 
 export const SetClaudeSessionMoverParams = z.object({ setting: z.enum(['off', 'ask', 'move']) })
 
+export const SetClaudeAuthProxyParams = z.object({ enabled: z.boolean() })
+
 export const SetClaudeAutoSwitchParams = z.object({ enabled: z.boolean() })
 
 export const SelectAccountParams = z.object({

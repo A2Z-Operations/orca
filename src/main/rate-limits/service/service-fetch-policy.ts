@@ -108,9 +108,16 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
   ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): void {
     // Why first: a session of another managed account reports that account's own quota; keeping it in
     // the account's entry gives the session mover a fresh reading between polls, for free.
+    // A proxy move bills `billingAccountId` while the spawn folder (configDir) stays put.
+    const inactive = this.inactiveClaudeAccountsResolver?.() ?? []
+    const billed = event.billingAccountId
+    if (billed && inactive.some((account) => account.id === billed)) {
+      this.ingestLiveInactiveClaudeRateLimits(billed, event)
+      return
+    }
     const eventConfigDir = normalizeClaudeConfigDir(event.configDir)
     let liveAccountId: string | null = null
-    if (eventConfigDir) {
+    if (!billed && eventConfigDir) {
       try {
         liveAccountId = this.liveClaudeAccountResolver?.(eventConfigDir) ?? null
       } catch (error) {
@@ -118,30 +125,28 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
         console.debug('[rate-limits] live account resolver threw', { eventConfigDir, error })
       }
     }
-    if (
-      liveAccountId &&
-      (this.inactiveClaudeAccountsResolver?.() ?? []).some(
-        (account) => account.id === liveAccountId
-      )
-    ) {
+    if (liveAccountId && inactive.some((account) => account.id === liveAccountId)) {
       this.ingestLiveInactiveClaudeRateLimits(liveAccountId, event)
       return
     }
     // Why: attribution needs the selected account's config dir; until a fetch cycle captures it, drop posts rather than guess the account.
+    // A billed post already names its account, so a missing or mismatched spawn folder does not drop it.
     const snapshot = this.lastClaudeAuthSnapshot
-    if (!snapshot) {
-      console.debug('[rate-limits] dropped live Claude usage: no auth snapshot yet', {
-        eventConfigDir: event.configDir
-      })
-      return
-    }
-    // Different accounts/runtimes report their own quota; never merge them into this bar.
-    if (normalizeClaudeConfigDir(event.configDir) !== snapshot.configDir) {
-      console.debug('[rate-limits] dropped live Claude usage: configDir mismatch', {
-        eventConfigDir: event.configDir,
-        snapshotConfigDir: snapshot.configDir
-      })
-      return
+    if (!billed) {
+      if (!snapshot) {
+        console.debug('[rate-limits] dropped live Claude usage: no auth snapshot yet', {
+          eventConfigDir: event.configDir
+        })
+        return
+      }
+      // Different accounts/runtimes report their own quota; never merge them into this bar.
+      if (normalizeClaudeConfigDir(event.configDir) !== snapshot.configDir) {
+        console.debug('[rate-limits] dropped live Claude usage: configDir mismatch', {
+          eventConfigDir: event.configDir,
+          snapshotConfigDir: snapshot.configDir
+        })
+        return
+      }
     }
     const previous = this.state.claude
     const now = Date.now()
@@ -192,7 +197,7 @@ export abstract class RateLimitServiceFetchPolicy extends RateLimitServiceFetchT
           lastSuccessfulSource: 'live-session',
           credentialSource: previous?.usageMetadata?.credentialSource,
           retryAtMs: previous?.usageMetadata?.retryAtMs,
-          authProvenance: snapshot.provenance
+          authProvenance: snapshot?.provenance ?? (billed ? `profile:${billed}` : 'system')
         }
       }
     })

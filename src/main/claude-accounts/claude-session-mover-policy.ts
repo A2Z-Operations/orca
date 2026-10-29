@@ -68,6 +68,8 @@ export type ClaudeSessionMoveInputs = {
   lastMoveAt: number
   lastFailureAt: number
   targetClaims: ReadonlyMap<string, ClaudeTargetClaim>
+  /** A proxy flip takes effect on the next request, so it does not wait for the turn to end. */
+  allowMidTurn?: boolean
 }
 
 function isFresh(usage: { updatedAt: number } | null, now: number): boolean {
@@ -138,18 +140,21 @@ export function decideClaudeSessionMove(
     return { kind: 'stay', reason: 'cooldown' }
   }
   // Why never mid-turn: a restart during a tool call or a permission prompt loses the turn.
-  // paneState is the main agent's own state when the hook published one.
-  if (inputs.paneState === null) {
-    return { kind: 'wait', reason: 'no-status' }
-  }
-  if (inputs.paneState !== 'done') {
-    return { kind: 'wait', reason: 'mid-turn' }
-  }
-  // A shell or monitor can outlive the main agent. Hold briefly, and never past the hard limit.
-  if (inputs.paneBackgroundWork && !atLimit) {
-    const startedAt = inputs.backgroundWaitStartedAt ?? 0
-    if (startedAt === 0 || now - startedAt < CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS) {
-      return { kind: 'wait', reason: 'background-work' }
+  // A proxy move does not restart, so it skips these waits and still keeps the claim, cooldown, and debit.
+  if (!inputs.allowMidTurn) {
+    // paneState is the main agent's own state when the hook published one.
+    if (inputs.paneState === null) {
+      return { kind: 'wait', reason: 'no-status' }
+    }
+    if (inputs.paneState !== 'done') {
+      return { kind: 'wait', reason: 'mid-turn' }
+    }
+    // A shell or monitor can outlive the main agent. Hold briefly, and never past the hard limit.
+    if (inputs.paneBackgroundWork && !atLimit) {
+      const startedAt = inputs.backgroundWaitStartedAt ?? 0
+      if (startedAt === 0 || now - startedAt < CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS) {
+        return { kind: 'wait', reason: 'background-work' }
+      }
     }
   }
   const open = inputs.candidates.filter((candidate) => {

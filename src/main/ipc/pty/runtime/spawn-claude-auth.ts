@@ -2,17 +2,18 @@ import {
   CLAUDE_INJECTED_CONFIG_DIR_ENV,
   CLAUDE_PROFILE_POINTER_ENV
 } from '../../../../shared/claude-profile-routing'
+import { noteUserAnthropicBaseUrl } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-note'
 import { getClaudeProfileRouter } from '../../../claude-accounts/claude-profile-installed-router'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import type { RuntimePtySpawnState } from './spawn-state'
 
 /**
- * Why: a session-mover resume names the account it moves to; every other launch runs on the selected
- * account, as before. The installed router is the one that routes the selected account's launches.
+ * Why: a session-mover resume names the account it moves to. A hand restart of a session the proxy
+ * already moved relaunches on that billed account. Every other launch runs on the selected account.
  */
 export async function resolveRuntimeClaudeAuth(
   ctx: Pick<RuntimePtySpawnState, 'codexSelectionTarget'> & {
-    args: Pick<RuntimePtySpawnState['args'], 'claudeAccountId'>
+    args: Pick<RuntimePtySpawnState['args'], 'claudeAccountId' | 'resumeProviderSession'>
     deps: Pick<RuntimePtySpawnState['deps'], 'prepareClaudeAuth'>
   }
 ): Promise<ClaudeRuntimeAuthPreparation | null> {
@@ -23,6 +24,18 @@ export async function resolveRuntimeClaudeAuth(
       throw new Error('claude_account_router_unavailable')
     }
     return router.prepareLaunchFor(accountId)
+  }
+  const sessionId = ctx.args.resumeProviderSession?.id
+  // Optional: test doubles of the router only implement prepareLaunchFor.
+  const assigned = sessionId
+    ? getClaudeProfileRouter()?.assignedAccountForResume?.(sessionId)
+    : null
+  if (assigned) {
+    const router = getClaudeProfileRouter()
+    if (!router) {
+      throw new Error('claude_account_router_unavailable')
+    }
+    return router.prepareLaunchFor(assigned)
   }
   return ctx.deps.prepareClaudeAuth ? ctx.deps.prepareClaudeAuth(ctx.codexSelectionTarget) : null
 }
@@ -48,5 +61,10 @@ export function applyRuntimeClaudeAuthEnv(
     delete base[CLAUDE_INJECTED_CONFIG_DIR_ENV]
     delete base.CLAUDE_CONFIG_DIR
   }
-  return { ...base, ...auth.envPatch }
+  const patch = { ...auth.envPatch }
+  if (base.ANTHROPIC_BASE_URL && patch.ANTHROPIC_BASE_URL) {
+    delete patch.ANTHROPIC_BASE_URL
+    noteUserAnthropicBaseUrl()
+  }
+  return { ...base, ...patch }
 }

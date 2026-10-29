@@ -19,6 +19,10 @@ import { prepareCodexAiVaultSessionResume } from '../codex/codex-ai-vault-sessio
 import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
 import { resolveHostAgentBaseEnvironment } from '../runtime/structured-agent-shell-environment'
 import { isWslHostOrcadProcess } from '../ipc/wsl-guest-windows-drive-path'
+import {
+  startClaudeAuthProxy,
+  stopClaudeAuthProxy
+} from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
 
 type StructuredLaunchInput = { launchEnv: NodeJS.ProcessEnv }
@@ -81,7 +85,9 @@ export function createOrcadAccountServices(args: {
           type: 'notification',
           source: 'plugin',
           title: 'Claude session mover',
-          body: `${notice.kind}: session ${notice.ptyId} on ${notice.from.email}${notice.to ? ` → ${notice.to.email}` : ''} (${notice.detail})`
+          body: notice.restartless
+            ? `${notice.from.email} continues on ${notice.to?.email ?? ''} without a restart`
+            : `${notice.kind}: session ${notice.ptyId} on ${notice.from.email}${notice.to ? ` → ${notice.to.email}` : ''} (${notice.detail})`
         })
     }
   })
@@ -91,9 +97,11 @@ export function createOrcadAccountServices(args: {
   const unsubscribePolling = store.onSettingsChanged((updates) => {
     polling.apply(updates)
   })
-  args.registerCleanup(() => {
+  void startClaudeAuthProxy()
+  args.registerCleanup(async () => {
     unsubscribePolling()
     services.sessionMover?.stop()
+    await stopClaudeAuthProxy()
     attachedRuntime = null
     services.rateLimits.stop()
     args.setClaudeStatusLineListener(null)

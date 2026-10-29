@@ -91,6 +91,7 @@ export function setup(
     getStatusSnapshotForPane?: AgentHookServer['getStatusSnapshotForPane']
     /** When set, `move` delegates here and leaves the registry record on the old PTY. */
     strategy?: ClaudeSessionMoveStrategy
+    proxyStrategy?: ClaudeSessionMoveStrategy
   } = {}
 ) {
   const settings = {
@@ -169,6 +170,7 @@ export function setup(
     resolveWorktreeId: () => 'repo-local::/fixture',
     accountHomes: (accountId) => [`/profiles/${accountId}/home`],
     strategy: { move },
+    ...(options.proxyStrategy ? { proxyStrategy: options.proxyStrategy } : {}),
     headless: options.headless ?? false,
     onNotice: (notice) => notices.push(notice),
     log

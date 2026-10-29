@@ -1,4 +1,5 @@
 import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
+import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
 import type { AgentStartupSettings } from '../../shared/agent-startup-plan-inputs'
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import { buildAgentResumeStartupPlan } from '../../shared/tui-agent-resume-startup'
@@ -35,7 +36,7 @@ export type ClaudeSessionMoveOutcome =
   | { kind: 'skipped'; reason: 'no-controller' | 'no-resume-plan' | 'no-pane' }
   | { kind: 'failed'; reason: 'owner-changed' | 'spawn-failed'; error: string }
 
-/** How a session gets onto another account. `resume` restarts it in place; a token swap is a later strategy. */
+/** How a session gets onto another account. `resume` restarts it; `proxy` flips the slot and keeps the PTY. */
 export type ClaudeSessionMoveStrategy = {
   move(request: ClaudeSessionMoveRequest): Promise<ClaudeSessionMoveOutcome>
 }
@@ -63,6 +64,36 @@ export type ResumeMoveStrategyDeps = {
 }
 
 const FALLBACK_SIZE = { cols: 120, rows: 40 }
+
+export type ProxyMoveStrategyDeps = {
+  getPane: (ptyId: string) => ClaudePaneAccountRecord | null
+  assignSlot: (slot: string, accountId: string) => boolean
+  assignAccount: (ptyId: string, accountId: string, providerSessionId: string) => boolean
+  rememberSession: (sessionId: string, accountId: string) => void
+}
+
+/**
+ * The pane already talks to the auth proxy. Point its slot at the target account; the next request
+ * bills that account, and the PTY stays. A missing slot is `no-controller` (fall back is the caller's).
+ */
+export function createProxyMoveStrategy(deps: ProxyMoveStrategyDeps): ClaudeSessionMoveStrategy {
+  return {
+    async move(request) {
+      const pane = deps.getPane(request.ptyId)
+      if (!pane) {
+        return { kind: 'skipped', reason: 'no-pane' }
+      }
+      if (!pane.proxySlot || !deps.assignSlot(pane.proxySlot, request.toAccountId)) {
+        return { kind: 'skipped', reason: 'no-controller' }
+      }
+      if (!deps.assignAccount(request.ptyId, request.toAccountId, request.providerSession.id)) {
+        return { kind: 'skipped', reason: 'no-pane' }
+      }
+      deps.rememberSession(request.providerSession.id, request.toAccountId)
+      return { kind: 'moved', newPtyId: request.ptyId }
+    }
+  }
+}
 
 /**
  * `claude --resume <id>` in the same pane, spawned on the target account: the resume is built as the

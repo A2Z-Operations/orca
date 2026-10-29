@@ -40,6 +40,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'account list',
       'account select',
       'account rm',
+      'account auth-proxy',
       'account auto-switch',
       'account session-mover'
     ],
