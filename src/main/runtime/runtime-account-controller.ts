@@ -1,3 +1,4 @@
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import { hasAppEnvironment } from '../../shared/app-environment'
 import { getManagedDataAccountService } from '../managed-data-accounts/service'
@@ -180,12 +181,12 @@ export class RuntimeAccountController {
     return this.requireServices().claudeAccounts.selectAccount(accountId)
   }
 
-  setClaudeAutoSwitch(enabled: boolean): ClaudeRateLimitAccountsState {
-    return this.requireServices().claudeAccounts.setAutoSwitch(enabled)
+  setClaudeSessionMover(setting: ClaudeSessionMoverSetting): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setSessionMover(setting)
   }
 
-  setClaudeSessionMover(setting: 'off' | 'ask' | 'move'): ClaudeRateLimitAccountsState {
-    return this.requireServices().claudeAccounts.setSessionMover(setting)
+  setClaudeAutoSwitch(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setAutoSwitch(enabled)
   }
 
   setClaudeAuthProxy(enabled: boolean): ClaudeRateLimitAccountsState {
@@ -195,6 +196,10 @@ export class RuntimeAccountController {
   /** Live listener. Does not require the account service: the proxy is process-global. */
   claudeAuthProxyStatus(): ClaudeAuthProxyStatus {
     return readClaudeAuthProxyStatus()
+  }
+
+  setClaudeAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setAccountPool(enabled)
   }
 
   /** Works without account services: a WSL guest has the proxy and the pane registry, not the desktop's accounts. */

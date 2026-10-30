@@ -31,6 +31,7 @@ import { normalizeCodexRuntimeSelection } from './codex-accounts/runtime-selecti
 import { normalizeClaudeRuntimeSelection } from './claude-accounts/runtime-selection'
 import type { ClaudeStatusLineRateLimits } from '../shared/claude-statusline-rate-limits'
 import { resolveClaudeAccountHome } from './claude-accounts/claude-account-home-attribution'
+import { bindClaudePoolLaunchToServices } from './claude-accounts/claude-account-pool-launch'
 
 export type ProviderAccountServices = {
   sessionMover: StartedClaudeSessionMover | null
@@ -62,6 +63,11 @@ export function createProviderAccountServices(
   )
   const claudeRuntimeAuth = new ClaudeRuntimeAuthService(store)
   const claudeAccounts = new ClaudeAccountService(store, rateLimits, claudeRuntimeAuth)
+  bindClaudePoolLaunchToServices({
+    getSettings: () => store.getSettings(),
+    listAccounts: () => claudeAccounts.listAccounts(),
+    getRateLimits: () => rateLimits.getState()
+  })
   rateLimits.onStateChange(
     createClaudeAccountAutoSwitch({
       getSettings: () => store.getSettings(),

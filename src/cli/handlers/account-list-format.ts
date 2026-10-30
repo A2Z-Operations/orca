@@ -11,14 +11,16 @@ type AccountsBlock = {
   autoSwitchEnabled?: boolean
   /** Claude only: what the host does with running sessions near a usage limit (absent from older hosts). */
   sessionMover?: 'off' | 'ask' | 'move'
-  /** Claude only: whether launches bill through the local auth proxy. */
-  authProxy?: 'on' | 'off'
-  /** Claude only: Windows view of WSL guest billing. */
-  wslAuthProxy?: 'on' | 'unsupported:wsl'
   /** Claude only: the mover's last decision per live session. JSON carries the same records. */
   sessionMoves?: readonly { ptyId: string; reason: string }[]
+  /** Claude only: whether new launches spread across accounts (absent from older hosts). */
+  pool?: 'on' | 'off'
   /** Claude only: live sessions billed to each account (absent from older hosts). */
   assignedSessions?: readonly { accountId: string; count: number }[]
+  /** Claude only: whether the host bills requests through the local auth proxy (absent from older hosts). */
+  authProxy?: 'on' | 'off'
+  /** Claude only: whether a WSL guest can bill through its own listener (absent when this host has no WSL accounts). */
+  wslAuthProxy?: 'on' | 'unsupported:wsl'
   /** Claude only: panes whose billed account differs from the folder they launched in. */
   paneAssignments?: readonly { ptyId: string; accountId: string }[]
 }
@@ -63,14 +65,17 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   if (block.sessionMover !== undefined) {
     lines.push(`  session-mover: ${block.sessionMover}`)
   }
+  if (block.pool !== undefined) {
+    lines.push(`  pool: ${block.pool}`)
+  }
+  for (const move of block.sessionMoves ?? []) {
+    lines.push(`  session ${move.ptyId}: ${move.reason}`)
+  }
   if (block.authProxy !== undefined) {
     lines.push(`  auth-proxy: ${block.authProxy}`)
   }
   if (block.wslAuthProxy !== undefined) {
     lines.push(`  wsl auth-proxy: ${block.wslAuthProxy}`)
-  }
-  for (const move of block.sessionMoves ?? []) {
-    lines.push(`  session ${move.ptyId}: ${move.reason}`)
   }
   for (const assignment of block.paneAssignments ?? []) {
     lines.push(`  pane ${assignment.ptyId}: account ${assignment.accountId}`)

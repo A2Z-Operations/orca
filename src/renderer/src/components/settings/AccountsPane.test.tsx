@@ -343,7 +343,7 @@ describe('Claude accounts section', () => {
     expect(render({ accounts }, {}, remote)).not.toContain('Switch accounts before a usage limit')
   })
 
-  it('lists recent session moves', () => {
+  it('lists recent session moves with the same rows as orca account moves', () => {
     expect(render({})).not.toContain('Recent moves')
     expect(render({ sessionMoves: [] })).toContain('No Claude session moves.')
     const markup = render(

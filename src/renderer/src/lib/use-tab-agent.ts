@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAppStore } from '@/store'
+import { useAppStore, type AppState } from '@/store'
 import { worktreeUsesRemoteConnection } from '@/store/terminals/terminal-workspace-routing'
 import { hasRemoteRuntimePtyForTab } from './tab-agent-remote-pty-selector'
 import { isTerminalLeafId, makePaneKey } from '../../../shared/stable-pane-id'
@@ -18,6 +18,29 @@ import {
 } from '../../../shared/tab-agent-from-signals'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import type { TerminalAgent } from '../../../shared/terminal-agent'
+
+/** The PTY of the focused leaf, or the only PTY when the tab has no split. */
+export function focusedTerminalPtyId(
+  state: {
+    terminalLayoutsByTabId?: AppState['terminalLayoutsByTabId']
+    ptyIdsByTabId?: AppState['ptyIdsByTabId']
+  },
+  tabId: string
+): string | null {
+  const layout = state.terminalLayoutsByTabId?.[tabId]
+  const activeLeafId = layout?.activeLeafId
+  const leafPty = activeLeafId ? layout?.ptyIdsByLeafId?.[activeLeafId] : undefined
+  if (leafPty) {
+    return leafPty
+  }
+  const ptyIds = state.ptyIdsByTabId?.[tabId] ?? []
+  const onlyPty = ptyIds.length === 1 ? ptyIds[0] : undefined
+  return onlyPty ?? null
+}
+
+export function useFocusedTerminalPtyId(tabId: string): string | null {
+  return useAppStore((state) => focusedTerminalPtyId(state, tabId))
+}
 
 /** Resolve pane identity, separate from activity, without foreground probes: live focused hook → process (normalized to owner group) → reuse/hookless title → completed/retained focused identity → sleeping session → launch → sibling fallback. Native OpenCode titles cannot displace durable ownership; local OSC 133;D suppresses exited idle identity. */
 export function useTabAgent(tab: TerminalTab): TerminalAgent | null {
@@ -73,16 +96,7 @@ export function useTabAgent(tab: TerminalTab): TerminalAgent | null {
   )
 
   // Focused pane's PTY; only used to reset per-process-generation signals on respawn.
-  const ptyId = useAppStore((s) => {
-    const layout = s.terminalLayoutsByTabId[tab.id]
-    const activeLeafId = layout?.activeLeafId
-    const leafPty = activeLeafId ? layout?.ptyIdsByLeafId?.[activeLeafId] : undefined
-    if (leafPty) {
-      return leafPty
-    }
-    const ptyIds = s.ptyIdsByTabId[tab.id] ?? []
-    return ptyIds.length === 1 ? ptyIds[0]! : null
-  })
+  const ptyId = useFocusedTerminalPtyId(tab.id)
   // Why: with no layout to place a completed row, only a single-pane tab may treat it as focused-pane exit evidence.
   const completedHookScopeKnown = useAppStore((s) => {
     const layout = s.terminalLayoutsByTabId[tab.id]
