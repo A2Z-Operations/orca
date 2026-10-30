@@ -4,8 +4,12 @@ import {
 } from '../../../../shared/claude-profile-routing'
 import { claudeAuthProxyListeningPort } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { noteUserAnthropicBaseUrl } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-note'
+import { releaseSupersededOwnProxySlot } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-slot-env'
+import {
+  claudeAuthProxySlotId,
+  isForeignClaudeAuthProxyUrl
+} from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-url'
 import { claudePoolAccountForLaunch } from '../../../claude-accounts/claude-account-pool-launch'
-import { isForeignClaudeAuthProxyUrl } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-url'
 import { getClaudeProfileRouter } from '../../../claude-accounts/claude-profile-installed-router'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import type { RuntimePtySpawnState } from './spawn-state'
@@ -98,10 +102,12 @@ export function applyRuntimeClaudeAuthEnv(
   }
   const patch = { ...auth.envPatch }
   const baseUrl = base.ANTHROPIC_BASE_URL
-  // A desktop loopback slot is not a user API host. This process's own slot keeps the previous winner.
+  // A desktop loopback slot is not a user API host. This process's terminal slot loses to the launch patch.
   if (baseUrl && isForeignClaudeAuthProxyUrl(baseUrl, claudeAuthProxyListeningPort())) {
     delete base.ANTHROPIC_BASE_URL
-  } else if (baseUrl && patch.ANTHROPIC_BASE_URL) {
+  } else if (releaseSupersededOwnProxySlot(baseUrl, patch.ANTHROPIC_BASE_URL)) {
+    delete base.ANTHROPIC_BASE_URL
+  } else if (baseUrl && patch.ANTHROPIC_BASE_URL && claudeAuthProxySlotId(baseUrl) === null) {
     delete patch.ANTHROPIC_BASE_URL
     noteUserAnthropicBaseUrl()
   }
