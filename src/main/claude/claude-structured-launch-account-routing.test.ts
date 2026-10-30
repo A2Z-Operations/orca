@@ -12,10 +12,14 @@ import {
   type ClaudeProfileRouterSettings
 } from '../claude-accounts/claude-profile-router'
 import { installClaudeProfileRouter } from '../claude-accounts/claude-profile-installed-router'
+import { installClaudePoolLaunchRead } from '../claude-accounts/claude-account-pool-launch'
+import { _internals as claudePaneAccounts } from '../claude-accounts/claude-pane-account-registry'
 
 const roots: string[] = []
 afterEach(() => {
   installClaudeProfileRouter(undefined)
+  installClaudePoolLaunchRead(null)
+  claudePaneAccounts.reset()
   roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }))
 })
 

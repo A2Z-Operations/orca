@@ -235,7 +235,11 @@ export function claudeStructuredLaunchPart(
       sources,
       { runtimeOnPath: false }
     )
-    const launchHome = await resolveClaudeStructuredLaunchHome(router, env, accountHome.path)
+    const launchHome = await resolveClaudeStructuredLaunchHome(router, env, accountHome.path, {
+      sessionId: identity.sessionId,
+      providerSessionId,
+      workspaceId: identity.workspaceId
+    })
     const resumesTranscript = resumedWithoutRouter ?? (await resumes(launchHome))
     if (fork?.throughEntryId && !resumesTranscript) {
       // Fork sources must pass the same account-history check as resumes.
