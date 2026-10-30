@@ -58,6 +58,7 @@ it.each([
       expectedPanes.map((paneKey, i) => ({
         paneKey,
         state: i < existing ? 'working' : 'done',
+        mainAgentState: i < existing ? 'working' : 'done',
         receivedAt: expect.any(Number),
         observedInCurrentRuntime: true
       }))
