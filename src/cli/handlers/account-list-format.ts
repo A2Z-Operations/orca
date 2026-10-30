@@ -16,7 +16,7 @@ type AccountsBlock = {
   /** Claude only: whether new launches spread across accounts (absent from older hosts). */
   pool?: 'on' | 'off'
   /** Claude only: live sessions billed to each account (absent from older hosts). */
-  assignedSessions?: readonly { accountId: string; count: number }[]
+  assignedSessions?: readonly { accountId: string; count: number; chatCount?: number }[]
   /** Claude only: whether the host bills requests through the local auth proxy (absent from older hosts). */
   authProxy?: 'on' | 'off'
   /** Claude only: whether a WSL guest can bill through its own listener (absent when this host has no WSL accounts). */
@@ -38,6 +38,12 @@ export function formatDataAccounts(label: string, state: ManagedDataAccountsStat
     .join('\n')}`
 }
 
+function formatSessionCount(count: number, chatCount: number | undefined): string {
+  const chats =
+    chatCount && chatCount > 0 ? ` (${chatCount} chat${chatCount === 1 ? '' : 's'})` : ''
+  return `sessions: ${count}${chats}`
+}
+
 export function formatAccountsBlock(label: string, block: AccountsBlock): string {
   if (block.accounts.length === 0) {
     return `No managed ${label} accounts.`
@@ -48,12 +54,13 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
     ...Object.values(block.activeAccountIdsByRuntime?.wsl ?? {})
   ])
   const sessionCountByAccount = new Map(
-    (block.assignedSessions ?? []).map((row) => [row.accountId, row.count])
+    (block.assignedSessions ?? []).map((row) => [row.accountId, row])
   )
   const lines = block.accounts.map((account) => {
+    const row = sessionCountByAccount.get(account.id)
     const sessions =
       block.assignedSessions !== undefined
-        ? `  sessions: ${sessionCountByAccount.get(account.id) ?? 0}`
+        ? `  ${formatSessionCount(row?.count ?? 0, row?.chatCount)}`
         : ''
     return `  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
       account.needsSignIn ? ' (sign in again in Orca Settings > AI Provider Accounts)' : ''

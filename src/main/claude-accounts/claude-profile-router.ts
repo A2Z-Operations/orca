@@ -226,6 +226,11 @@ export class ClaudeProfileRouter {
     })
   }
 
+  /** The account selected for host launches. Null when System default is selected. */
+  selectedAccountId(): string | null {
+    return getSelectedClaudeAccountIdForTarget(this.args.getSettings(), { runtime: 'host' })
+  }
+
   /** Account a previous proxy move billed, so a `--resume` of that session stays there. */
   assignedAccountForResume(sessionId: string): string | null {
     return claudeAssignedAccountForProviderSession(sessionId)

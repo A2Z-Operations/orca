@@ -1,20 +1,126 @@
 import { join } from 'node:path'
+import { claudeAuthProxyListeningPort } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
+import {
+  claudeAuthProxySlotId,
+  isForeignClaudeAuthProxyUrl
+} from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-url'
 import type { ClaudeProfileRouter } from '../claude-accounts/claude-profile-router'
 import { applyClaudeEnvPatch } from '../claude-accounts/environment'
+import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth/runtime-auth-types'
+import {
+  forgetClaudePaneAccount,
+  getClaudePaneAccount,
+  recordClaudePaneAccount
+} from '../claude-accounts/claude-pane-account-registry'
 import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import { resolveStructuredClaudeAccountHomePath } from '../runtime/structured-agent-account-home'
+import {
+  applyStructuredClaudeProxySlot,
+  prepareStructuredClaudeAccount,
+  preparedClaudeProxySlot,
+  releasePreparedClaudeSlot,
+  structuredLaunchAccountId
+} from './claude-structured-pane-account'
+import { structuredClaudeSessionKey } from './claude-structured-session-key'
+
+export type ClaudeStructuredLaunchSession = {
+  sessionId: string
+  providerSessionId: string
+  workspaceId?: string
+}
 
 /** Follow the current account selection and pin its environment for this launch. */
 export async function resolveClaudeStructuredLaunchHome(
   router: ClaudeProfileRouter | undefined,
   env: Record<string, string>,
-  recordHome: string
+  recordHome: string,
+  session?: ClaudeStructuredLaunchSession
 ): Promise<string> {
   if (!router) {
     return recordHome
   }
-  const preparation = await router.prepareLaunch()
+  const userDir = env.CLAUDE_CONFIG_DIR?.trim() || undefined
+  dropForeignProxyUrl(env)
+  const userPinnedUrl = Boolean(
+    env.ANTHROPIC_BASE_URL && claudeAuthProxySlotId(env.ANTHROPIC_BASE_URL) === null
+  )
+  if (!session) {
+    const preparation = await router.prepareLaunch()
+    const launchHome = pinClaudeLaunchHome(router, env, preparation, userDir)
+    releasePreparedClaudeSlot(
+      preparation,
+      preparedClaudeProxySlot({ ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL })
+    )
+    return launchHome
+  }
+  const sessionKey = structuredClaudeSessionKey(session.sessionId)
+  const existing = getClaudePaneAccount(sessionKey)
+  const chosen = await prepareStructuredClaudeAccount({
+    router,
+    existing,
+    providerSessionId: session.providerSessionId,
+    // A folder the user set is the launch. The pool still chooses when only the base URL is pinned.
+    allowPool: !userDir
+  })
+  const launchHome = pinClaudeLaunchHome(router, env, chosen.preparation, userDir)
+  const proxySlot = applyStructuredClaudeProxySlot({
+    env,
+    preparation: chosen.preparation,
+    existing,
+    reuseRecordedSlot: chosen.reuseRecordedSlot && !userPinnedUrl,
+    userPinnedUrl
+  })
+  const accountId = structuredLaunchAccountId(
+    chosen.preparation.provenance,
+    router.selectedAccountId()
+  )
+  if (!accountId) {
+    if (proxySlot) {
+      releasePreparedClaudeSlot(chosen.preparation)
+    }
+    forgetClaudePaneAccount(sessionKey)
+    return launchHome
+  }
+  const recorded = chosen.keepRecordedAccount ? existing : null
+  const billed = recorded ? (recorded.assignedAccountId ?? recorded.accountId) : accountId
+  recordClaudePaneAccount({
+    ptyId: sessionKey,
+    paneKey: sessionKey,
+    surface: 'chat',
+    launchSelectionId: router.selectedAccountId(),
+    accountId: recorded ? recorded.accountId : accountId,
+    configDir: launchHome,
+    launchedAt: recorded?.launchedAt ?? Date.now(),
+    pinned: Boolean(userDir) || userPinnedUrl,
+    source: chosen.pooled ? 'pool' : recorded ? recorded.source : 'spawn',
+    providerSessionId: session.providerSessionId,
+    ...(session.workspaceId || recorded?.worktreeId
+      ? { worktreeId: session.workspaceId ?? recorded?.worktreeId }
+      : {}),
+    ...(proxySlot || chosen.pooled || recorded?.assignedAccountId
+      ? {
+          ...(proxySlot ? { proxySlot } : {}),
+          assignedAccountId: billed
+        }
+      : {})
+  })
+  return launchHome
+}
+
+function dropForeignProxyUrl(env: Record<string, string>): void {
+  const url = env.ANTHROPIC_BASE_URL
+  if (url && isForeignClaudeAuthProxyUrl(url, claudeAuthProxyListeningPort())) {
+    delete env.ANTHROPIC_BASE_URL
+  }
+}
+
+function pinClaudeLaunchHome(
+  router: ClaudeProfileRouter,
+  env: Record<string, string>,
+  preparation: ClaudeRuntimeAuthPreparation,
+  userDir: string | undefined
+): string {
   // Read before patching: System default preserves the launch environment's CLAUDE_CONFIG_DIR.
   const launchHome =
     preparation.provenance === 'system'
@@ -25,6 +131,10 @@ export async function resolveClaudeStructuredLaunchHome(
         })
       : preparation.configDir
   applyClaudeEnvPatch(env, preparation.envPatch)
+  if (userDir) {
+    env.CLAUDE_CONFIG_DIR = userDir
+    return userDir
+  }
   return launchHome
 }
 
