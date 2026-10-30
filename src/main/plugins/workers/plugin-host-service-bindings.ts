@@ -1,4 +1,5 @@
 import { PLUGIN_WORKSPACE_TERMINAL_LIMIT } from '../../../shared/plugins/workers/plugin-host-api'
+import { readPluginClaudeAccounts } from '../plugin-claude-account-events'
 import type { PluginHostServices } from './plugin-host-methods'
 import { PluginSecretsStore } from '../plugin-secrets-store'
 import { PluginKvStore } from '../plugin-storage-store'
@@ -31,6 +32,7 @@ export type PluginRuntimeDelegate = {
 export function bindPluginHostServices(input: {
   delegate: PluginRuntimeDelegate
   pluginsDataDir: string
+  listClaudeAccounts?: PluginHostServices['listClaudeAccounts']
 }): PluginHostServices {
   const { delegate, pluginsDataDir } = input
   return {
@@ -78,6 +80,7 @@ export function bindPluginHostServices(input: {
       getAll: (key) => new PluginKvStore(pluginsDataDir, key, 'settings.json').getAll(),
       set: (key, itemKey, value) =>
         new PluginKvStore(pluginsDataDir, key, 'settings.json').set(itemKey, value)
-    }
+    },
+    listClaudeAccounts: input.listClaudeAccounts ?? (() => readPluginClaudeAccounts())
   }
 }

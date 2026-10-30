@@ -29,6 +29,16 @@ function eventTitle(event: PluginEventName): string {
         'auto.components.settings.PluginContributionActionEvents.agentStatusChanged',
         'When an agent’s status changes'
       )
+    case 'accounts.usage.changed':
+      return translate(
+        'auto.components.settings.PluginContributionActionEvents.usageChanged',
+        'When Claude account usage changes'
+      )
+    case 'accounts.session.moved':
+      return translate(
+        'auto.components.settings.PluginContributionActionEvents.sessionMoved',
+        'When a Claude session moves to another account'
+      )
   }
 }
 
