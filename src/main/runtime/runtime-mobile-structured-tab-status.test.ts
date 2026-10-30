@@ -1,4 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  _internals as claudePaneAccounts,
+  recordClaudePaneAccount
+} from '../claude-accounts/claude-pane-account-registry'
+import {
+  structuredAgentSessionPaneKey,
+  structuredAgentSessionTabId
+} from '../../shared/structured-agent-session-projection'
 import { makeStructuredAgentStatusSubject } from '../../shared/agent-status-subject'
 import type { AgentSessionStatusSummary } from '../../shared/agent-session-wire'
 import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
@@ -42,6 +50,10 @@ function projectChatTab(store: AgentHookServer, worktree: string) {
 }
 
 describe('a chat tab on the phone', () => {
+  afterEach(() => {
+    claudePaneAccounts.reset()
+  })
+
   it("carries the host's structured row for its session, and only in that workspace", () => {
     const store = new AgentHookServer()
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fields a structured status summary needs for ingest.
@@ -72,5 +84,46 @@ describe('a chat tab on the phone', () => {
       chatStatus: { state: 'working', structuredHostOwned: true }
     })
     expect(projectChatTab(store, 'repo-1::/workspace/other')).not.toHaveProperty('chatStatus')
+  })
+
+  it('stamps the billed Claude account onto the chat status the phone reads', () => {
+    const store = new AgentHookServer()
+    const paneKey = structuredAgentSessionPaneKey(structuredAgentSessionTabId(SESSION), SESSION)
+    recordClaudePaneAccount({
+      ptyId: paneKey,
+      paneKey,
+      surface: 'chat',
+      accountId: 'acct-1',
+      configDir: null,
+      launchedAt: 1,
+      pinned: false,
+      source: 'spawn',
+      assignedAccountId: 'acct-2'
+    })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fields a structured status summary needs for ingest.
+    const summary = {
+      sessionId: SESSION,
+      workspaceId: WORKTREE_ID,
+      agent: 'claude',
+      status: 'working',
+      latestPrompt: 'ship the thing',
+      updatedAt: 1_757_030_400_000,
+      hostExecutionOwned: true
+    } as AgentSessionStatusSummary
+    store.ingestStructuredStatus(
+      summary,
+      makeStructuredAgentStatusSubject(
+        {
+          executionHostId: 'local',
+          wslDistro: null,
+          workspaceId: WORKTREE_ID,
+          workspaceKind: 'git-worktree'
+        },
+        SESSION
+      )
+    )
+    expect(projectChatTab(store, WORKTREE_ID)).toMatchObject({
+      chatStatus: { claudeAccountId: 'acct-2' }
+    })
   })
 })

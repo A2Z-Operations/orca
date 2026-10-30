@@ -138,8 +138,8 @@ export type ClaudeRateLimitAccountsState = {
   accountPool?: 'off' | 'on'
   /** Same value as `accountPool`. The CLI and status bar read this name. */
   pool?: 'on' | 'off'
-  /** Live sessions billed to each account. Absent from older hosts. */
-  assignedSessions?: { accountId: string; count: number }[]
+  /** Live sessions billed to each account. Absent from older hosts. `chatCount` is native chat. */
+  assignedSessions?: { accountId: string; count: number; chatCount?: number }[]
   /** Every live pane and the account it bills. The tab badge reads this snapshot. */
   paneAccounts?: ClaudePaneAccountSnapshot[]
   /**
@@ -185,6 +185,8 @@ export type ClaudeSessionMoveSummary = {
   at: number
   /** How a move of this pane would land. Absent from hosts that predate the pool surface. */
   strategy?: 'resume' | 'proxy'
+  /** Native chat. Absent on terminal sessions and older hosts. */
+  chat?: true
 }
 
 /** Orca moved Claude to another account before a usage limit, so running sessions can follow. */
