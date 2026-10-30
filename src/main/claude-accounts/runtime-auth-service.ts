@@ -5,6 +5,7 @@ import { resolveLocalAccountRuntimeTarget } from '../../shared/local-account-run
 import type { Store } from '../persistence'
 import { isWslDistroRunning } from '../wsl-background-distro-gate'
 import { getDefaultWslDistro, getWslHome } from '../wsl'
+import { dropUnboundAuthProxySlot } from './claude-auth-proxy/claude-auth-proxy-slot-env'
 import { ClaudeProfileRouter } from './claude-profile-router'
 import { ClaudeWslProfileRouter } from './claude-profile-wsl-router'
 import {
@@ -72,7 +73,8 @@ export class ClaudeRuntimeAuthService {
       }
     }
     try {
-      return await (wsl ? wsl.router.preparation(wsl.distro) : this.router.preparation())
+      const prepared = await (wsl ? wsl.router.preparation(wsl.distro) : this.router.preparation())
+      return dropUnboundAuthProxySlot(prepared)
     } catch (error) {
       // An unavailable account must not interrupt polling other providers.
       return {

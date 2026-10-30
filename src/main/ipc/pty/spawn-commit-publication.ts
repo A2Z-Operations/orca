@@ -1,3 +1,4 @@
+import { retainAppliedClaudeAuthProxySlot } from '../../claude-accounts/claude-auth-proxy/claude-auth-proxy-slot-env'
 import { recordClaudePaneAccountForSpawn } from './host-env/claude-pane-account'
 import { agentHookServer } from '../../agent-hooks/server'
 import { clearMigrationUnsupportedPtysForPaneKey } from '../../agent-hooks/migration-unsupported-pty-state'
@@ -93,6 +94,11 @@ export function publishCommittedPtySpawn(input: PtySpawnCommitInput): PtySpawnOu
     claudeAccountId: args.claudeAccountId,
     settings: deps.getSettings?.(),
     target: state.codexSelectionTarget
+  })
+  retainAppliedClaudeAuthProxySlot({
+    ptyId: result.id,
+    env: input.codexLaunchEnv,
+    isReattach: result.isReattach === true
   })
   if (input.paneKeyAliases) {
     registerSpawnPaneKeyAliases(result, input.paneKey, input.paneKeyAliases)

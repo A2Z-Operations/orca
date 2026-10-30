@@ -7,8 +7,10 @@ import type { Store } from '../../../persistence'
 import { TEST_LEAF_1 } from '../../../persistence/persistence-session-fixtures'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { installClaudeProfileRouter } from '../../../claude-accounts/claude-profile-installed-router'
+import { claudeListedPaneAccounts } from '../../../claude-accounts/claude-listed-pane-accounts'
 import {
   getClaudePaneAccount,
+  listClaudePaneAccounts,
   recordClaudePaneAccount
 } from '../../../claude-accounts/claude-pane-account-registry'
 import { clearProviderPtyState } from '../provider/state-cleanup'
@@ -146,8 +148,21 @@ describe('runtime replacement addendum', () => {
       accountId: 'b',
       configDir: home,
       pinned: false,
-      paneKey
+      paneKey,
+      source: 'spawn'
     })
+    expect(
+      claudeListedPaneAccounts(
+        [
+          { id: 'a', email: 'a@example.test' },
+          { id: 'b', email: 'b@example.test' }
+        ],
+        listClaudePaneAccounts()
+      ).assignedSessions
+    ).toEqual([
+      { accountId: 'a', count: 0 },
+      { accountId: 'b', count: 1 }
+    ])
     expect(getClaudePaneAccount('old')).toBeNull()
     expect(bound).toBe('new')
     expect(paneSpawnReservationsByOwnerKey.size).toBe(0)
@@ -174,7 +189,23 @@ describe('runtime replacement addendum', () => {
     })
     bound = 'old'
     await spawn({ claudeAccountId: undefined })
-    expect(getClaudePaneAccount('new')).toMatchObject({ accountId: 'a', pinned: false })
+    expect(getClaudePaneAccount('new')).toMatchObject({
+      accountId: 'a',
+      pinned: false,
+      source: 'spawn'
+    })
+    expect(
+      claudeListedPaneAccounts(
+        [
+          { id: 'a', email: 'a@example.test' },
+          { id: 'b', email: 'b@example.test' }
+        ],
+        listClaudePaneAccounts()
+      ).assignedSessions
+    ).toEqual([
+      { accountId: 'a', count: 1 },
+      { accountId: 'b', count: 0 }
+    ])
   })
 
   it('(l) refuses invalid host binding before stopping or reserving the old PTY', async () => {

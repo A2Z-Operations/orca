@@ -9,6 +9,7 @@ import {
 } from '../../../../shared/claude-profile-routing'
 import { resetUserAnthropicBaseUrlNote } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-note'
 import { installClaudePoolLaunchRead } from '../../../claude-accounts/claude-account-pool-launch'
+import * as claudeAuthProxyHost from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import {
   applyRuntimeClaudeAuthEnv,
   claudeLaunchPinsAccount,
@@ -296,6 +297,33 @@ describe('applyRuntimeClaudeAuthEnv', () => {
     expect(env?.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:4010/p/host-slot/')
     expect(info).not.toHaveBeenCalled()
     info.mockRestore()
+    resetUserAnthropicBaseUrlNote()
+  })
+
+  it('prefers this process launch slot over the terminal slot and does not treat it as a user URL', () => {
+    resetUserAnthropicBaseUrlNote()
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(claudeAuthProxyHost, 'claudeAuthProxyListeningPort').mockReturnValue(4010)
+    const release = vi
+      .spyOn(claudeAuthProxyHost, 'releaseOwnClaudeAuthProxySlot')
+      .mockImplementation(() => {})
+    const env = applyRuntimeClaudeAuthEnv(
+      { ...terminalEnv, ANTHROPIC_BASE_URL: 'http://127.0.0.1:4010/p/terminal-slot/' },
+      {
+        ...selected,
+        envPatch: {
+          CLAUDE_CONFIG_DIR: '/a',
+          ANTHROPIC_BASE_URL: 'http://127.0.0.1:4010/p/launch-slot/'
+        }
+      },
+      false
+    )
+    expect(env?.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:4010/p/launch-slot/')
+    expect(release).toHaveBeenCalledWith('terminal-slot')
+    expect(info).not.toHaveBeenCalled()
+    info.mockRestore()
+    release.mockRestore()
+    vi.mocked(claudeAuthProxyHost.claudeAuthProxyListeningPort).mockRestore()
     resetUserAnthropicBaseUrlNote()
   })
 })
