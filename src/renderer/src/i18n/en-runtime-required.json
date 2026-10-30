@@ -643,6 +643,11 @@
           "fullCoverage_one": "All 1 detected agent has the skill.",
           "fullCoverage_other": "All {{value0}} detected agents have the skill."
         },
+        "PluginConsentDialog": {
+          "capability": {
+            "accountsRead": "Read Claude account ids, labels, usage windows, and how many sessions each account is running. Does not include tokens or credential paths."
+          }
+        },
         "PluginDevelopmentSection": {
           "title": "Development"
         },

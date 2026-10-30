@@ -11957,6 +11957,7 @@
             "secrets": "Store its own encrypted secrets",
             "settingsOwn": "Read and change its own settings",
             "agentsRead": "Get notified when agent status changes",
+            "accountsRead": "Read Claude account ids, labels, usage windows, and how many sessions each account is running. Does not include tokens or credential paths.",
             "terminalRun": "Run commands in your terminals, including SSH"
           },
           "decisionFailed": "Could not save the permission decision. Try again.",
@@ -13310,6 +13311,8 @@
           "worktreeCreated": "When a workspace is created",
           "worktreeRemoved": "When a workspace is removed",
           "agentStatusChanged": "When an agent’s status changes",
+          "usageChanged": "When Claude account usage changes",
+          "sessionMoved": "When a Claude session moves to another account",
           "detail": "Background code runs"
         },
         "pluginInstallAction": {
