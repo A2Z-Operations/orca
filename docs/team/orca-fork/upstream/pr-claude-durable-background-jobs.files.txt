@@ -1,0 +1,40 @@
+HEAD c1552b7eccf8
+35 files changed, 2805 insertions(+), 6 deletions(-)
+
+c1552b7eccf Add durable background jobs that outlive a Claude restart.
+
+config/build-plugins/durable-job-scripts.ts
+config/electron-builder.config.cjs
+config/scripts/electron-builder-config.test.mjs
+config/scripts/main-entry-facade.test.ts
+docs/site/content/docs/agents/claude-code.mdx
+electron.vite.config.ts
+resources/durable-jobs/durable-background-job-hook.mjs
+resources/durable-jobs/durable-background-job-plan.mjs
+resources/durable-jobs/durable-background-job.mjs
+src/cli/handler-group-manifest.ts
+src/cli/handlers/job.test.ts
+src/cli/handlers/job.ts
+src/cli/help.ts
+src/cli/job-handler-group.ts
+src/cli/remote-selection-scope.ts
+src/cli/root-help-text-primary.ts
+src/cli/root-help-text-secondary.ts
+src/cli/specs/index.ts
+src/cli/specs/job.ts
+src/main/claude/durable-background-job-plugin.test.ts
+src/main/claude/durable-background-job-plugin.ts
+src/main/claude/durable-background-job.test.ts
+src/main/ipc/pty/host-env/assembly.ts
+src/main/ipc/pty/host-env/durable-background-job.test.ts
+src/main/ipc/pty/host-env/durable-background-job.ts
+src/main/ipc/pty/host-env/pi-agent.ts
+src/main/ipc/pty/pty-launch-parity.test.ts
+src/main/ipc/pty/spawn-options-assembly.ts
+src/main/native-chat/agent-session-wire/structured-agent-session-create-adoption.test.ts
+src/main/orcad/durable-residue.ts
+src/main/orcad/orcad-entry.ts
+src/main/pty/wsl-orca-env.test.ts
+src/main/pty/wsl-orca-env.ts
+src/main/startup/cli-command-names.ts
+src/main/startup/main-process-ready-runtime.ts

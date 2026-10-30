@@ -1,0 +1,11 @@
+HEAD e71e24465158
+6 files changed, 62 insertions(+), 3 deletions(-)
+
+e71e2446515 Restart a monitoring Claude pane once its main agent is done.
+
+src/main/agent-hooks/server-status-listener-fanout.test.ts
+src/main/agent-hooks/server/server-listeners.ts
+src/main/agent-hooks/server/server-types.ts
+src/main/native-chat/agent-session-wire/structured-agent-session-create-adoption.test.ts
+src/renderer/src/lib/claude-session-account-move.test.ts
+src/renderer/src/lib/claude-session-account-move.ts
