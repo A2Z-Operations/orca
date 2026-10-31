@@ -78,7 +78,7 @@ export type ClaudeAccountUsage = Pick<
   'evictInactiveClaudeCache' | 'refreshForClaudeAccountChange'
 >
 
-type ClaudeUsageWindows = { accountId: string; weekly: number | null; fable: number | null }[]
+type ClaudeUsageWindows = NonNullable<ClaudeRateLimitAccountsState['usageWindows']>
 
 export class ClaudeAccountSelection {
   constructor(

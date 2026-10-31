@@ -164,8 +164,13 @@ export type ClaudeRateLimitAccountsState = {
   paneAssignments?: { ptyId: string; accountId: string }[]
   /** The mover's last decision per live session, newest first. */
   sessionMoves?: ClaudeSessionMoveSummary[]
-  /** Weekly and Fable percents. Absent from older hosts. Null means that window was not readable. */
-  usageWindows?: { accountId: string; weekly: number | null; fable: number | null }[]
+  /** Weekly and Fable percents. Absent from older hosts. Null means that window was not readable. `unavailable` names why. */
+  usageWindows?: {
+    accountId: string
+    weekly: number | null
+    fable: number | null
+    unavailable?: string
+  }[]
   /** Spend Fable first, then Opus. Absent from older hosts. */
   modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
   /** Last model-policy pass per live pane. Absent from older hosts and when none has run. */
