@@ -57,8 +57,12 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
   }
 
   protected shouldBackgroundPoll(): boolean {
+    // Headless serve attaches a hidden window. The opt-in still has to poll; desktop start omits it.
+    if (this.pollWithoutWindow) {
+      return true
+    }
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
-      return this.pollWithoutWindow
+      return false
     }
     // UI-only polling pauses while inactive to save CLI/API budget; activation refreshes it.
     if (!this.mainWindow.isVisible() || this.mainWindow.isMinimized()) {

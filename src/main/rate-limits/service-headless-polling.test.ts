@@ -71,15 +71,34 @@ describe('headless rate-limit polling', () => {
   })
 
   it.each(['focused', 'visible', 'minimized'] as const)(
-    'preserves the attached desktop window %s gate even when opted in',
+    'keeps the attached desktop window %s gate unless headless polling is opted in',
     async (field) => {
       const window = new FakeRateLimitWindow()
       window[field] = field === 'minimized'
       service.attach(asRateLimitWindow(window))
-      const options = { fetchImmediately: true, pollWithoutWindow: true }
-      service.start(options)
+      service.start({ fetchImmediately: true })
       await vi.advanceTimersByTimeAsync(DEFAULT_POLL_MS * 2)
       expect(service.fetches).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it.each(['focused', 'visible', 'minimized'] as const)(
+    'polls an attached %s window when headless polling is opted in',
+    async (field) => {
+      const inactive = vi
+        .spyOn(service, 'fetchInactiveClaudeAccountsOnOpen')
+        .mockResolvedValue(undefined)
+      const window = new FakeRateLimitWindow()
+      window[field] = field === 'minimized'
+      service.attach(asRateLimitWindow(window))
+      service.start({
+        fetchImmediately: true,
+        pollWithoutWindow: true,
+        pollInactiveClaude: true
+      })
+      await vi.advanceTimersByTimeAsync(DEFAULT_POLL_MS * 2)
+      expect(service.fetches).toHaveBeenCalledTimes(3)
+      expect(inactive).toHaveBeenCalledTimes(3)
     }
   )
 })
