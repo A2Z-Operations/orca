@@ -27,9 +27,12 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
       if (!this.shouldBackgroundPoll()) {
         return
       }
-      void this.fetchAll()
+      void this.fetchAll().finally(() => this.afterBackgroundFetch())
     }, this.pollInterval)
   }
+
+  /** Subclasses read inactive accounts after the active cycle so the two fetches do not overlap. */
+  protected afterBackgroundFetch(): void {}
 
   protected stopTimer(): void {
     if (this.timer) {

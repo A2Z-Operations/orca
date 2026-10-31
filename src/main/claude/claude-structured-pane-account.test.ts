@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
 import { formatClaudeSessionMoveLine } from '../../shared/claude-session-move-line'
+import { CLAUDE_FABLE_MODEL_ID } from '../claude-accounts/claude-model-policy'
 import { installClaudePoolLaunchRead } from '../claude-accounts/claude-account-pool-launch'
 import {
   getClaudeAuthProxy,
@@ -158,6 +159,44 @@ describe('structured Claude launch account', () => {
     const again = await resolveClaudeStructuredLaunchHome(router, second, '/recorded', SESSION)
     expect(again).toBe(router.accountHome('b'))
     expect(claudeAuthProxySlotId(second.ANTHROPIC_BASE_URL ?? '')).toBe(slot)
+  })
+
+  it('stamps a policy model when the structured launch did not pin one', async () => {
+    const { router } = await routerFor(['a'])
+    installClaudePoolLaunchRead(() => ({
+      accountId: 'a',
+      named: false,
+      pooled: false,
+      model: 'fable',
+      modelId: CLAUDE_FABLE_MODEL_ID,
+      modelReason: 'fable-headroom'
+    }))
+    const env: Record<string, string> = {}
+    await resolveClaudeStructuredLaunchHome(router, env, '/recorded', SESSION)
+    expect(env.ANTHROPIC_MODEL).toBe(CLAUDE_FABLE_MODEL_ID)
+    expect(getClaudePaneAccount(structuredClaudeSessionKey(SESSION.sessionId))).toMatchObject({
+      model: 'fable',
+      modelSource: 'policy'
+    })
+  })
+
+  it('keeps a launch ANTHROPIC_MODEL pinned', async () => {
+    const { router } = await routerFor(['a'])
+    installClaudePoolLaunchRead(() => ({
+      accountId: 'a',
+      named: false,
+      pooled: false,
+      model: 'fable',
+      modelId: CLAUDE_FABLE_MODEL_ID,
+      modelReason: 'fable-headroom'
+    }))
+    const env: Record<string, string> = { ANTHROPIC_MODEL: 'claude-sonnet-4-5' }
+    await resolveClaudeStructuredLaunchHome(router, env, '/recorded', SESSION)
+    expect(env.ANTHROPIC_MODEL).toBe('claude-sonnet-4-5')
+    expect(getClaudePaneAccount(structuredClaudeSessionKey(SESSION.sessionId))).toMatchObject({
+      model: 'claude-sonnet-4-5',
+      modelSource: 'pinned'
+    })
   })
 
   it('follows a new selection instead of the account the chat was created under', async () => {

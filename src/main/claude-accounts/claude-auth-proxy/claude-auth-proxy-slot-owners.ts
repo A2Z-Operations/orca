@@ -4,7 +4,7 @@
  * then drops it. A bound slot stays while that PTY is still registered or still in the pane registry.
  */
 
-import type { ClaudeModelSource } from '../claude-model-policy'
+import { claudePolicyModelLabel, type ClaudeModelSource } from '../claude-model-policy'
 
 export const CLAUDE_AUTH_PROXY_UNBOUND_SLOT_GRACE_MS = 30_000
 
@@ -47,12 +47,20 @@ export function setClaudeAuthProxySlotModel(
   now = Date.now()
 ): void {
   const current = owners.get(slot)
+  const previous =
+    current?.modelSource === 'policy' && current.model
+      ? claudePolicyModelLabel(current.model)
+      : null
+  const next = modelSource === 'policy' ? claudePolicyModelLabel(model) : null
   owners.set(slot, {
     ptyId: current?.ptyId ?? null,
     allocatedAt: current?.allocatedAt ?? now,
     model,
     modelSource
   })
+  if (next && next !== previous) {
+    console.info(`[claude-model-policy] proxy slot ${slot} ${previous ?? 'unset'} → ${next}`)
+  }
 }
 
 export function claudeAuthProxySlotModel(

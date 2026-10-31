@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
 import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
+import { resetClaudeModelPolicyEvaluations } from './claude-model-policy-evaluations'
 import { createClaudeModelPolicyTicker } from './claude-model-policy-ticker'
 import { CLAUDE_MODEL_POLICY_FLIP_COOLDOWN_MS } from './claude-model-policy'
+
+afterEach(() => {
+  resetClaudeModelPolicyEvaluations()
+})
 
 const NOW = Date.UTC(2026, 9, 29, 12)
 
@@ -84,5 +89,41 @@ describe('createClaudeModelPolicyTicker', () => {
       now: () => NOW
     })
     expect(ticker.evaluate()).toEqual([])
+  })
+
+  it('flips on a settings change without waiting for the next usage publish', () => {
+    let current: 'fable' | 'opus' = 'fable'
+    let settings = { claudeModelPolicy: { enabled: true, fableLine: 90, weeklyGuard: 91 } }
+    const onSettings: { current: (() => void) | null } = { current: null }
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const ticker = createClaudeModelPolicyTicker({
+      getSettings: () => settings,
+      panes: () => [pane(current)],
+      usageFor: () => ({ rateLimits: limits(64, 63), updatedAt: NOW }),
+      subscribe: () => () => {},
+      subscribeSettings: (listener) => {
+        onSettings.current = listener
+        return () => {
+          onSettings.current = null
+        }
+      },
+      apply: (flip) => {
+        current = flip.to
+      },
+      now: () => NOW
+    })
+    const stop = ticker.start()
+    expect(current).toBe('fable')
+    expect(info).toHaveBeenCalledWith('[claude-model-policy] started')
+    settings = { claudeModelPolicy: { enabled: true, fableLine: 1, weeklyGuard: 1 } }
+    onSettings.current?.()
+    expect(current).toBe('opus')
+    const lines = info.mock.calls.map((call) => String(call[0]))
+    expect(lines.some((line) => line.includes('fable → opus') && line.includes('fable-line'))).toBe(
+      true
+    )
+    stop()
+    expect(info).toHaveBeenCalledWith('[claude-model-policy] stopped')
+    info.mockRestore()
   })
 })

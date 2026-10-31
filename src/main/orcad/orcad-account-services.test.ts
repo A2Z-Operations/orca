@@ -12,6 +12,14 @@ import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-p
 import { getClaudeAgentViewService } from '../claude/agent-view-service'
 import { createOrcadAccountServices } from './orcad-account-services'
 import { getClaudeAuthProxy } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
+import {
+  claudeModelPolicyEvaluations,
+  resetClaudeModelPolicyEvaluations
+} from '../claude-accounts/claude-model-policy-evaluations'
+import {
+  _internals,
+  recordClaudePaneAccount
+} from '../claude-accounts/claude-pane-account-registry'
 import { RateLimitService } from '../rate-limits/service'
 import { USAGE_CREDENTIALS_RUNTIME_CAPABILITY } from '../../shared/account-runtime-capabilities'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
@@ -118,10 +126,55 @@ describe('orcad account services', () => {
       expect(create(store, false)).not.toBeNull()
       expect(start).toHaveBeenCalledExactlyOnceWith({
         fetchImmediately: true,
-        pollWithoutWindow: true
+        pollWithoutWindow: true,
+        pollInactiveClaude: true
       })
     } finally {
       start.mockRestore()
+    }
+  })
+
+  it('re-evaluates the model policy when the lines change on the headless host', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const { store } = createRuntime()
+    store.updateSettings({ claudeSessionMover: 'off', claudeAutoSwitchEnabled: false })
+    const start = vi.spyOn(RateLimitService.prototype, 'start').mockImplementation(() => {})
+    try {
+      expect(create(store, false)).not.toBeNull()
+      expect(
+        info.mock.calls.some((call) => String(call[0]) === '[claude-model-policy] started')
+      ).toBe(true)
+      recordClaudePaneAccount({
+        ptyId: 'pty-policy',
+        paneKey: 'pane-policy',
+        accountId: 'acct',
+        configDir: null,
+        launchedAt: 1,
+        pinned: false,
+        source: 'spawn',
+        model: 'fable',
+        modelSource: 'policy'
+      })
+      store.updateSettings(
+        { claudeModelPolicy: { enabled: true, fableLine: 1, weeklyGuard: 1 } },
+        { notifyListeners: true }
+      )
+      expect(claudeModelPolicyEvaluations()).toEqual([
+        expect.objectContaining({
+          paneKey: 'pane-policy',
+          accountId: 'acct',
+          model: 'fable',
+          source: 'policy',
+          choice: null,
+          reason: 'stale',
+          skip: 'stale'
+        })
+      ])
+    } finally {
+      info.mockRestore()
+      start.mockRestore()
+      _internals.reset()
+      resetClaudeModelPolicyEvaluations()
     }
   })
 
@@ -140,7 +193,8 @@ describe('orcad account services', () => {
       store.updateSettings({ claudeSessionMover: 'move' }, { notifyListeners: true })
       expect(start).toHaveBeenCalledExactlyOnceWith({
         fetchImmediately: true,
-        pollWithoutWindow: true
+        pollWithoutWindow: true,
+        pollInactiveClaude: true
       })
       store.updateSettings({ claudeSessionMover: 'off' }, { notifyListeners: true })
       expect(stop).toHaveBeenCalledTimes(1)

@@ -187,7 +187,7 @@ export function createClaudeAccountAutoSwitch(
 /** Usage is tagged `profile:<id>` (`profile:<id>:wsl:<distro>` in WSL) by the account it was read for. */
 function isReadingOf(
   limits: ProviderRateLimits | null,
-  account: ClaudeManagedAccountSummary
+  account: { id: string; runsOnSystemDefault?: true }
 ): boolean {
   const provenance = limits?.usageMetadata?.authProvenance
   // Why: an account System default covers runs on that login, so its usage is tagged `system`.
