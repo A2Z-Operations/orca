@@ -1,5 +1,8 @@
 import { defineMethod } from '../core'
-import { SetClaudeModelPolicyParams } from '../../../../shared/rpc-contract/accounts-params'
+import {
+  SetClaudeAccountTokenRefreshParams,
+  SetClaudeModelPolicyParams
+} from '../../../../shared/rpc-contract/accounts-params'
 
 export const setClaudeModelPolicyMethod = defineMethod({
   name: 'accounts.setClaudeModelPolicy',
@@ -7,3 +10,15 @@ export const setClaudeModelPolicyMethod = defineMethod({
   params: SetClaudeModelPolicyParams,
   handler: async (params, { runtime }) => runtime.setClaudeModelPolicy(params)
 })
+
+export const setClaudeAccountTokenRefreshMethod = defineMethod({
+  name: 'accounts.setClaudeAccountTokenRefresh',
+  permission: 'accounts-admin',
+  params: SetClaudeAccountTokenRefreshParams,
+  handler: async (params, { runtime }) => runtime.setClaudeAccountTokenRefresh(params.enabled)
+})
+
+export const claudeAccountSettingMethods = [
+  setClaudeModelPolicyMethod,
+  setClaudeAccountTokenRefreshMethod
+]

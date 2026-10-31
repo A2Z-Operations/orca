@@ -82,6 +82,19 @@ describe('formatAccountsBlock', () => {
     expect(text).toContain('  b@example.com  weekly — (401) · fable — (401)')
   })
 
+  it('prints the sign-in hint when the refresh token is lapsed', () => {
+    const text = formatAccountsBlock('Claude', {
+      accounts: [{ id: 'a', email: 'a@example.com' }],
+      activeAccountId: null,
+      usageWindows: [{ accountId: 'a', weekly: null, fable: null, unavailable: 'lapsed' }],
+      tokenRefresh: 'on'
+    })
+    expect(text).toContain(
+      '  a@example.com (sign in again in Orca Settings > AI Provider Accounts)  weekly — (lapsed) · fable — (lapsed)'
+    )
+    expect(text).toContain('  token-refresh: on')
+  })
+
   it('prints a model flip on its own moves line', () => {
     expect(
       formatClaudeSessionMoveLine({

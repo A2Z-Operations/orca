@@ -1,7 +1,5 @@
-import {
-  claudeAuthProxyEnabled,
-  type ClaudeSessionMoverSetting
-} from '../../shared/claude-account-switch-settings'
+import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
+import { claudeTokenRefreshFields, installClaudeTokenRefresh } from './claude-token-refresh-list'
 import type {
   ClaudeManagedAccount,
   ClaudeManagedAccountSummary,
@@ -19,7 +17,7 @@ import { wslAuthProxyStatus } from './wsl-auth-proxy-status'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
 import { claudeModelPolicyEvaluations } from './claude-model-policy-evaluations'
 import { resolveClaudeModelPolicy, type ClaudeModelPolicyPatch } from './claude-model-policy'
-import { claudeListedPaneAccounts } from './claude-listed-pane-accounts'
+import { claudeListedPaneAccounts, listedPaneAssignments } from './claude-listed-pane-accounts'
 import { listClaudePaneAccounts } from './claude-pane-account-registry'
 import {
   getClaudeSelectionTargetForAccount,
@@ -47,6 +45,7 @@ export type ClaudeAccountSettings = Pick<
   | 'claudeAutoSwitchEnabled'
   | 'claudeSessionMover'
   | 'claudeAuthProxy'
+  | 'claudeAccountTokenRefresh'
   | 'claudeAccountPool'
   | 'claudeModelPolicy'
 >
@@ -85,7 +84,9 @@ export class ClaudeAccountSelection {
     private readonly store: ClaudeAccountStore,
     private readonly rateLimits: ClaudeAccountUsage,
     private readonly runtimeAuth: ClaudeAccountRuntime
-  ) {}
+  ) {
+    installClaudeTokenRefresh(this.store)
+  }
 
   private sessionMovesProvider: (() => ClaudeSessionMoveSummary[]) | null = null
   // Accounts are passed in. The provider must not call list(); list() is the caller.
@@ -126,6 +127,11 @@ export class ClaudeAccountSelection {
     return this.list()
   }
 
+  setTokenRefresh(enabled: boolean): ClaudeRateLimitAccountsState {
+    this.saveSettings({ claudeAccountTokenRefresh: enabled })
+    return this.list()
+  }
+
   setAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
     this.saveSettings({ claudeAccountPool: enabled ? 'on' : 'off' })
     return this.list()
@@ -147,11 +153,7 @@ export class ClaudeAccountSelection {
       .sort((a, b) => b.updatedAt - a.updatedAt)
     const paneRecords = listClaudePaneAccounts()
     const { paneAccounts, assignedSessions } = claudeListedPaneAccounts(accounts, paneRecords)
-    const paneAssignments = paneRecords.flatMap((record) =>
-      record.assignedAccountId && record.assignedAccountId !== record.accountId
-        ? [{ ptyId: record.ptyId, accountId: record.assignedAccountId }]
-        : []
-    )
+    const paneAssignments = listedPaneAssignments(paneRecords)
     const userConfigDir = this.runtimeAuth.router.userConfigDir()
     // Throttle parsing of the large, frequently rewritten personal state file.
     const systemDefault =
@@ -165,7 +167,7 @@ export class ClaudeAccountSelection {
       activeAccountIdsByRuntime: selection,
       autoSwitchEnabled: settings.claudeAutoSwitchEnabled === true,
       sessionMover: settings.claudeSessionMover ?? 'ask',
-      authProxy: claudeAuthProxyEnabled(settings) ? 'on' : 'off',
+      ...claudeTokenRefreshFields(settings, accounts),
       accountPool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       pool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       modelPolicy: resolveClaudeModelPolicy(settings),

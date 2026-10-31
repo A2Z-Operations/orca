@@ -2,11 +2,10 @@ import { randomBytes } from 'node:crypto'
 import {
   Agent as HttpAgent,
   createServer,
-  request as httpRequest,
   type IncomingMessage,
   type ServerResponse
 } from 'node:http'
-import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
+import { Agent as HttpsAgent } from 'node:https'
 import { bindHostIsNetworkExposed, ORCAD_LOOPBACK_BIND_HOST } from '../../orcad/orcad-bind-address'
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
 import { forwardRequestHeaders, forwardResponseHeaders } from './claude-auth-proxy-headers'
@@ -19,6 +18,14 @@ import {
 import { createClaudeAuthProxyRequestLog } from './claude-auth-proxy-request-log'
 import { createClaudeAuthProxyTokenCache } from './claude-auth-proxy-token-cache'
 import { CLAUDE_MODEL_REWRITE_BUFFER_CAP } from '../claude-model-body-rewrite'
+import {
+  finishBufferedClaudeAuthProxy,
+  headerContentLength,
+  pipeClaudeAuthProxy,
+  readBoundedProxyBody,
+  streamOverflowClaudeAuthProxy,
+  type ClaudeAuthProxyExchange
+} from './claude-auth-proxy-replay'
 
 const UPSTREAM_ORIGIN = 'https://api.anthropic.com'
 const SLOT_PATH = /^\/p\/([^/]+)(\/.*)?$/
@@ -68,6 +75,11 @@ export type ClaudeAuthProxyOptions = {
   modelForSlot?: (slot: string) => ClaudeProxySlotModel | null
   /** Bodies over this size swap the model string instead of parsing. Tests set a small cap. */
   modelRewriteBufferCap?: number
+  /**
+   * On an upstream 401, refresh the slot's account and replay the buffered body once.
+   * A body over the rewrite cap is not replayed; the refresh still runs for the next request.
+   */
+  refreshAccessToken?: (accountId: string) => Promise<string | null>
 }
 
 export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAuthProxy {
@@ -205,24 +217,59 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     const slotModel = slot ? (options.modelForSlot?.(slot) ?? null) : null
     // Snapshot the model before the body, same as the token: a flip mid-body stays on the next request.
     const rewrite = claudeProxyShouldRewriteModel(method, contentType, slotModel)
-    const buffered = rewrite ? await readIncomingMessageBody(req) : null
-    const rewritten =
-      buffered && slotModel
-        ? rewriteClaudeProxyBody(
-            buffered,
-            slotModel.model,
-            options.modelRewriteBufferCap ?? CLAUDE_MODEL_REWRITE_BUFFER_CAP
-          )
-        : null
-    if (rewritten) {
-      headers['content-length'] = String(rewritten.body.length)
-    }
+    const cap = options.modelRewriteBufferCap ?? CLAUDE_MODEL_REWRITE_BUFFER_CAP
+    const declaredLength = headerContentLength(req.headers['content-length'])
+    const refresh = options.refreshAccessToken
     const target = new URL(`${upstreamPath}${requestUrl.search}`, upstream)
-    let settled = false
-    const onResponse = (upstreamRes: IncomingMessage): void => {
-      settled = true
-      const status = upstreamRes.statusCode ?? 502
+    releaseIdleAfterClose(res)
+    const exchange: ClaudeAuthProxyExchange = {
+      req,
+      res,
+      method,
+      upstreamPath,
+      accountId,
+      unknownSlot,
+      headers,
+      target,
+      httpAgent,
+      httpsAgent,
+      idleTimeoutMs,
+      observe: (status) => requests.observe(method, upstreamPath, status, accountId, unknownSlot),
+      invalidate: (id) => tokens.invalidate(id),
+      ...(refresh ? { refresh } : {}),
+      deliver: deliverUpstream
+    }
+
+    if (rewrite) {
+      const raw = await readIncomingMessageBody(req)
+      const rewritten = slotModel ? rewriteClaudeProxyBody(raw, slotModel.model, cap) : null
+      const payload = rewritten?.body ?? raw
+      if (rewritten) {
+        headers['content-length'] = String(payload.length)
+      }
+      await finishBufferedClaudeAuthProxy(exchange, payload, payload.length <= cap, token)
+      return
+    }
+
+    if (refresh && (declaredLength === null || declaredLength <= cap)) {
+      const read = await readBoundedProxyBody(req, cap)
+      if (read.kind === 'overflow') {
+        await streamOverflowClaudeAuthProxy(exchange, read.prefix, read.restChunk)
+        return
+      }
+      headers['content-length'] = String(read.body.length)
+      await finishBufferedClaudeAuthProxy(exchange, read.body, true, token)
+      return
+    }
+
+    pipeClaudeAuthProxy(exchange, token, true)
+
+    function deliverUpstream(status: number, upstreamRes: IncomingMessage): void {
       requests.observe(method, upstreamPath, status, accountId, unknownSlot)
+      if (res.headersSent || res.writableEnded) {
+        upstreamRes.resume()
+        return
+      }
       res.writeHead(status, forwardResponseHeaders(upstreamRes.headers))
       upstreamRes.on('error', () => {
         if (!res.writableEnded) {
@@ -232,35 +279,6 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
       // pipe pauses upstream when the client stops reading.
       upstreamRes.pipe(res)
     }
-    const upstreamReq =
-      target.protocol === 'https:'
-        ? httpsRequest(target, { method, headers, agent: httpsAgent }, onResponse)
-        : httpRequest(target, { method, headers, agent: httpAgent }, onResponse)
-    upstreamReq.setTimeout(idleTimeoutMs, () => upstreamReq.destroy())
-    upstreamReq.on('error', () => {
-      if (settled || res.headersSent || res.writableEnded) {
-        if (!res.writableEnded) {
-          res.destroy()
-        }
-        return
-      }
-      settled = true
-      requests.observe(method, upstreamPath, 502, accountId, unknownSlot)
-      res.writeHead(502)
-      res.end()
-    })
-    const abortUpstream = (): void => {
-      upstreamReq.destroy()
-    }
-    req.on('aborted', abortUpstream)
-    req.on('error', abortUpstream)
-    releaseIdleAfterClose(res)
-    if (rewritten) {
-      upstreamReq.end(rewritten.body)
-      return
-    }
-    // Pipe the body. Do not buffer it: /compact posts are hundreds of kilobytes.
-    req.pipe(upstreamReq)
   }
 
   return {

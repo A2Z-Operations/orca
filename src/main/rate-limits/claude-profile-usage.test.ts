@@ -33,6 +33,7 @@ vi.mock('@orca/process-host', () => ({
   }
 }))
 import { fetchActiveClaudeRateLimits } from './claude-active-usage-fetch'
+import { resetClaudeOAuthRefreshStateForTests } from './claude-oauth-refresh'
 import {
   readClaudeOAuthCredentials,
   resolveClaudeOAuthCredentialReadOptions
@@ -42,6 +43,7 @@ import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../shared/claude-profile-rout
 const roots: string[] = []
 afterEach(() => {
   roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }))
+  resetClaudeOAuthRefreshStateForTests()
   vi.unstubAllGlobals()
   vi.clearAllMocks()
 })
@@ -69,7 +71,7 @@ function systemDefault() {
     }
   }
 }
-it('lets the server decide a locally expired token and never refreshes it', async () => {
+it('keeps a stale-token result when the refresh endpoint fails and does not retry usage', async () => {
   const f = profile()
   const file = join(f.home, '.credentials.json')
   writeFileSync(

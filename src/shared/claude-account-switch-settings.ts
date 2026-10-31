@@ -14,6 +14,13 @@ export function claudeAuthProxyEnabled(
   return settings?.claudeAuthProxy !== false
 }
 
+/** Absent means on. Only an explicit false stops refreshing idle Claude accounts. */
+export function claudeAccountTokenRefreshEnabled(
+  settings: { claudeAccountTokenRefresh?: boolean } | null | undefined
+): boolean {
+  return settings?.claudeAccountTokenRefresh !== false
+}
+
 export type ClaudeAccountSwitchSettings = {
   /** Absent means 'ask'. */
   claudeAccountSwitchRunningSessions?: ClaudeAccountSwitchRunningSessions
@@ -21,6 +28,8 @@ export type ClaudeAccountSwitchSettings = {
   claudeSessionMover?: ClaudeSessionMoverSetting
   /** Absent means on. Only an explicit false turns the proxy off. */
   claudeAuthProxy?: boolean
+  /** Absent means on. Only an explicit false stops refreshing idle Claude accounts. */
+  claudeAccountTokenRefresh?: boolean
   /** Absent means off. The selected account stays what non-pooled launches and the status bar show. */
   claudeAccountPool?: ClaudeAccountPoolSetting
   /**

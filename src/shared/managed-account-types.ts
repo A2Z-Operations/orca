@@ -147,6 +147,15 @@ export type ClaudeRateLimitAccountsState = {
   sessionMover?: ClaudeSessionMoverSetting
   /** Whether launches bill through the local auth proxy; absent from older hosts. */
   authProxy?: 'on' | 'off'
+  /** Whether idle Claude accounts refresh their own access tokens. Absent from older hosts. */
+  tokenRefresh?: 'on' | 'off'
+  /** In-memory refresh book for this process. Absent from older hosts. */
+  tokenRefreshAccounts?: {
+    accountId: string
+    lastRefreshAt: number | null
+    nextRetryAt: number | null
+    lapsed: boolean
+  }[]
   /** Whether Orca-made Claude launches spread across accounts; absent from older hosts means off. */
   accountPool?: 'off' | 'on'
   /** Same value as `accountPool`. The CLI and status bar read this name. */
