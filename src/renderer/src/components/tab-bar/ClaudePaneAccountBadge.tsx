@@ -23,17 +23,22 @@ export function claudeSessionCountLabel(count: number): string {
 /** Presentational chip. The tab header passes the label the host already shortened. */
 export function ClaudePaneAccountChip({
   label,
-  email
+  email,
+  model
 }: {
   label: string
   email: string
+  model?: string
 }): React.JSX.Element {
-  const name = translate('accounts.claude.pool.paneBadge', 'Claude account {{label}}', { label })
+  const shown = model ? `${label} · ${model}` : label
+  const name = translate('accounts.claude.pool.paneBadge', 'Claude account {{label}}', {
+    label: shown
+  })
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Badge variant="hostContext" aria-label={name} className="mr-1 max-w-32 text-3xs">
-          <span className="truncate">{label}</span>
+          <span className="truncate">{shown}</span>
         </Badge>
       </TooltipTrigger>
       {email ? (
@@ -56,7 +61,13 @@ export function ClaudePaneAccountBadge({ ptyId }: { ptyId: string }): React.JSX.
   if (!assignment) {
     return null
   }
-  return <ClaudePaneAccountChip label={assignment.label} email={assignment.email} />
+  return (
+    <ClaudePaneAccountChip
+      label={assignment.label}
+      email={assignment.email}
+      model={assignment.model}
+    />
+  )
 }
 
 /** Account chip and tab color, hidden while the title is being edited. */

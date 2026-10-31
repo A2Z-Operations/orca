@@ -112,6 +112,12 @@ export function recordClaudePaneAccountForSpawn(args: {
     // transcript later and marked pinned there.
     pinned: false,
     source: pooled ? 'pool' : 'spawn',
+    ...(args.claudeAuth.appliedModel
+      ? {
+          model: args.claudeAuth.appliedModel.model,
+          modelSource: args.claudeAuth.appliedModel.modelSource
+        }
+      : {}),
     // A pooled launch records the assignment even before a proxy slot exists.
     ...(proxySlot || pooled
       ? { ...(proxySlot ? { proxySlot } : {}), assignedAccountId: accountId }

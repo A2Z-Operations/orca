@@ -43,6 +43,7 @@ import { setClaudeAuthProxy } from './account-auth-proxy'
 import { setClaudeAutoSwitch } from './account-auto-switch'
 import { printClaudeAccountMoves } from './account-moves'
 import { setClaudeAccountPool } from './account-pool'
+import { setClaudeModelPolicy } from './account-model-policy'
 import { setClaudeSessionMover } from './account-session-mover'
 
 type AccountsListSnapshot = {
@@ -301,5 +302,6 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
   'account auto-switch': setClaudeAutoSwitch,
   'account moves': printClaudeAccountMoves,
   'account pool': setClaudeAccountPool,
+  'account model-policy': setClaudeModelPolicy,
   'account session-mover': setClaudeSessionMover
 }

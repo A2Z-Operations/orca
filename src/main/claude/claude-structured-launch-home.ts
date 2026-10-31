@@ -6,6 +6,7 @@ import {
 } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-url'
 import type { ClaudeProfileRouter } from '../claude-accounts/claude-profile-router'
 import { applyClaudeEnvPatch } from '../claude-accounts/environment'
+import { resolveClaudeLaunchModel } from '../claude-accounts/claude-model-policy-launch'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth/runtime-auth-types'
 import {
   forgetClaudePaneAccount,
@@ -94,6 +95,12 @@ export async function resolveClaudeStructuredLaunchHome(
     launchedAt: recorded?.launchedAt ?? Date.now(),
     pinned: Boolean(userDir) || userPinnedUrl,
     source: chosen.pooled ? 'pool' : recorded ? recorded.source : 'spawn',
+    ...(chosen.preparation.appliedModel
+      ? {
+          model: chosen.preparation.appliedModel.model,
+          modelSource: chosen.preparation.appliedModel.modelSource
+        }
+      : {}),
     providerSessionId: session.providerSessionId,
     ...(session.workspaceId || recorded?.worktreeId
       ? { worktreeId: session.workspaceId ?? recorded?.worktreeId }
@@ -130,7 +137,17 @@ function pinClaudeLaunchHome(
           getClaudeConfigDirectory: () => router.systemDefaultHome()
         })
       : preparation.configDir
+  const applied = resolveClaudeLaunchModel({
+    env,
+    policy: preparation.policyModel ?? null
+  })
   applyClaudeEnvPatch(env, preparation.envPatch)
+  if (applied) {
+    preparation.appliedModel = { model: applied.model, modelSource: applied.modelSource }
+    if (applied.inject) {
+      env.ANTHROPIC_MODEL = applied.inject
+    }
+  }
   if (userDir) {
     env.CLAUDE_CONFIG_DIR = userDir
     return userDir

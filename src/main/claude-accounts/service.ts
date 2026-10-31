@@ -158,6 +158,20 @@ export class ClaudeAccountService {
     this.selection.setSessionMovesProvider(provider)
   }
 
+  setUsageWindowsProvider(
+    provider: Parameters<ClaudeAccountSelection['setUsageWindowsProvider']>[0]
+  ): void {
+    this.selection.setUsageWindowsProvider(provider)
+  }
+
+  setModelPolicy(patch: {
+    enabled?: boolean
+    fableLine?: number
+    weeklyGuard?: number
+  }): ClaudeRateLimitAccountsState {
+    return this.selection.setModelPolicy(patch)
+  }
+
   getRuntimeConfigDir(target?: ClaudeAccountSelectionTarget): string {
     return this.runtimeAuth.getRuntimeConfigDir(target)
   }

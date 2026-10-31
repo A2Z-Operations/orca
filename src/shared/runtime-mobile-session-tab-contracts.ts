@@ -129,6 +129,8 @@ export type RuntimeMobileSessionAgentTabStatus = Pick<
 > & {
   /** Billed Claude account. Absent on other agents and until the chat is registered. */
   claudeAccountId?: string
+  /** Effective Claude model (`fable`, `opus`, or a pinned id). */
+  model?: string
 }
 
 export type RuntimeMobileSessionSnapshotTab =

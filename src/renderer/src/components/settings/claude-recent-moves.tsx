@@ -44,7 +44,10 @@ export function ClaudeRecentMoves({
       ) : (
         <ul className="space-y-1">
           {moves.map((move) => (
-            <li key={move.ptyId} className="break-all font-mono text-xs text-muted-foreground">
+            <li
+              key={`${move.kind ?? 'move'}:${move.ptyId}:${move.at}`}
+              className="break-all font-mono text-xs text-muted-foreground"
+            >
               {formatClaudeSessionMoveLine(move)}
             </li>
           ))}

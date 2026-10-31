@@ -187,6 +187,7 @@ export function buildDefaultSettings(args: {
     claudeSessionMover: 'ask',
     claudeAuthProxy: false,
     claudeAccountPool: 'off',
+    claudeModelPolicy: { enabled: true, fableLine: 90, weeklyGuard: 91 },
     terminalScopeHistoryByWorktree: true,
     terminalHiddenViewParking: true,
     // Default-on kill switches use !== false so older persisted settings retain behavior.

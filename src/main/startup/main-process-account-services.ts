@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { KeybindingService } from '../keybindings/keybinding-service'
 import { createProviderAccountServices } from '../provider-account-services'
+import { stopClaudeModelPolicyTicker } from '../provider-claude-session-mover'
 import { createCodexSessionMigrationScheduler } from '../codex/codex-session-migration-scheduler'
 import { startCodexSessionBackfillInBackground } from '../codex/codex-session-backfill'
 import { startCodexSessionIndexHealInBackground } from '../codex/codex-session-index-heal'
@@ -163,7 +164,8 @@ export function initializeMainProcessAccountServices(): void {
           ? ''
           : email
             ? claudeAccountShortLabel(email, emails)
-            : notice.accountId.slice(0, 8)
+            : notice.accountId.slice(0, 8),
+      ...(notice.model ? { model: notice.model } : {})
     }
   }
   const stopPaneAssigned = onClaudePaneAssigned((notice) => {
@@ -172,6 +174,7 @@ export function initializeMainProcessAccountServices(): void {
   state.stopClaudeSessionMover = () => {
     stopPaneAssigned()
     services.sessionMover?.stop()
+    stopClaudeModelPolicyTicker()
     void stopClaudeAuthProxy()
   }
   state.rateLimits = services.rateLimits

@@ -4,7 +4,10 @@ import type {
   RuntimeMobileSessionAgentTab,
   RuntimeMobileSessionAgentTabStatus
 } from '../../shared/runtime-types'
-import { claudeAccountIdForPaneKey } from '../claude-accounts/claude-pane-account-registry'
+import {
+  claudeAccountIdForPaneKey,
+  claudeModelForPaneKey
+} from '../claude-accounts/claude-pane-account-registry'
 import {
   structuredAgentSessionPaneKey,
   structuredAgentSessionTabId
@@ -35,6 +38,7 @@ export function withStructuredChatStatus(
     return tab
   }
   const claudeAccountId = tab.agent === 'claude' ? claudeAccountIdForPaneKey(paneKey) : null
+  const model = tab.agent === 'claude' ? claudeModelForPaneKey(paneKey) : null
   const chatStatus: RuntimeMobileSessionAgentTabStatus = {
     state: row.state,
     ...(row.workingMode ? { workingMode: row.workingMode } : {}),
@@ -42,7 +46,8 @@ export function withStructuredChatStatus(
     updatedAt: row.receivedAt,
     ...(row.evidenceObservedAt !== undefined ? { evidenceObservedAt: row.evidenceObservedAt } : {}),
     ...(row.structuredHost === 'owned' ? { structuredHostOwned: true as const } : {}),
-    ...(claudeAccountId ? { claudeAccountId } : {})
+    ...(claudeAccountId ? { claudeAccountId } : {}),
+    ...(model ? { model } : {})
   }
   return { ...tab, chatStatus }
 }

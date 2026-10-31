@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { formatAccountsBlock } from './account-list-format'
+import { formatClaudeSessionMoveLine } from '../../shared/claude-session-move-line'
+import { formatAccountsBlock, formatClaudeModelPolicyLine } from './account-list-format'
 
 describe('formatAccountsBlock', () => {
   it('prints the WSL guest proxy status without changing the host proxy line', () => {
@@ -27,5 +28,39 @@ describe('formatAccountsBlock', () => {
     })
     expect(text).toContain('  a@example.com (active)  sessions: 2 (1 chat)')
     expect(text).toContain('  b@example.com  sessions: 0')
+  })
+
+  it('prints both windows and the model-policy line', () => {
+    const text = formatAccountsBlock('Claude', {
+      accounts: [{ id: 'a', email: 'a@example.com' }],
+      activeAccountId: 'a',
+      pool: 'on',
+      usageWindows: [{ accountId: 'a', weekly: 42.4, fable: null }],
+      modelPolicy: { enabled: true, fableLine: 90, weeklyGuard: 91 }
+    })
+    expect(text).toContain('  a@example.com (active)  weekly 42% · fable —')
+    expect(text).toContain('  pool: on\n  model-policy: on (fable<90, weekly<91)')
+    expect(formatClaudeModelPolicyLine({ enabled: false, fableLine: 80, weeklyGuard: 70 })).toBe(
+      'model-policy: off'
+    )
+  })
+
+  it('prints a model flip on its own moves line', () => {
+    expect(
+      formatClaudeSessionMoveLine({
+        ptyId: 'pty-1',
+        paneKey: 'reports',
+        fromAccountId: 'acct',
+        toAccountId: 'acct',
+        window: null,
+        percent: null,
+        line: null,
+        reason: 'weekly-guard',
+        at: Date.parse('2026-10-30T00:00:00.000Z'),
+        kind: 'model',
+        modelFrom: 'fable',
+        modelTo: 'opus'
+      })
+    ).toBe('2026-10-30T00:00:00.000Z  reports  fable → opus  weekly-guard  model')
   })
 })

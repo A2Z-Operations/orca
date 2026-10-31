@@ -11,9 +11,13 @@ import type {
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { RateLimitService } from '../rate-limits/service'
 import { claudeStateFile, readClaudeFolderLogin } from './claude-account-folder'
-import { savedWslClaudeAccountHome } from './claude-profile-wsl-paths'
+import {
+  savedClaudeManagedAccountSummary,
+  summarizeClaudeManagedAccount
+} from './claude-account-summary'
 import { wslAuthProxyStatus } from './wsl-auth-proxy-status'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
+import { resolveClaudeModelPolicy, type ClaudeModelPolicyPatch } from './claude-model-policy'
 import { claudeListedPaneAccounts } from './claude-listed-pane-accounts'
 import { listClaudePaneAccounts } from './claude-pane-account-registry'
 import {
@@ -43,6 +47,7 @@ export type ClaudeAccountSettings = Pick<
   | 'claudeSessionMover'
   | 'claudeAuthProxy'
   | 'claudeAccountPool'
+  | 'claudeModelPolicy'
 >
 
 export type ClaudeAccountStore = {
@@ -72,6 +77,8 @@ export type ClaudeAccountUsage = Pick<
   'evictInactiveClaudeCache' | 'refreshForClaudeAccountChange'
 >
 
+type ClaudeUsageWindows = { accountId: string; weekly: number | null; fable: number | null }[]
+
 export class ClaudeAccountSelection {
   constructor(
     private readonly store: ClaudeAccountStore,
@@ -80,9 +87,32 @@ export class ClaudeAccountSelection {
   ) {}
 
   private sessionMovesProvider: (() => ClaudeSessionMoveSummary[]) | null = null
+  // Accounts are passed in. The provider must not call list(); list() is the caller.
+  private usageWindowsProvider:
+    | ((accounts: readonly ClaudeManagedAccountSummary[]) => ClaudeUsageWindows)
+    | null = null
 
   setSessionMovesProvider(provider: (() => ClaudeSessionMoveSummary[]) | null): void {
     this.sessionMovesProvider = provider
+  }
+
+  setUsageWindowsProvider(
+    provider: ((accounts: readonly ClaudeManagedAccountSummary[]) => ClaudeUsageWindows) | null
+  ): void {
+    this.usageWindowsProvider = provider
+  }
+
+  setModelPolicy(patch: ClaudeModelPolicyPatch): ClaudeRateLimitAccountsState {
+    const current = this.store.getSettings().claudeModelPolicy
+    const resolved = resolveClaudeModelPolicy({
+      claudeModelPolicy: {
+        enabled: patch.enabled ?? current?.enabled,
+        fableLine: patch.fableLine ?? current?.fableLine,
+        weeklyGuard: patch.weeklyGuard ?? current?.weeklyGuard
+      }
+    })
+    this.saveSettings({ claudeModelPolicy: resolved })
+    return this.list()
   }
 
   setSessionMover(setting: ClaudeSessionMoverSetting): ClaudeRateLimitAccountsState {
@@ -110,7 +140,7 @@ export class ClaudeAccountSelection {
           return this.summarize(account)
         } catch (error) {
           console.warn('[claude-accounts] Could not read account folder:', error)
-          return { ...this.savedSummary(account), needsSignIn: true }
+          return { ...savedClaudeManagedAccountSummary(account), needsSignIn: true }
         }
       })
       .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -136,6 +166,8 @@ export class ClaudeAccountSelection {
       authProxy: claudeAuthProxyEnabled(settings) ? 'on' : 'off',
       accountPool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       pool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
+      modelPolicy: resolveClaudeModelPolicy(settings),
+      ...(this.usageWindowsProvider ? { usageWindows: this.usageWindowsProvider(accounts) } : {}),
       assignedSessions,
       paneAccounts,
       sessionMoves: this.sessionMovesProvider?.() ?? [],
@@ -160,41 +192,7 @@ export class ClaudeAccountSelection {
   }
 
   private summarize(account: ClaudeManagedAccount): ClaudeManagedAccountSummary {
-    const summary = this.savedSummary(account)
-    if (account.managedAuthRuntime === 'wsl') {
-      // Avoid starting stopped distros; only legacy layouts are known to need sign-in.
-      return savedWslClaudeAccountHome(account) ? summary : { ...summary, needsSignIn: true }
-    }
-    const home = this.runtimeAuth.router.accountHome(account.id)
-    const login = readClaudeFolderLogin(claudeStateFile(home))
-    if (login) {
-      return {
-        ...summary,
-        home,
-        email: login.email,
-        organizationUuid: login.organizationUuid,
-        organizationName: login.organizationName
-      }
-    }
-    // Allow System default to supply the login until the account signs in separately.
-    return this.runtimeAuth.router.coveredBySystemDefault(account.id)
-      ? { ...summary, home, runsOnSystemDefault: true }
-      : { ...summary, home, needsSignIn: true }
-  }
-
-  private savedSummary(account: ClaudeManagedAccount): ClaudeManagedAccountSummary {
-    return {
-      id: account.id,
-      email: account.email,
-      managedAuthRuntime: account.managedAuthRuntime ?? 'host',
-      wslDistro: account.wslDistro ?? null,
-      authMethod: account.authMethod ?? 'unknown',
-      organizationUuid: account.organizationUuid ?? null,
-      organizationName: account.organizationName ?? null,
-      createdAt: account.createdAt,
-      updatedAt: account.updatedAt,
-      lastAuthenticatedAt: account.lastAuthenticatedAt
-    }
+    return summarizeClaudeManagedAccount(account, this.runtimeAuth.router)
   }
 
   async remove(accountId: string): Promise<ClaudeRateLimitAccountsState> {

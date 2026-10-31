@@ -10,6 +10,7 @@ import { noteUserAnthropicBaseUrl } from './claude-auth-proxy-note'
 import { createClaudeAuthProxy, type ClaudeAuthProxy } from './claude-auth-proxy'
 import {
   bindClaudeAuthProxySlotToPty,
+  claudeAuthProxySlotModel,
   claudeAuthProxySlotShouldPrune,
   forgetClaudeAuthProxySlotOwner,
   noteClaudeAuthProxySlotAllocated,
@@ -55,7 +56,8 @@ export function startClaudeAuthProxy(): Promise<void> {
   }
   const created = createClaudeAuthProxy({
     readToken: readClaudeAuthProxyAccessToken,
-    log: (line) => console.info(`[claude-auth-proxy] ${line}`)
+    log: (line) => console.info(`[claude-auth-proxy] ${line}`),
+    modelForSlot: claudeAuthProxySlotModel
   })
   pending = created
     .start()

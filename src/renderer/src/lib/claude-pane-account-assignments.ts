@@ -7,6 +7,7 @@ export type ClaudePaneAccountAssignment = {
   label: string
   email: string
   accountId: string
+  model?: string
 }
 
 const listeners = new Set<() => void>()
@@ -31,10 +32,13 @@ function applyEvent(
     next.delete(event.ptyId)
     return next
   }
+  const previous = current.get(event.ptyId)
+  const model = event.model !== undefined ? event.model : previous?.model
   next.set(event.ptyId, {
     accountId: event.accountId,
     label: event.label,
-    email: event.email
+    email: event.email,
+    ...(model ? { model } : {})
   })
   return next
 }
@@ -47,7 +51,8 @@ function fromList(
     next.set(pane.ptyId, {
       accountId: pane.accountId,
       label: pane.label,
-      email: pane.email
+      email: pane.email,
+      ...(pane.model ? { model: pane.model } : {})
     })
   }
   return next

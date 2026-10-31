@@ -99,7 +99,8 @@ export async function prepareRuntimePtySpawn(
   ctx.env = applyRuntimeClaudeAuthEnv(
     args.env,
     ctx.claudeAuth,
-    claudeLaunchPinsAccount(ctx.claudeAuth, args.claudeAccountId)
+    claudeLaunchPinsAccount(ctx.claudeAuth, args.claudeAccountId),
+    args.command
   )
   if (
     ctx.isClaudeLaunch &&

@@ -454,6 +454,33 @@ describe('runtime-selector flags on locally pinned CLI commands', () => {
     expect(callMock).toHaveBeenCalledWith('accounts.setClaudeAccountPool', { enabled: true })
   })
 
+  it('routes `account model-policy --environment` to the named server too', async () => {
+    pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
+    callMock.mockImplementation(async (method: string) => {
+      if (method === 'accounts.setClaudeModelPolicy') {
+        return okFixture('req_account_model_policy', {
+          accounts: [],
+          activeAccountId: null,
+          modelPolicy: { enabled: false, fableLine: 90, weeklyGuard: 91 }
+        })
+      }
+      throw new Error(`unexpected ${method}`)
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    runtimeClientConstructorMock.mockClear()
+
+    await main(
+      ['account', 'model-policy', '--agent', 'claude', '--off', '--environment', 'm4air', '--json'],
+      '/tmp/repo'
+    )
+
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual({
+      modelPolicy: { enabled: false, fableLine: 90, weeklyGuard: 91 }
+    })
+    expect(runtimeClientConstructorMock).toHaveBeenCalledWith(undefined, 'm4air')
+    expect(callMock).toHaveBeenCalledWith('accounts.setClaudeModelPolicy', { enabled: false })
+  })
+
   it('routes `account moves --environment` to the named server too', async () => {
     pairRuntimeEnvironment(listEnvironmentsMock, 'env-m4air', 'm4air')
     callMock.mockImplementation(async (method: string) => {

@@ -15,6 +15,10 @@ type AccountsBlock = {
   sessionMoves?: readonly { ptyId: string; reason: string }[]
   /** Claude only: whether new launches spread across accounts (absent from older hosts). */
   pool?: 'on' | 'off'
+  /** Claude only: weekly and Fable percents. Absent from older hosts. */
+  usageWindows?: readonly { accountId: string; weekly: number | null; fable: number | null }[]
+  /** Claude only: spend Fable first. Absent from older hosts. */
+  modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
   /** Claude only: live sessions billed to each account (absent from older hosts). */
   assignedSessions?: readonly { accountId: string; count: number; chatCount?: number }[]
   /** Claude only: whether the host bills requests through the local auth proxy (absent from older hosts). */
@@ -38,6 +42,20 @@ export function formatDataAccounts(label: string, state: ManagedDataAccountsStat
     .join('\n')}`
 }
 
+function formatWindowPercent(value: number | null): string {
+  return value === null ? '—' : `${Math.round(value)}%`
+}
+
+export function formatClaudeModelPolicyLine(policy: {
+  enabled: boolean
+  fableLine: number
+  weeklyGuard: number
+}): string {
+  return policy.enabled
+    ? `model-policy: on (fable<${policy.fableLine}, weekly<${policy.weeklyGuard})`
+    : 'model-policy: off'
+}
+
 function formatSessionCount(count: number, chatCount: number | undefined): string {
   const chats =
     chatCount && chatCount > 0 ? ` (${chatCount} chat${chatCount === 1 ? '' : 's'})` : ''
@@ -56,15 +74,20 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   const sessionCountByAccount = new Map(
     (block.assignedSessions ?? []).map((row) => [row.accountId, row])
   )
+  const windowsByAccount = new Map((block.usageWindows ?? []).map((row) => [row.accountId, row]))
   const lines = block.accounts.map((account) => {
     const row = sessionCountByAccount.get(account.id)
     const sessions =
       block.assignedSessions !== undefined
         ? `  ${formatSessionCount(row?.count ?? 0, row?.chatCount)}`
         : ''
+    const windows = windowsByAccount.get(account.id)
+    const windowText = windows
+      ? `  weekly ${formatWindowPercent(windows.weekly)} · fable ${formatWindowPercent(windows.fable)}`
+      : ''
     return `  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
       account.needsSignIn ? ' (sign in again in Orca Settings > AI Provider Accounts)' : ''
-    }${sessions}`
+    }${sessions}${windowText}`
   })
   if (block.autoSwitchEnabled !== undefined) {
     lines.push(`  auto-switch: ${block.autoSwitchEnabled ? 'on' : 'off'}`)
@@ -74,6 +97,9 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   }
   if (block.pool !== undefined) {
     lines.push(`  pool: ${block.pool}`)
+  }
+  if (block.modelPolicy) {
+    lines.push(`  ${formatClaudeModelPolicyLine(block.modelPolicy)}`)
   }
   for (const move of block.sessionMoves ?? []) {
     lines.push(`  session ${move.ptyId}: ${move.reason}`)
