@@ -16,7 +16,12 @@ type AccountsBlock = {
   /** Claude only: whether new launches spread across accounts (absent from older hosts). */
   pool?: 'on' | 'off'
   /** Claude only: weekly and Fable percents. Absent from older hosts. */
-  usageWindows?: readonly { accountId: string; weekly: number | null; fable: number | null }[]
+  usageWindows?: readonly {
+    accountId: string
+    weekly: number | null
+    fable: number | null
+    unavailable?: string
+  }[]
   /** Claude only: spend Fable first. Absent from older hosts. */
   modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
   /** Claude only: live sessions billed to each account (absent from older hosts). */
@@ -42,8 +47,17 @@ export function formatDataAccounts(label: string, state: ManagedDataAccountsStat
     .join('\n')}`
 }
 
-function formatWindowPercent(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}%`
+function formatWindowPercent(value: number | null, unavailable?: string): string {
+  if (value !== null) {
+    return `${Math.round(value)}%`
+  }
+  if (unavailable === 'keychain denied') {
+    return '? (keychain denied)'
+  }
+  if (unavailable) {
+    return `— (${unavailable})`
+  }
+  return '—'
 }
 
 export function formatClaudeModelPolicyLine(policy: {
@@ -98,7 +112,7 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
         : ''
     const windows = windowsByAccount.get(account.id)
     const windowText = windows
-      ? `  weekly ${formatWindowPercent(windows.weekly)} · fable ${formatWindowPercent(windows.fable)}`
+      ? `  weekly ${formatWindowPercent(windows.weekly, windows.unavailable)} · fable ${formatWindowPercent(windows.fable, windows.unavailable)}`
       : ''
     return `  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
       account.needsSignIn ? ' (sign in again in Orca Settings > AI Provider Accounts)' : ''

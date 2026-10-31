@@ -55,4 +55,49 @@ describe('claudeAccountUsageWindows', () => {
     })
     expect(rows).toEqual([{ accountId: 'idle', weekly: null, fable: null }])
   })
+
+  it('names a keychain denial and an http failure instead of a blank window', () => {
+    const failed = (
+      accountId: string,
+      usageMetadata: ProviderRateLimits['usageMetadata']
+    ): ProviderRateLimits => ({
+      ...reading(accountId, 10, 10),
+      status: 'error',
+      weekly: null,
+      fableWeekly: null,
+      error: 'Claude usage is unavailable.',
+      usageMetadata
+    })
+    const rows = claudeAccountUsageWindows({
+      accounts: [account('keychain'), account('http'), account('login'), account('unread')],
+      selectedAccountId: 'active',
+      selectedLimits: null,
+      inactiveAccounts: [
+        {
+          accountId: 'keychain',
+          rateLimits: failed('keychain', { failureKind: 'keychain-unavailable' }),
+          updatedAt: 1,
+          isFetching: false
+        },
+        {
+          accountId: 'http',
+          rateLimits: failed('http', { failureKind: 'missing-credentials', httpStatus: 401 }),
+          updatedAt: 1,
+          isFetching: false
+        },
+        {
+          accountId: 'login',
+          rateLimits: failed('login', { failureKind: 'missing-credentials' }),
+          updatedAt: 1,
+          isFetching: false
+        }
+      ]
+    })
+    expect(rows).toEqual([
+      { accountId: 'keychain', weekly: null, fable: null, unavailable: 'keychain denied' },
+      { accountId: 'http', weekly: null, fable: null, unavailable: '401' },
+      { accountId: 'login', weekly: null, fable: null, unavailable: 'sign in again' },
+      { accountId: 'unread', weekly: null, fable: null }
+    ])
+  })
 })

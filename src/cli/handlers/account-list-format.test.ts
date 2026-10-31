@@ -64,6 +64,24 @@ describe('formatAccountsBlock', () => {
     )
   })
 
+  it('prints keychain denial and an http status instead of a silent dash', () => {
+    const text = formatAccountsBlock('Claude', {
+      accounts: [
+        { id: 'a', email: 'a@example.com' },
+        { id: 'b', email: 'b@example.com' }
+      ],
+      activeAccountId: null,
+      usageWindows: [
+        { accountId: 'a', weekly: null, fable: null, unavailable: 'keychain denied' },
+        { accountId: 'b', weekly: null, fable: null, unavailable: '401' }
+      ]
+    })
+    expect(text).toContain(
+      '  a@example.com  weekly ? (keychain denied) · fable ? (keychain denied)'
+    )
+    expect(text).toContain('  b@example.com  weekly — (401) · fable — (401)')
+  })
+
   it('prints a model flip on its own moves line', () => {
     expect(
       formatClaudeSessionMoveLine({
