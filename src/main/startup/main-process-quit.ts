@@ -94,6 +94,8 @@ function installBeforeQuitHandler(): void {
     // Delay PTY cleanup until scrollback capture; exit events otherwise unmount the renderer callbacks.
     state.stopClaudeSessionMover?.()
     state.stopClaudeSessionMover = null
+    state.stopClaudeUsagePolling?.()
+    state.stopClaudeUsagePolling = null
     state.rateLimits?.stop()
     // History GC is idempotent and rescheduled next launch; a vetoed quit costs only a deferred sweep.
     cancelHistoryGc()
