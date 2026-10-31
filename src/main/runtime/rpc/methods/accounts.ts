@@ -28,6 +28,7 @@ import {
   HostAccountSignInCodeParams
 } from '../../../../shared/rpc-contract/accounts-params'
 import { HostAccountLaunchEnvParams } from '../../../../shared/host-account-launch-env'
+import { setClaudeModelPolicyMethod } from './accounts-model-policy'
 
 // Use a per-process counter: same-millisecond subscriptions must not evict each other's cleanup.
 let accountsSubscriptionSeq = 0
@@ -168,6 +169,7 @@ export const ACCOUNT_METHODS = [
     params: SetClaudeAccountPoolParams,
     handler: async (params, { runtime }) => runtime.setClaudeAccountPool(params.enabled)
   }),
+  setClaudeModelPolicyMethod,
   defineMethod({
     name: 'accounts.assignClaudePane',
     permission: 'accounts-admin',

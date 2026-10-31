@@ -26,6 +26,7 @@ import type { CodexRateLimitResetOutcome, RateLimitState } from '../../shared/ra
 import type { CodexResetCreditExpectedScope } from '../../shared/codex-reset-credit-scope'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
 import type { ClaudeAccountSelectionTarget } from '../claude-accounts/runtime-selection'
+import type { ClaudeModelPolicyPatch } from '../claude-accounts/claude-model-policy'
 import {
   hostAccountLaunchEnvFor,
   hostAccountsManagedByDesktopMessage,
@@ -230,6 +231,10 @@ export class RuntimeAccountController {
 
   setClaudeAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
     return this.requireServices().claudeAccounts.setAccountPool(enabled)
+  }
+
+  setClaudeModelPolicy(patch: ClaudeModelPolicyPatch): ClaudeRateLimitAccountsState {
+    return this.requireServices().claudeAccounts.setModelPolicy(patch)
   }
 
   /** Works without account services: a WSL guest has the proxy and the pane registry, not the desktop's accounts. */

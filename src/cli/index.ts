@@ -35,6 +35,7 @@ function shouldIgnoreRemoteSelection(commandPath: string[]): boolean {
       commandPath[1] !== 'session-mover' &&
       commandPath[1] !== 'auth-proxy' &&
       commandPath[1] !== 'pool' &&
+      commandPath[1] !== 'model-policy' &&
       commandPath[1] !== 'moves') ||
     commandPath[0] === 'artifacts' ||
     commandPath[0] === 'environment' ||

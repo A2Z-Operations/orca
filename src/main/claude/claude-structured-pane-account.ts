@@ -1,4 +1,7 @@
-import { claudePoolAccountForLaunch } from '../claude-accounts/claude-account-pool-launch'
+import {
+  claudePolicyModelForAccount,
+  claudePoolAccountForLaunch
+} from '../claude-accounts/claude-account-pool-launch'
 import {
   getClaudeAuthProxy,
   releaseOwnClaudeAuthProxySlot
@@ -71,7 +74,7 @@ export async function prepareStructuredClaudeAccount(input: {
       ? (input.existing.assignedAccountId ?? input.existing.accountId)
       : null
     return {
-      preparation: await input.router.prepareLaunchFor(resumed),
+      preparation: attachPolicyModel(await input.router.prepareLaunchFor(resumed), resumed),
       pooled: false,
       keepRecordedAccount: billed === resumed,
       reuseRecordedSlot: Boolean(input.existing?.proxySlot) && billed === resumed
@@ -97,7 +100,7 @@ async function keepRecordedPreparation(
   const selectedAccount = structuredLaunchAccountId(selected.provenance, router.selectedAccountId())
   if (selectedAccount === billed) {
     return {
-      preparation: selected,
+      preparation: attachPolicyModel(selected, billed),
       pooled: existing.source === 'pool',
       keepRecordedAccount: true,
       reuseRecordedSlot: Boolean(existing.proxySlot)
@@ -107,7 +110,7 @@ async function keepRecordedPreparation(
     const preparation = await router.prepareLaunchFor(billed)
     releasePreparedClaudeSlot(selected)
     return {
-      preparation,
+      preparation: attachPolicyModel(preparation, billed),
       pooled: existing.source === 'pool',
       keepRecordedAccount: true,
       reuseRecordedSlot: Boolean(existing.proxySlot)
@@ -126,6 +129,41 @@ async function keepRecordedPreparation(
   }
 }
 
+function attachPolicyModel(
+  preparation: ClaudeRuntimeAuthPreparation,
+  accountId: string | null
+): ClaudeRuntimeAuthPreparation {
+  if (preparation.policyModel || !accountId) {
+    return preparation
+  }
+  const choice = claudePolicyModelForAccount(accountId)
+  if (!choice || choice.reason === 'off') {
+    return preparation
+  }
+  return {
+    ...preparation,
+    policyModel: { model: choice.model, modelId: choice.modelId, reason: choice.reason }
+  }
+}
+
+function withPoolModel(
+  preparation: ClaudeRuntimeAuthPreparation,
+  pool: ReturnType<typeof claudePoolAccountForLaunch>,
+  accountId: string | null
+): ClaudeRuntimeAuthPreparation {
+  if (pool?.model && pool.modelId) {
+    return {
+      ...preparation,
+      policyModel: {
+        model: pool.model,
+        modelId: pool.modelId,
+        reason: pool.modelReason ?? pool.model
+      }
+    }
+  }
+  return attachPolicyModel(preparation, accountId)
+}
+
 async function finishFreshPreparation(
   router: ClaudeProfileRouter,
   allowPool: boolean,
@@ -134,13 +172,13 @@ async function finishFreshPreparation(
   const pool = allowPool ? claudePoolAccountForLaunch(HOST) : null
   if (pool?.named) {
     try {
-      const preparation = await router.prepareLaunchFor(pool.accountId)
+      const prepared = await router.prepareLaunchFor(pool.accountId)
       if (selected) {
         releasePreparedClaudeSlot(selected)
       }
       return {
-        preparation,
-        pooled: true,
+        preparation: withPoolModel(prepared, pool, pool.accountId),
+        pooled: pool.pooled !== false,
         keepRecordedAccount: false,
         reuseRecordedSlot: false
       }
@@ -152,9 +190,10 @@ async function finishFreshPreparation(
     }
   }
   const preparation = selected ?? (await router.prepareLaunch())
+  const accountId = structuredLaunchAccountId(preparation.provenance, router.selectedAccountId())
   return {
-    preparation,
-    pooled: Boolean(pool && !pool.named),
+    preparation: withPoolModel(preparation, pool, accountId),
+    pooled: Boolean(pool && !pool.named && pool.pooled !== false),
     keepRecordedAccount: false,
     reuseRecordedSlot: false
   }

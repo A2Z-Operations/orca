@@ -26,7 +26,8 @@ export function claudeListedPaneAccounts(
       paneKey: record.paneKey,
       accountId,
       email: account.email,
-      label: claudeAccountShortLabel(account.email, emails)
+      label: claudeAccountShortLabel(account.email, emails),
+      ...(record.model ? { model: record.model } : {})
     })
   }
   return {

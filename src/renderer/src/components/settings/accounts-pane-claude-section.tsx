@@ -10,6 +10,7 @@ import { SearchableSetting } from './SearchableSetting'
 import { renderClaudeAutoSwitchSetting } from './accounts-pane-claude-auto-switch'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
 import { ClaudeAccountPoolSetting } from './claude-account-pool-setting'
+import { ClaudeModelPolicySetting } from './claude-model-policy-setting'
 import { ClaudeAuthProxySetting } from './claude-auth-proxy-setting'
 import { ClaudeSessionMoverSetting } from './claude-session-mover-setting'
 import { ClaudeRecentMoves } from './claude-recent-moves'
@@ -395,6 +396,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
           <ClaudeRunningSessionSwitchSetting settings={settings} updateSettings={updateSettings} />
           <ClaudeSessionMoverSetting settings={settings} updateSettings={updateSettings} />
           <ClaudeAccountPoolSetting settings={settings} updateSettings={updateSettings} />
+          <ClaudeModelPolicySetting settings={settings} updateSettings={updateSettings} />
           <ClaudeAuthProxySetting settings={settings} updateSettings={updateSettings} />
         </>
       )}

@@ -21390,6 +21390,10 @@
         "sessionsOther": "{{count}} sessions",
         "badge": "Pool",
         "paneBadge": "Claude account {{label}}"
+      },
+      "modelPolicy": {
+        "settingTitle": "Spend Fable first",
+        "settingDescription": "Run Fable while its window is under {{fable}}% and the weekly window is under {{weekly}}%. Otherwise run Opus 5.5. A running session switches without a restart."
       }
     },
     "managedData": {

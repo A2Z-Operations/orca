@@ -12,9 +12,35 @@ import { parseValidPaneKey } from '../pane/key-state'
 import { shouldRefreshNativeClaudeAgentTeamsEnv } from '../pane/launch-authority'
 import { selectWindowJcodeRuntimeDir, stampPtySpawnPaneEnv } from '../spawn-pane-env'
 import type { PtyIpcSpawnState } from './spawn-state'
+import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
 import { assemblePtyIpcSpawnCodexEnv } from './spawn-env-codex'
 import { prepareAntigravityAccountForLaunch } from '../../../antigravity/native-account-launch'
 import { releaseSupersededOwnProxySlot } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-slot-env'
+import { resolveClaudeLaunchModel } from '../../../claude-accounts/claude-model-policy-launch'
+
+/** Same pin rule as the runtime spawn path. The IPC spread never calls applyRuntimeClaudeAuthEnv. */
+function stampIpcClaudeLaunchModel(
+  env: Record<string, string> | undefined,
+  auth: ClaudeRuntimeAuthPreparation | null | undefined,
+  command: string | undefined
+): Record<string, string> | undefined {
+  if (!env || !auth) {
+    return env
+  }
+  const resolved = resolveClaudeLaunchModel({
+    env,
+    command,
+    policy: auth.policyModel ?? null
+  })
+  if (!resolved) {
+    return env
+  }
+  auth.appliedModel = { model: resolved.model, modelSource: resolved.modelSource }
+  if (!resolved.inject) {
+    return env
+  }
+  return { ...env, ANTHROPIC_MODEL: resolved.inject }
+}
 
 export async function assemblePtyIpcSpawnEnv(ctx: PtyIpcSpawnState): Promise<void> {
   const args = ctx.args
@@ -26,7 +52,8 @@ export async function assemblePtyIpcSpawnEnv(ctx: PtyIpcSpawnState): Promise<voi
       ctx.claudeAuth.envPatch.ANTHROPIC_BASE_URL
     )
   }
-  const baseEnvWithAuth = ctx.claudeAuth ? { ...args.env, ...ctx.claudeAuth.envPatch } : args.env
+  const mergedAuthEnv = ctx.claudeAuth ? { ...args.env, ...ctx.claudeAuth.envPatch } : args.env
+  const baseEnvWithAuth = stampIpcClaudeLaunchModel(mergedAuthEnv, ctx.claudeAuth, args.command)
   const spawnPaneKey = baseEnvWithAuth?.ORCA_PANE_KEY
   const parsedSpawnPaneKey = parseValidPaneKey(spawnPaneKey)
   const verifiedPaneKey =

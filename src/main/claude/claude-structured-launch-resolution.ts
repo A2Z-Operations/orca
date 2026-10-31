@@ -30,6 +30,12 @@ import {
   claudeLaunchResumesTranscript,
   resolveClaudeStructuredLaunchHome
 } from './claude-structured-launch-home'
+import {
+  getClaudePaneAccount,
+  setClaudePaneModel
+} from '../claude-accounts/claude-pane-account-registry'
+import { claudePolicyModelLabel } from '../claude-accounts/claude-model-policy'
+import { structuredClaudeSessionKey } from './claude-structured-session-key'
 import type { StructuredAgentLaunchPartResolver } from '../runtime/structured-agent-launch-composition'
 import { claudeSessionIdForOrcaSession } from './structured/claude-structured-session-id'
 import {
@@ -240,6 +246,19 @@ export function claudeStructuredLaunchPart(
       providerSessionId,
       workspaceId: identity.workspaceId
     })
+    const sessionKey = structuredClaudeSessionKey(identity.sessionId)
+    const flaggedModel = configured.extraArgs.model
+    const flagged = typeof flaggedModel === 'string' && flaggedModel.length > 0
+    if (flagged) {
+      if (getClaudePaneAccount(sessionKey)?.modelSource === 'policy') {
+        delete env.ANTHROPIC_MODEL
+      }
+      setClaudePaneModel(sessionKey, claudePolicyModelLabel(flaggedModel) ?? flaggedModel, 'pinned')
+    }
+    const policyModelId =
+      !flagged && getClaudePaneAccount(sessionKey)?.modelSource === 'policy'
+        ? env.ANTHROPIC_MODEL
+        : undefined
     const resumesTranscript = resumedWithoutRouter ?? (await resumes(launchHome))
     if (fork?.throughEntryId && !resumesTranscript) {
       // Fork sources must pass the same account-history check as resumes.
@@ -259,6 +278,7 @@ export function claudeStructuredLaunchPart(
           ...CLAUDE_STRUCTURED_BASE_OPTIONS,
           ...permission,
           ...(additionalDirectories.length ? { additionalDirectories } : {}),
+          ...(policyModelId ? { model: policyModelId } : {}),
           ...(visuals?.pluginDir ? { plugins: [{ type: 'local', path: visuals.pluginDir }] } : {}),
           extraArgs: {
             ...configured.extraArgs,

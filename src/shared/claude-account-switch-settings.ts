@@ -23,4 +23,14 @@ export type ClaudeAccountSwitchSettings = {
   claudeAuthProxy?: boolean
   /** Absent means off. The selected account stays what non-pooled launches and the status bar show. */
   claudeAccountPool?: ClaudeAccountPoolSetting
+  /**
+   * Which Claude model a managed account runs. Absent means on: Fable while its Fable window is
+   * under `fableLine` and the weekly window is under `weeklyGuard`, otherwise Opus 5.5.
+   */
+  claudeModelPolicy?: {
+    /** Absent means on. Only an explicit false turns the policy off. */
+    enabled?: boolean
+    fableLine?: number
+    weeklyGuard?: number
+  }
 }

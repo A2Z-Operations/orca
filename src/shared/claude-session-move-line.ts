@@ -3,6 +3,9 @@ import type { ClaudeSessionMoveSummary } from './managed-account-types'
 /** One row of `orca account moves`. Callers that want newest first sort before this. */
 export function formatClaudeSessionMoveLine(move: ClaudeSessionMoveSummary): string {
   const pane = move.paneKey ?? move.ptyId
+  if (move.kind === 'model') {
+    return `${new Date(move.at).toISOString()}  ${pane}  ${move.modelFrom ?? '-'} → ${move.modelTo ?? '-'}  ${move.reason}  model`
+  }
   const to = move.toAccountId ?? '-'
   const strategy = move.strategy ?? '-'
   const chat = move.chat ? '  chat' : ''

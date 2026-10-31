@@ -62,4 +62,15 @@ export type PluginClaudeUsageWindow = z.infer<typeof pluginClaudeUsageWindowSche
 export type PluginClaudeAccountUsage = z.infer<typeof pluginClaudeAccountUsageSchema>
 export type PluginClaudeAccountView = z.infer<typeof pluginClaudeAccountSchema>
 export type PluginClaudeUsageChangedPayload = z.infer<typeof pluginClaudeUsageChangedPayloadSchema>
+export const pluginClaudeModelChangedPayloadSchema = z
+  .object({
+    ptyId: z.string().min(1).max(1024),
+    accountId: z.string().min(1).max(PLUGIN_CLAUDE_ACCOUNT_ID_MAX_LENGTH),
+    from: z.enum(['fable', 'opus']),
+    to: z.enum(['fable', 'opus']),
+    reason: z.string().min(1).max(256)
+  })
+  .strict()
+
 export type PluginClaudeSessionMovedPayload = z.infer<typeof pluginClaudeSessionMovedPayloadSchema>
+export type PluginClaudeModelChangedPayload = z.infer<typeof pluginClaudeModelChangedPayloadSchema>

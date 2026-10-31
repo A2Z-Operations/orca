@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  pluginClaudeModelChangedPayloadSchema,
   pluginClaudeSessionMovedPayloadSchema,
   pluginClaudeUsageChangedPayloadSchema
 } from './plugin-claude-account-contract'
@@ -49,7 +50,8 @@ export const PLUGIN_EVENT_PAYLOAD_SCHEMAS: Record<PluginEventName, z.ZodTypeAny>
   'worktree.removed': worktreeRemovedPayloadSchema,
   'agent.status.changed': agentStatusChangedPayloadSchema,
   'accounts.usage.changed': pluginClaudeUsageChangedPayloadSchema,
-  'accounts.session.moved': pluginClaudeSessionMovedPayloadSchema
+  'accounts.session.moved': pluginClaudeSessionMovedPayloadSchema,
+  'accounts.model.changed': pluginClaudeModelChangedPayloadSchema
 }
 
 export type PluginWorktreeCreatedPayload = z.infer<typeof worktreeCreatedPayloadSchema>
