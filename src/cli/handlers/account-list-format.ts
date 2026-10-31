@@ -56,6 +56,21 @@ export function formatClaudeModelPolicyLine(policy: {
     : 'model-policy: off'
 }
 
+export function formatClaudeModelPolicyEvaluationLine(row: {
+  ptyId: string
+  paneKey: string | null
+  accountId: string | null
+  model: string | null
+  source: string | null
+  choice: string | null
+  reason: string
+  skip: string | null
+  at: number
+}): string {
+  const skip = row.skip ? `  skip ${row.skip}` : ''
+  return `pane ${row.paneKey ?? row.ptyId}  account ${row.accountId ?? '-'}  model ${row.model ?? '-'}  source ${row.source ?? '-'}  choice ${row.choice ?? '-'}  reason ${row.reason}${skip}  at ${new Date(row.at).toISOString()}`
+}
+
 function formatSessionCount(count: number, chatCount: number | undefined): string {
   const chats =
     chatCount && chatCount > 0 ? ` (${chatCount} chat${chatCount === 1 ? '' : 's'})` : ''

@@ -117,6 +117,19 @@ export type ClaudeAccountSignIn = {
   wslDistro?: string | null
 }
 
+/** One pane's latest model-policy pass. `skip` is why it did not flip. */
+export type ClaudeModelPolicyEvaluation = {
+  ptyId: string
+  paneKey: string | null
+  accountId: string | null
+  model: string | null
+  source: 'policy' | 'pinned' | null
+  choice: 'fable' | 'opus' | null
+  reason: string
+  skip: string | null
+  at: number
+}
+
 export type ClaudeRateLimitAccountsState = {
   accounts: ClaudeManagedAccountSummary[]
   activeAccountId: string | null
@@ -155,6 +168,8 @@ export type ClaudeRateLimitAccountsState = {
   usageWindows?: { accountId: string; weekly: number | null; fable: number | null }[]
   /** Spend Fable first, then Opus. Absent from older hosts. */
   modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
+  /** Last model-policy pass per live pane. Absent from older hosts and when none has run. */
+  modelPolicyEvaluations?: ClaudeModelPolicyEvaluation[]
 }
 
 /** One live Claude pane and the account its next request bills. */

@@ -63,7 +63,8 @@ describe('claude usage polling policy', () => {
     expect(rateLimits.start).toHaveBeenCalledTimes(1)
     expect(rateLimits.start).toHaveBeenCalledWith({
       fetchImmediately: true,
-      pollWithoutWindow: true
+      pollWithoutWindow: true,
+      pollInactiveClaude: true
     })
 
     expect(polling.apply({ appFontFamily: 'unused' })).toBe(true)

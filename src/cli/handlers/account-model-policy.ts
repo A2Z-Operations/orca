@@ -2,7 +2,10 @@ import type { HandlerContext } from '../dispatch'
 import { getRepeatedStringFlag } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
 import type { ClaudeRateLimitAccountsState } from '../../shared/managed-account-types'
-import { formatClaudeModelPolicyLine } from './account-list-format'
+import {
+  formatClaudeModelPolicyEvaluationLine,
+  formatClaudeModelPolicyLine
+} from './account-list-format'
 
 type AccountsListSnapshot = {
   claude: ClaudeRateLimitAccountsState
@@ -39,7 +42,7 @@ export async function setClaudeModelPolicy(ctx: HandlerContext): Promise<void> {
   }
   if (status) {
     const listed = await ctx.client.call<AccountsListSnapshot>('accounts.list', {})
-    printPolicy(ctx, listed.result.claude.modelPolicy)
+    printStatus(ctx, listed.result.claude)
     return
   }
   const patch: ModelPolicyPatch = parseSet(sets)
@@ -54,6 +57,23 @@ export async function setClaudeModelPolicy(ctx: HandlerContext): Promise<void> {
     patch
   )
   printPolicy(ctx, result.result.modelPolicy)
+}
+
+function printStatus(ctx: HandlerContext, claude: ClaudeRateLimitAccountsState): void {
+  const resolved = claude.modelPolicy ?? { enabled: true, fableLine: 90, weeklyGuard: 91 }
+  const evaluations = claude.modelPolicyEvaluations ?? []
+  if (ctx.json) {
+    console.log(JSON.stringify({ modelPolicy: resolved, evaluations }, null, 2))
+    return
+  }
+  console.log(formatClaudeModelPolicyLine(resolved))
+  if (evaluations.length === 0) {
+    console.log('  no pane evaluations')
+    return
+  }
+  for (const row of evaluations) {
+    console.log(`  ${formatClaudeModelPolicyEvaluationLine(row)}`)
+  }
 }
 
 function printPolicy(
