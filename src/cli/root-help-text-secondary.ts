@@ -47,7 +47,7 @@ export const ROOT_HELP_TEXT_SECONDARY = [
   '  orca account auto-switch --agent claude --on|--off [--environment <selector>]',
   '  orca account session-mover --agent claude --off|--ask|--move [--environment <selector>]',
   '  orca account auth-proxy --agent claude --on|--off|--status [--environment <selector>]',
-  '  orca account token-refresh --agent claude --on|--off|--status [--environment <selector>]',
+  '  orca account token-refresh --agent claude --on|--off|--status|--now <email|id> [--force] [--environment <selector>]',
   '  orca account pool --agent claude --on|--off [--environment <selector>]',
   '  orca account model-policy --agent claude --on|--off|--status|--set fable-line=<n> [--environment <selector>]',
   '  orca account moves [--environment <selector>]',

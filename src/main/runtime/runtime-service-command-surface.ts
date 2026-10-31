@@ -1,3 +1,8 @@
+import type {
+  ClaudeTokenRefreshNowInput,
+  ClaudeTokenRefreshNowResult
+} from '../claude-accounts/claude-token-refresh-now'
+import { refreshOneClaudeAccountToken } from '../claude-accounts/claude-token-refresh-now'
 import type { RuntimeAccountController } from './runtime-account-controller'
 import type { RuntimeAiVaultCommands } from './runtime-ai-vault-commands'
 import type { RuntimeBrowserDriverController } from './runtime-browser-driver-controller'
@@ -58,6 +63,9 @@ export type RuntimeServiceCommandSurface = {
   setClaudeAutoSwitch: RuntimeAccountController['setClaudeAutoSwitch']
   setClaudeAuthProxy: RuntimeAccountController['setClaudeAuthProxy']
   setClaudeAccountTokenRefresh: RuntimeAccountController['setClaudeAccountTokenRefresh']
+  refreshClaudeAccountTokenNow: (
+    input: ClaudeTokenRefreshNowInput
+  ) => Promise<ClaudeTokenRefreshNowResult>
   claudeAuthProxyStatus: RuntimeAccountController['claudeAuthProxyStatus']
   setClaudeAccountPool: RuntimeAccountController['setClaudeAccountPool']
   setClaudeModelPolicy: RuntimeAccountController['setClaudeModelPolicy']
@@ -179,6 +187,8 @@ export function installRuntimeServiceCommandSurface(
     setClaudeAutoSwitch: accounts.setClaudeAutoSwitch.bind(accounts),
     setClaudeAuthProxy: accounts.setClaudeAuthProxy.bind(accounts),
     setClaudeAccountTokenRefresh: accounts.setClaudeAccountTokenRefresh.bind(accounts),
+    refreshClaudeAccountTokenNow: (input) =>
+      refreshOneClaudeAccountToken(accounts.getSnapshot().claude.accounts, input),
     claudeAuthProxyStatus: accounts.claudeAuthProxyStatus.bind(accounts),
     setClaudeAccountPool: accounts.setClaudeAccountPool.bind(accounts),
     setClaudeModelPolicy: accounts.setClaudeModelPolicy.bind(accounts),
