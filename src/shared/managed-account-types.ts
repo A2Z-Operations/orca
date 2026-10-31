@@ -151,6 +151,10 @@ export type ClaudeRateLimitAccountsState = {
   paneAssignments?: { ptyId: string; accountId: string }[]
   /** The mover's last decision per live session, newest first. */
   sessionMoves?: ClaudeSessionMoveSummary[]
+  /** Weekly and Fable percents. Absent from older hosts. Null means that window was not readable. */
+  usageWindows?: { accountId: string; weekly: number | null; fable: number | null }[]
+  /** Spend Fable first, then Opus. Absent from older hosts. */
+  modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
 }
 
 /** One live Claude pane and the account its next request bills. */
@@ -161,6 +165,8 @@ export type ClaudePaneAccountSnapshot = {
   /** Email local-part, or `local@domain` when two accounts share a local-part. */
   label: string
   email: string
+  /** Effective model (`fable`, `opus`, or a pinned id). Absent when the launch recorded none. */
+  model?: string
 }
 
 /** Pushed when a pane's billed account changes, including when the pane is gone (`accountId` null). */
@@ -170,6 +176,7 @@ export type ClaudePaneAssignedEvent = {
   accountId: string | null
   label: string
   email: string
+  model?: string
 }
 
 /** The session mover's last decision for a live Claude session (`orca account list --json`). */
@@ -187,6 +194,10 @@ export type ClaudeSessionMoveSummary = {
   strategy?: 'resume' | 'proxy'
   /** Native chat. Absent on terminal sessions and older hosts. */
   chat?: true
+  /** `model` is a mid-session model flip. Absent on account moves and older hosts. */
+  kind?: 'model'
+  modelFrom?: string
+  modelTo?: string
 }
 
 /** Orca moved Claude to another account before a usage limit, so running sessions can follow. */

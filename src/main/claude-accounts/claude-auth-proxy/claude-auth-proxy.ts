@@ -10,8 +10,15 @@ import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { bindHostIsNetworkExposed, ORCAD_LOOPBACK_BIND_HOST } from '../../orcad/orcad-bind-address'
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
 import { forwardRequestHeaders, forwardResponseHeaders } from './claude-auth-proxy-headers'
+import {
+  claudeProxyShouldRewriteModel,
+  readIncomingMessageBody,
+  rewriteClaudeProxyBody,
+  type ClaudeProxySlotModel
+} from './claude-auth-proxy-model-body'
 import { createClaudeAuthProxyRequestLog } from './claude-auth-proxy-request-log'
 import { createClaudeAuthProxyTokenCache } from './claude-auth-proxy-token-cache'
+import { CLAUDE_MODEL_REWRITE_BUFFER_CAP } from '../claude-model-body-rewrite'
 
 const UPSTREAM_ORIGIN = 'https://api.anthropic.com'
 const SLOT_PATH = /^\/p\/([^/]+)(\/.*)?$/
@@ -57,6 +64,10 @@ export type ClaudeAuthProxyOptions = {
   /** Socket inactivity budget. Defaults to Claude's 10 minutes. */
   idleTimeoutMs?: number
   now?: () => number
+  /** Effective model for a slot. A pinned model is not rewritten. */
+  modelForSlot?: (slot: string) => ClaudeProxySlotModel | null
+  /** Bodies over this size swap the model string instead of parsing. Tests set a small cap. */
+  modelRewriteBufferCap?: number
 }
 
 export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAuthProxy {
@@ -189,6 +200,23 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     if (token) {
       headers.authorization = `Bearer ${token}`
     }
+    const contentTypeHeader = req.headers['content-type']
+    const contentType = Array.isArray(contentTypeHeader) ? contentTypeHeader[0] : contentTypeHeader
+    const slotModel = slot ? (options.modelForSlot?.(slot) ?? null) : null
+    // Snapshot the model before the body, same as the token: a flip mid-body stays on the next request.
+    const rewrite = claudeProxyShouldRewriteModel(method, contentType, slotModel)
+    const buffered = rewrite ? await readIncomingMessageBody(req) : null
+    const rewritten =
+      buffered && slotModel
+        ? rewriteClaudeProxyBody(
+            buffered,
+            slotModel.model,
+            options.modelRewriteBufferCap ?? CLAUDE_MODEL_REWRITE_BUFFER_CAP
+          )
+        : null
+    if (rewritten) {
+      headers['content-length'] = String(rewritten.body.length)
+    }
     const target = new URL(`${upstreamPath}${requestUrl.search}`, upstream)
     let settled = false
     const onResponse = (upstreamRes: IncomingMessage): void => {
@@ -227,6 +255,10 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     req.on('aborted', abortUpstream)
     req.on('error', abortUpstream)
     releaseIdleAfterClose(res)
+    if (rewritten) {
+      upstreamReq.end(rewritten.body)
+      return
+    }
     // Pipe the body. Do not buffer it: /compact posts are hundreds of kilobytes.
     req.pipe(upstreamReq)
   }

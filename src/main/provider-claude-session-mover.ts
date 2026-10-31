@@ -7,7 +7,8 @@ import {
   getClaudePaneAccount,
   listClaudePaneAccounts,
   recordClaudePaneAccount,
-  rememberClaudeSessionAssignment
+  rememberClaudeSessionAssignment,
+  setClaudePaneModel
 } from './claude-accounts/claude-pane-account-registry'
 import {
   createClaudeSessionMover,
@@ -18,12 +19,28 @@ import {
   createProxyMoveStrategy,
   createResumeMoveStrategy
 } from './claude-accounts/claude-session-move-strategy'
+import { publishClaudeAccountModelChanged } from './claude-accounts/claude-account-plugin-publish'
+import {
+  claudeModelFlips,
+  rememberClaudeModelFlip
+} from './claude-accounts/claude-model-flip-history'
+import { createClaudeModelPolicyTicker } from './claude-accounts/claude-model-policy-ticker'
+import { isClaudeUsageReadingOf } from './claude-accounts/claude-account-auto-switch'
+import { getSelectedClaudeAccountIdForTarget } from './claude-accounts/runtime-selection'
 import { getPtyIdForPaneKey, ptyPaneKey } from './ipc/pty/pane/key-state'
 import { listRegisteredPtys } from './memory/pty-registry'
 import type { Store } from './persistence'
 import type { ProviderAccountServices } from './provider-account-services'
 
 export type StartedClaudeSessionMover = ClaudeSessionMover & { stop: () => void }
+
+let stopModelPolicyTicker: (() => void) | null = null
+
+/** Stops the model ticker when the session mover itself was not started. */
+export function stopClaudeModelPolicyTicker(): void {
+  stopModelPolicyTicker?.()
+  stopModelPolicyTicker = null
+}
 
 export type ProviderClaudeSessionMoverOptions = {
   headless: boolean
@@ -78,9 +95,78 @@ export function createProviderClaudeSessionMover(
         onNotice: options.onNotice
       })
     : null
+  claudeAccounts.setUsageWindowsProvider((accounts) => {
+    const settings = store.getSettings()
+    const state = rateLimits.getState()
+    const selectedId = getSelectedClaudeAccountIdForTarget(settings, state.claudeTarget)
+    return accounts.map((account) => {
+      const limits =
+        account.id === selectedId && state.claude && isClaudeUsageReadingOf(state.claude, account)
+          ? state.claude
+          : (state.inactiveClaudeAccounts.find((row) => row.accountId === account.id)?.rateLimits ??
+            null)
+      const readable = limits?.status === 'ok' ? limits : null
+      return {
+        accountId: account.id,
+        weekly: readable?.weekly ? readable.weekly.usedPercent : null,
+        fable: readable?.fableWeekly ? readable.fableWeekly.usedPercent : null
+      }
+    })
+  })
+  stopClaudeModelPolicyTicker()
+  const ticker = createClaudeModelPolicyTicker({
+    getSettings: () => store.getSettings(),
+    panes: listClaudePaneAccounts,
+    usageFor: (accountId) => {
+      const settings = store.getSettings()
+      const state = rateLimits.getState()
+      const account = claudeAccounts
+        .listAccounts()
+        .accounts.find((candidate) => candidate.id === accountId)
+      if (!account) {
+        return null
+      }
+      const selectedId = getSelectedClaudeAccountIdForTarget(settings, state.claudeTarget)
+      if (
+        account.id === selectedId &&
+        state.claude &&
+        isClaudeUsageReadingOf(state.claude, account)
+      ) {
+        return { rateLimits: state.claude, updatedAt: state.claude.updatedAt }
+      }
+      const inactive = state.inactiveClaudeAccounts.find((row) => row.accountId === account.id)
+      return inactive ? { rateLimits: inactive.rateLimits, updatedAt: inactive.updatedAt } : null
+    },
+    subscribe: (listener) => rateLimits.onStateChange(() => listener()),
+    apply: (flip) => {
+      setClaudePaneModel(flip.ptyId, flip.to, 'policy')
+      rememberClaudeModelFlip(flip)
+      publishClaudeAccountModelChanged({
+        ptyId: flip.ptyId,
+        accountId: flip.accountId,
+        from: flip.from,
+        to: flip.to,
+        reason: flip.reason
+      })
+    },
+    onWarning: (ptyId, warning) => {
+      console.warn(`[claude-model-policy] ${ptyId}: ${warning}`)
+    }
+  })
+  stopModelPolicyTicker = ticker.start()
+  claudeAccounts.setSessionMovesProvider(() => {
+    const moves = sessionMover?.lastDecisions() ?? []
+    return [...moves, ...claudeModelFlips()].sort((left, right) => right.at - left.at)
+  })
   if (sessionMover) {
-    claudeAccounts.setSessionMovesProvider(() => sessionMover.lastDecisions())
-    return { ...sessionMover, stop: sessionMover.start() }
+    const stopMover = sessionMover.start()
+    return {
+      ...sessionMover,
+      stop: () => {
+        stopMover()
+        stopClaudeModelPolicyTicker()
+      }
+    }
   }
   return null
 }

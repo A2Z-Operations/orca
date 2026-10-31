@@ -94,6 +94,25 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     ]
   },
   {
+    path: ['account', 'model-policy'],
+    summary: 'Spend Fable while both weekly windows have room, otherwise Opus 5.5',
+    usage:
+      'orca account model-policy --agent claude (--on | --off | --status | --set fable-line=<n> | --set weekly-guard=<n>) [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off', 'status', 'set'],
+    repeatableFlags: ['set'],
+    notes: [
+      'Writes claudeModelPolicy (accounts.setClaudeModelPolicy). Default on: Fable while Fable is under 90% and the regular weekly window is under 91%. Otherwise that account runs Opus 5.5.',
+      '--set accepts fable-line and weekly-guard, repeated or comma-separated (fable-line=80,weekly-guard=85). Lines clamp to 1–100.',
+      '--status reads accounts.list and does not change the setting. A running session switches models through the auth proxy, without a restart, at most once per 10 minutes.',
+      'With --environment the setting is written on that paired Orca server. An explicit --model or ANTHROPIC_MODEL on a launch stays pinned.'
+    ],
+    examples: [
+      'orca account model-policy --agent claude --status',
+      'orca account model-policy --agent claude --set fable-line=80 --set weekly-guard=85',
+      'orca account model-policy --agent claude --off --environment macstudio'
+    ]
+  },
+  {
     path: ['account', 'moves'],
     summary: "Show the Claude session mover's last decision for each live session",
     usage: 'orca account moves [--agent claude] [--environment <selector>] [--json]',

@@ -50,6 +50,26 @@ describe('account RPC methods', () => {
     expect(setClaudeAccountPool).toHaveBeenCalledWith(true)
   })
 
+  it('sets the Claude model policy on the server that owns the accounts', async () => {
+    const state = {
+      accounts: [],
+      activeAccountId: null,
+      modelPolicy: { enabled: true, fableLine: 80, weeklyGuard: 91 }
+    }
+    const setClaudeModelPolicy = vi.fn().mockReturnValue(state)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler only calls setClaudeModelPolicy.
+    const runtime = { setClaudeModelPolicy } as unknown as OrcaRuntimeService
+    const set = method('accounts.setClaudeModelPolicy')
+    if (isStreamingMethod(set)) {
+      throw new Error('accounts.setClaudeModelPolicy must be a request method')
+    }
+
+    expect(set.permission).toBe('accounts-admin')
+    expect(() => set.params?.parse({})).toThrow()
+    await expect(set.handler({ fableLine: 80 }, { runtime })).resolves.toEqual(state)
+    expect(setClaudeModelPolicy).toHaveBeenCalledWith({ fableLine: 80 })
+  })
+
   it('sets the Claude auth proxy on the server that owns the accounts', async () => {
     const state = { accounts: [], activeAccountId: null, authProxy: 'off' as const }
     const setClaudeAuthProxy = vi.fn().mockReturnValue(state)

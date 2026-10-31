@@ -110,9 +110,28 @@ async function call(runtime: OrcaRuntimeService, name: string, params: unknown):
 }
 
 describe('orcad account services', () => {
-  it('follows usage settings and cannot restart polling after cleanup', async () => {
+  it('polls for the default-on model policy even when the mover and auto-switch are off', () => {
     const { store } = createRuntime()
     store.updateSettings({ claudeSessionMover: 'off', claudeAutoSwitchEnabled: false })
+    const start = vi.spyOn(RateLimitService.prototype, 'start').mockImplementation(() => {})
+    try {
+      expect(create(store, false)).not.toBeNull()
+      expect(start).toHaveBeenCalledExactlyOnceWith({
+        fetchImmediately: true,
+        pollWithoutWindow: true
+      })
+    } finally {
+      start.mockRestore()
+    }
+  })
+
+  it('follows usage settings and cannot restart polling after cleanup', async () => {
+    const { store } = createRuntime()
+    store.updateSettings({
+      claudeSessionMover: 'off',
+      claudeAutoSwitchEnabled: false,
+      claudeModelPolicy: { enabled: false }
+    })
     const start = vi.spyOn(RateLimitService.prototype, 'start').mockImplementation(() => {})
     const stop = vi.spyOn(RateLimitService.prototype, 'stop').mockImplementation(() => {})
     try {

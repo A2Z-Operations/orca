@@ -1,15 +1,22 @@
 import {
+  pluginClaudeModelChangedPayloadSchema,
   pluginClaudeSessionMovedPayloadSchema,
   pluginClaudeUsageChangedPayloadSchema,
   type PluginClaudeAccountView
 } from '../../shared/plugins/plugin-claude-account-contract'
-import { setClaudeAccountPluginPublishListener } from '../claude-accounts/claude-account-plugin-publish'
+import {
+  setClaudeAccountModelPluginPublishListener,
+  setClaudeAccountPluginPublishListener
+} from '../claude-accounts/claude-account-plugin-publish'
 import {
   diffPluginClaudeAccountUsage,
   fingerprintPluginClaudeAccounts
 } from './plugin-claude-account-projection'
 
-export type PluginClaudeAccountEventName = 'accounts.usage.changed' | 'accounts.session.moved'
+export type PluginClaudeAccountEventName =
+  | 'accounts.usage.changed'
+  | 'accounts.session.moved'
+  | 'accounts.model.changed'
 
 type EmitPluginClaudeAccountEvent = (event: PluginClaudeAccountEventName, payload: unknown) => void
 
@@ -71,6 +78,17 @@ export function bindPluginClaudeAccountEvents(input: {
       // Delivery must not fail the session move. The publisher swallows too.
     }
   })
+  setClaudeAccountModelPluginPublishListener((changed) => {
+    const parsed = pluginClaudeModelChangedPayloadSchema.safeParse(changed)
+    if (!parsed.success) {
+      return
+    }
+    try {
+      input.emit('accounts.model.changed', parsed.data)
+    } catch {
+      // Delivery must not fail the model flip.
+    }
+  })
   const release = (): void => {
     unsubscribe()
     if (releaseCurrent !== release) {
@@ -79,6 +97,7 @@ export function bindPluginClaudeAccountEvents(input: {
     releaseCurrent = null
     readBoundAccounts = () => []
     setClaudeAccountPluginPublishListener(null)
+    setClaudeAccountModelPluginPublishListener(null)
   }
   releaseCurrent = release
   return release

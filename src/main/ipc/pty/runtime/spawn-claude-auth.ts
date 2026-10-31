@@ -2,14 +2,22 @@ import {
   CLAUDE_INJECTED_CONFIG_DIR_ENV,
   CLAUDE_PROFILE_POINTER_ENV
 } from '../../../../shared/claude-profile-routing'
-import { claudeAuthProxyListeningPort } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
+import {
+  claudeAccountIdFromAuthProvenance,
+  claudeAuthProxyListeningPort
+} from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { noteUserAnthropicBaseUrl } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-note'
 import { releaseSupersededOwnProxySlot } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-slot-env'
 import {
   claudeAuthProxySlotId,
   isForeignClaudeAuthProxyUrl
 } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-url'
-import { claudePoolAccountForLaunch } from '../../../claude-accounts/claude-account-pool-launch'
+import {
+  claudePolicyModelForAccount,
+  claudePoolAccountForLaunch,
+  type ClaudePoolLaunchDecision
+} from '../../../claude-accounts/claude-account-pool-launch'
+import { resolveClaudeLaunchModel } from '../../../claude-accounts/claude-model-policy-launch'
 import { getClaudeProfileRouter } from '../../../claude-accounts/claude-profile-installed-router'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import type { RuntimePtySpawnState } from './spawn-state'
@@ -19,6 +27,34 @@ import type { RuntimePtySpawnState } from './spawn-state'
  * already moved relaunches on that billed account. Every other Orca-made launch runs on the
  * selected account, or on the pool's choice when the pool is on.
  */
+function withPolicyModel(
+  preparation: ClaudeRuntimeAuthPreparation,
+  accountId: string | null,
+  decision?: ClaudePoolLaunchDecision | null
+): ClaudeRuntimeAuthPreparation {
+  if (decision?.model && decision.modelId) {
+    return {
+      ...preparation,
+      policyModel: {
+        model: decision.model,
+        modelId: decision.modelId,
+        reason: decision.modelReason ?? decision.model
+      }
+    }
+  }
+  if (!accountId) {
+    return preparation
+  }
+  const choice = claudePolicyModelForAccount(accountId)
+  if (!choice || choice.reason === 'off') {
+    return preparation
+  }
+  return {
+    ...preparation,
+    policyModel: { model: choice.model, modelId: choice.modelId, reason: choice.reason }
+  }
+}
+
 export async function resolveRuntimeClaudeAuth(
   ctx: Pick<RuntimePtySpawnState, 'codexSelectionTarget'> & {
     args: Pick<RuntimePtySpawnState['args'], 'claudeAccountId' | 'resumeProviderSession'>
@@ -31,7 +67,7 @@ export async function resolveRuntimeClaudeAuth(
     if (!router) {
       throw new Error('claude_account_router_unavailable')
     }
-    return router.prepareLaunchFor(accountId)
+    return withPolicyModel(await router.prepareLaunchFor(accountId), accountId)
   }
   const sessionId = ctx.args.resumeProviderSession?.id
   // Optional: test doubles of the router only implement prepareLaunchFor.
@@ -43,7 +79,7 @@ export async function resolveRuntimeClaudeAuth(
     if (!router) {
       throw new Error('claude_account_router_unavailable')
     }
-    return router.prepareLaunchFor(assigned)
+    return withPolicyModel(await router.prepareLaunchFor(assigned), assigned)
   }
   const pooled = claudePoolAccountForLaunch(ctx.codexSelectionTarget)
   if (pooled?.named) {
@@ -51,7 +87,11 @@ export async function resolveRuntimeClaudeAuth(
     if (router) {
       try {
         const preparation = await router.prepareLaunchFor(pooled.accountId)
-        return { ...preparation, pooled: true }
+        return withPolicyModel(
+          { ...preparation, pooled: pooled.pooled !== false },
+          pooled.accountId,
+          pooled
+        )
       } catch (error) {
         // A missing folder or a WSL account cannot take a host launch env. The selected account still launches.
         console.warn(
@@ -67,8 +107,13 @@ export async function resolveRuntimeClaudeAuth(
   // A named choice that failed to prepare is the selected account, so it is not recorded as pooled.
   if (!selected || !pooled || pooled.named) {
     return selected
+      ? withPolicyModel(selected, claudeAccountIdFromAuthProvenance(selected.provenance) ?? null)
+      : null
   }
-  return { ...selected, pooled: true }
+  if (pooled.pooled === false) {
+    return withPolicyModel(selected, pooled.accountId, pooled)
+  }
+  return withPolicyModel({ ...selected, pooled: true }, pooled.accountId, pooled)
 }
 
 /** An explicit account, or any pool choice, must not keep the selected account's shell pointer. */
@@ -89,7 +134,8 @@ export function claudeLaunchPinsAccount(
 export function applyRuntimeClaudeAuthEnv(
   env: Record<string, string> | undefined,
   auth: ClaudeRuntimeAuthPreparation | null,
-  pinnedToAccount: boolean
+  pinnedToAccount: boolean,
+  command?: string
 ): Record<string, string> | undefined {
   if (!auth) {
     return env
@@ -111,5 +157,18 @@ export function applyRuntimeClaudeAuthEnv(
     delete patch.ANTHROPIC_BASE_URL
     noteUserAnthropicBaseUrl()
   }
-  return { ...base, ...patch }
+  const merged = { ...base, ...patch }
+  const resolved = resolveClaudeLaunchModel({
+    env: base,
+    command,
+    policy: auth.policyModel ?? null
+  })
+  if (!resolved) {
+    return merged
+  }
+  auth.appliedModel = { model: resolved.model, modelSource: resolved.modelSource }
+  if (!resolved.inject) {
+    return merged
+  }
+  return { ...merged, ANTHROPIC_MODEL: resolved.inject }
 }

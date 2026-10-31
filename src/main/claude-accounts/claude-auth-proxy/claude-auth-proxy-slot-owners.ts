@@ -4,11 +4,24 @@
  * then drops it. A bound slot stays while that PTY is still registered or still in the pane registry.
  */
 
+import type { ClaudeModelSource } from '../claude-model-policy'
+
 export const CLAUDE_AUTH_PROXY_UNBOUND_SLOT_GRACE_MS = 30_000
 
 type ClaudeAuthProxySlotOwner = {
   ptyId: string | null
   allocatedAt: number
+  model?: string
+  modelSource?: ClaudeModelSource
+}
+
+function carriedModel(
+  current: ClaudeAuthProxySlotOwner | undefined
+): Pick<ClaudeAuthProxySlotOwner, 'model' | 'modelSource'> {
+  if (!current?.model || !current.modelSource) {
+    return {}
+  }
+  return { model: current.model, modelSource: current.modelSource }
 }
 
 const owners = new Map<string, ClaudeAuthProxySlotOwner>()
@@ -17,20 +30,56 @@ export function noteClaudeAuthProxySlotAllocated(slot: string, now = Date.now())
   const current = owners.get(slot)
   owners.set(slot, {
     ptyId: current?.ptyId ?? null,
-    allocatedAt: current?.allocatedAt ?? now
+    allocatedAt: current?.allocatedAt ?? now,
+    ...carriedModel(current)
   })
 }
 
 export function bindClaudeAuthProxySlotToPty(slot: string, ptyId: string, now = Date.now()): void {
   const current = owners.get(slot)
-  owners.set(slot, { ptyId, allocatedAt: current?.allocatedAt ?? now })
+  owners.set(slot, { ptyId, allocatedAt: current?.allocatedAt ?? now, ...carriedModel(current) })
 }
 
-export function claudeAuthProxySlotOwner(
+export function setClaudeAuthProxySlotModel(
+  slot: string,
+  model: string,
+  modelSource: ClaudeModelSource,
+  now = Date.now()
+): void {
+  const current = owners.get(slot)
+  owners.set(slot, {
+    ptyId: current?.ptyId ?? null,
+    allocatedAt: current?.allocatedAt ?? now,
+    model,
+    modelSource
+  })
+}
+
+export function claudeAuthProxySlotModel(
   slot: string
-): { ptyId: string | null; allocatedAt: number } | null {
+): { model: string; modelSource: ClaudeModelSource } | null {
   const owner = owners.get(slot)
-  return owner ? { ptyId: owner.ptyId, allocatedAt: owner.allocatedAt } : null
+  if (!owner?.model || !owner.modelSource) {
+    return null
+  }
+  return { model: owner.model, modelSource: owner.modelSource }
+}
+
+export function claudeAuthProxySlotOwner(slot: string): {
+  ptyId: string | null
+  allocatedAt: number
+  model?: string
+  modelSource?: ClaudeModelSource
+} | null {
+  const owner = owners.get(slot)
+  if (!owner) {
+    return null
+  }
+  return {
+    ptyId: owner.ptyId,
+    allocatedAt: owner.allocatedAt,
+    ...carriedModel(owner)
+  }
 }
 
 /** Removes and returns every slot bound to this PTY. The caller releases them. */

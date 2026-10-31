@@ -12,6 +12,12 @@ import {
   type ClaudeStructuredSpawnOptions
 } from './claude-structured-spawn-options'
 import {
+  getClaudePaneAccount,
+  setClaudePaneModel
+} from '../claude-accounts/claude-pane-account-registry'
+import { claudePolicyModelLabel } from '../claude-accounts/claude-model-policy'
+import { structuredClaudeSessionKey } from './claude-structured-session-key'
+import {
   cancelClaudeAcquisitionAttempt,
   type ClaudeAcquisitionAttempt,
   type ClaudeAcquisitionRegistry,
@@ -99,6 +105,14 @@ export async function resolveClaudeAcquisitionLaunch(args: {
       })
     acquisitions.assertCurrent(sessionId, attempt)
     const spawn = claudeStructuredSpawnOptions({ launch, saved: input.options })
+    const savedModel = input.options?.model
+    if (typeof savedModel === 'string' && savedModel.length > 0) {
+      const sessionKey = structuredClaudeSessionKey(input.identity.sessionId)
+      if (launch.env && getClaudePaneAccount(sessionKey)?.modelSource === 'policy') {
+        delete launch.env.ANTHROPIC_MODEL
+      }
+      setClaudePaneModel(sessionKey, claudePolicyModelLabel(savedModel) ?? savedModel, 'pinned')
+    }
     return {
       ...launch,
       options: spawn.sdkOptions,

@@ -62,6 +62,7 @@ import {
   SetClaudeAccountPoolParams,
   SetClaudeAuthProxyParams,
   SetClaudeAutoSwitchParams,
+  SetClaudeModelPolicyParams,
   SetClaudeSessionMoverParams
 } from './accounts-params'
 import { PrepareCodexForWslPaneParams } from './agent-hooks-params'
@@ -730,6 +731,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'accounts.setClaudeAccountPool': SetClaudeAccountPoolParams,
   'accounts.setClaudeAuthProxy': SetClaudeAuthProxyParams,
   'accounts.setClaudeAutoSwitch': SetClaudeAutoSwitchParams,
+  'accounts.setClaudeModelPolicy': SetClaudeModelPolicyParams,
   'accounts.setClaudeSessionMover': SetClaudeSessionMoverParams,
   'accounts.setHostLaunchEnv': HostAccountLaunchEnvParams,
   'accounts.subscribe': null,

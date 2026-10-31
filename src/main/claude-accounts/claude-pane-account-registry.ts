@@ -3,8 +3,10 @@ import {
   bindClaudeAuthProxySlotToPty,
   forgetClaudeAuthProxySlotOwner,
   resetClaudeAuthProxySlotOwners,
+  setClaudeAuthProxySlotModel,
   takeClaudeAuthProxySlotsForPty
 } from './claude-auth-proxy/claude-auth-proxy-slot-owners'
+import type { ClaudeModelSource } from './claude-model-policy'
 import { normalizeClaudeConfigDir } from '../rate-limits/service/service-types'
 
 /**
@@ -54,6 +56,10 @@ export type ClaudePaneAccountRecord = {
   proxySlot?: string
   /** Claude session id, remembered so a later `--resume` stays on the billed account. */
   providerSessionId?: string
+  /** Effective model the chip and the proxy show: `fable`, `opus`, or the user's pin token. */
+  model?: string
+  /** `policy` follows the lines. `pinned` is a `--model` or `ANTHROPIC_MODEL` the user set. */
+  modelSource?: ClaudeModelSource
 }
 
 const records = new Map<string, ClaudePaneAccountRecord>()
@@ -66,6 +72,8 @@ export type ClaudePaneAssignedNotice = {
   paneKey: string | null
   /** Null when the pane left the registry. */
   accountId: string | null
+  /** Effective model. Absent when the pane left or the launch recorded none. */
+  model?: string
 }
 
 const paneAssignedListeners = new Set<(notice: ClaudePaneAssignedNotice) => void>()
@@ -80,6 +88,24 @@ export function onClaudePaneAssigned(
 function publishPaneAssigned(notice: ClaudePaneAssignedNotice): void {
   for (const listener of paneAssignedListeners) {
     listener(notice)
+  }
+}
+
+function noticeFor(
+  record: Pick<ClaudePaneAccountRecord, 'ptyId' | 'paneKey' | 'model'>,
+  accountId: string | null
+): ClaudePaneAssignedNotice {
+  return {
+    ptyId: record.ptyId,
+    paneKey: record.paneKey,
+    accountId,
+    ...(record.model ? { model: record.model } : {})
+  }
+}
+
+function syncSlotModel(record: ClaudePaneAccountRecord): void {
+  if (record.proxySlot && record.model && record.modelSource) {
+    setClaudeAuthProxySlotModel(record.proxySlot, record.model, record.modelSource)
   }
 }
 
@@ -101,18 +127,16 @@ export function recordClaudePaneAccount(record: ClaudePaneAccountRecord): void {
   if (record.proxySlot) {
     bindClaudeAuthProxySlotToPty(record.proxySlot, record.ptyId)
   }
+  syncSlotModel(record)
   records.set(record.ptyId, record)
   const nextAccountId = claudeBillingAccountId(record)
   if (
     !previous ||
     claudeBillingAccountId(previous) !== nextAccountId ||
-    previous.paneKey !== record.paneKey
+    previous.paneKey !== record.paneKey ||
+    previous.model !== record.model
   ) {
-    publishPaneAssigned({
-      ptyId: record.ptyId,
-      paneKey: record.paneKey,
-      accountId: nextAccountId
-    })
+    publishPaneAssigned(noticeFor(record, nextAccountId))
   }
 }
 
@@ -149,9 +173,39 @@ export function assignClaudePaneAccount(
     record.providerSessionId = providerSessionId
   }
   if (previousAccountId !== accountId) {
-    publishPaneAssigned({ ptyId, paneKey: record.paneKey, accountId })
+    publishPaneAssigned(noticeFor(record, accountId))
   }
   return true
+}
+
+/** The model the proxy rewrites toward, and the token the tab chip shows. */
+export function setClaudePaneModel(
+  ptyId: string,
+  model: string,
+  modelSource: ClaudeModelSource
+): boolean {
+  const record = records.get(ptyId)
+  if (!record) {
+    return false
+  }
+  const changed = record.model !== model || record.modelSource !== modelSource
+  record.model = model
+  record.modelSource = modelSource
+  syncSlotModel(record)
+  if (changed) {
+    publishPaneAssigned(noticeFor(record, claudeBillingAccountId(record)))
+  }
+  return true
+}
+
+/** Effective model for a native-chat pane, for the phone status row. */
+export function claudeModelForPaneKey(paneKey: string): string | null {
+  for (const record of records.values()) {
+    if (record.paneKey === paneKey || record.ptyId === paneKey) {
+      return record.model ?? null
+    }
+  }
+  return null
 }
 
 export function rememberClaudeSessionAssignment(sessionId: string, accountId: string): void {
