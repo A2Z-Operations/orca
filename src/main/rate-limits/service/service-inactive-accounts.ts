@@ -1,4 +1,5 @@
 import { fetchManagedAccountUsage } from '../claude-fetcher'
+import { beginClaudeOAuthRefreshCycle } from '../claude-oauth-refresh'
 import { fetchCodexRateLimits } from '../codex-fetcher'
 import { makeClaudeUsageResult } from '../claude-usage-result'
 import {
@@ -51,6 +52,7 @@ export abstract class RateLimitServiceInactiveAccounts extends RateLimitServiceS
       return
     }
     console.info(`[claude-usage] inactive fetch start n=${count}`)
+    beginClaudeOAuthRefreshCycle()
     const fetchGeneration = this.inactiveClaudeAccountsGeneration
     const controller = this.beginFetchCycle()
     const signal = controller.signal

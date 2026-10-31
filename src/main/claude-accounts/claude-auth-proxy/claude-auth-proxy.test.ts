@@ -620,6 +620,118 @@ describe('claude auth proxy', () => {
     ])
   })
 
+  it('refreshes once on an upstream 401 and replays with the new bearer', async () => {
+    const seen: { authorization?: string; body: string }[] = []
+    const upstream = createServer(async (req, res) => {
+      const body = await readBody(req)
+      seen.push({ authorization: req.headers.authorization, body })
+      if (req.headers.authorization === `Bearer ${TOKEN_A}`) {
+        res.writeHead(401, { 'content-type': 'application/json' })
+        res.end('{"type":"error"}')
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end('{"ok":true}')
+    })
+    upstreams.push(upstream)
+    const port = await listen(upstream)
+    const lines: string[] = []
+    const refresh = vi.fn(async (accountId: string) => {
+      expect(accountId).toBe('account-a')
+      return TOKEN_B
+    })
+    const proxy = createClaudeAuthProxy({
+      readToken: async () => TOKEN_A,
+      refreshAccessToken: refresh,
+      upstream: `http://127.0.0.1:${port}`,
+      log: (line) => lines.push(line)
+    })
+    proxies.push(proxy)
+    await proxy.start()
+    const response = await proxyRequest(
+      `${proxy.slotBaseUrl(proxy.allocateSlot('account-a'))}v1/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer from-claude' },
+        body: '{"hi":1}'
+      }
+    )
+    expect(response.status).toBe(200)
+    expect(response.chunks.join('')).toBe('{"ok":true}')
+    expect(seen.map((row) => row.authorization)).toEqual([`Bearer ${TOKEN_A}`, `Bearer ${TOKEN_B}`])
+    expect(seen.map((row) => row.body)).toEqual(['{"hi":1}', '{"hi":1}'])
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(lines.join('\n')).toBe('POST /v1/messages 200 account-a')
+    expect(lines.join('\n')).not.toContain(TOKEN_A)
+    expect(lines.join('\n')).not.toContain(TOKEN_B)
+  })
+
+  it('forwards the 401 when the refresh does not return a token', async () => {
+    const seen: string[] = []
+    const upstream = createServer(async (req, res) => {
+      await readBody(req)
+      seen.push(req.headers.authorization ?? '')
+      res.writeHead(401)
+      res.end('{"type":"error"}')
+    })
+    upstreams.push(upstream)
+    const port = await listen(upstream)
+    const refresh = vi.fn(async () => null)
+    const proxy = createClaudeAuthProxy({
+      readToken: async () => TOKEN_A,
+      refreshAccessToken: refresh,
+      upstream: `http://127.0.0.1:${port}`
+    })
+    proxies.push(proxy)
+    await proxy.start()
+    const response = await proxyRequest(
+      `${proxy.slotBaseUrl(proxy.allocateSlot('account-a'))}v1/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{"hi":1}'
+      }
+    )
+    expect(response.status).toBe(401)
+    expect(seen).toEqual([`Bearer ${TOKEN_A}`])
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes a body over the cap without replaying it', async () => {
+    const seen: string[] = []
+    const upstream = createServer(async (req, res) => {
+      await readBody(req)
+      seen.push(req.headers.authorization ?? '')
+      res.writeHead(401)
+      res.end('{"type":"error"}')
+    })
+    upstreams.push(upstream)
+    const port = await listen(upstream)
+    let refreshed = false
+    const proxy = createClaudeAuthProxy({
+      readToken: async () => TOKEN_A,
+      refreshAccessToken: async () => {
+        refreshed = true
+        return TOKEN_B
+      },
+      modelRewriteBufferCap: 8,
+      upstream: `http://127.0.0.1:${port}`
+    })
+    proxies.push(proxy)
+    await proxy.start()
+    const response = await proxyRequest(
+      `${proxy.slotBaseUrl(proxy.allocateSlot('account-a'))}v1/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '0123456789abcdef'
+      }
+    )
+    expect(response.status).toBe(401)
+    expect(seen).toEqual([`Bearer ${TOKEN_A}`])
+    expect(refreshed).toBe(true)
+  })
+
   it('invalidates the token cache only when the auth snapshot changes', () => {
     expect(claudeAccountIdFromAuthProvenance('profile:account-a')).toBe('account-a')
     expect(claudeAccountIdFromAuthProvenance('profile:account-a:wsl:Ubuntu')).toBe('account-a')

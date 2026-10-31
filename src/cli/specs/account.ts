@@ -142,5 +142,23 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
       'orca account auth-proxy --agent claude --on --environment macstudio',
       'orca account auth-proxy --agent claude --status'
     ]
+  },
+  {
+    path: ['account', 'token-refresh'],
+    summary: 'Refresh access tokens for idle managed Claude accounts',
+    usage:
+      'orca account token-refresh --agent claude (--on | --off | --status) [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off', 'status'],
+    notes: [
+      'Writes claudeAccountTokenRefresh (accounts.setClaudeAccountTokenRefresh). Default on: an idle account refreshes its access token the way Claude Code does, then usage and the auth proxy retry once.',
+      'A live Claude session for that account is left alone. invalid_grant is lapsed and is not retried.',
+      "--status reads accounts.list and does not change the setting. It prints each account's last refresh, next retry, and whether the login lapsed.",
+      'With --environment the setting is written on that paired Orca server.'
+    ],
+    examples: [
+      'orca account token-refresh --agent claude --status',
+      'orca account token-refresh --agent claude --off',
+      'orca account token-refresh --agent claude --on --environment macstudio'
+    ]
   }
 ]

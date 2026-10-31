@@ -95,6 +95,17 @@ const WRITE_CALL =
 const SECURITY_RUNNER = 'main/macos-keychain/generic-password.ts'
 // Only account removal may delete Keychain items.
 const KEYCHAIN_DELETE_OWNER = 'main/claude-accounts/claude-account-folder.ts'
+/**
+ * Inactive accounts never run Claude Code, so this one writer rotates the same item Claude Code
+ * reads. A second file that posts a refresh or writes the item still fails the census.
+ */
+const credentialAllowances: Record<string, readonly string[]> = {
+  'main/rate-limits/claude-oauth-refresh.ts': [
+    'token refresh',
+    'keychain write',
+    'credentials file write'
+  ]
+}
 
 /** Follow aliases of credential file paths. */
 function credentialFileNames(text: string): Set<string> {
@@ -227,13 +238,30 @@ it('keeps every Claude credential writer removed, in every form and on every lau
       const found = statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? files(dir) : []
       return only ? found.filter((file) => only.test(file)) : found
     })
-    .flatMap((file) =>
-      credentialMutations(
-        stripComments(readFileSync(file, 'utf8')),
-        relative(src, file).replaceAll('\\', '/')
-      ).map((kind) => `${relative(src, file)}: ${kind}`)
-    )
+    .flatMap((file) => {
+      const rel = relative(src, file).replaceAll('\\', '/')
+      const allowed = new Set(credentialAllowances[rel] ?? [])
+      return credentialMutations(stripComments(readFileSync(file, 'utf8')), rel)
+        .filter((kind) => !allowed.has(kind))
+        .map((kind) => `${rel}: ${kind}`)
+    })
   expect(violations).toEqual([])
+})
+
+it('still rejects a second file that refreshes or writes Claude credentials', () => {
+  const source = [
+    "execSecurityCommand(['add-generic-password', '-U', '-s', service, '-w', json])",
+    "fetch('https://platform.claude.com/v1/oauth/token', { body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: token }) })",
+    "writeCredentialFileAtomic(path.join(path.dirname(pending.store.path), '.credentials.json'), body)"
+  ].join('\n')
+  const kinds = credentialMutations(source, 'main/rate-limits/other-refresh.ts')
+  expect(kinds).toEqual(
+    expect.arrayContaining(['token refresh', 'keychain write', 'credentials file write'])
+  )
+  const allowed = new Set(credentialAllowances['main/rate-limits/other-refresh.ts'] ?? [])
+  expect(kinds.filter((kind) => !allowed.has(kind)).length).toBeGreaterThan(0)
+  const reviewed = new Set(credentialAllowances['main/rate-limits/claude-oauth-refresh.ts'])
+  expect(kinds.filter((kind) => !reviewed.has(kind))).toEqual([])
 })
 
 it('confines filesystem persistence in accounts and usage to named profile surfaces', () => {

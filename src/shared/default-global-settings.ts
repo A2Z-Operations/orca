@@ -186,6 +186,7 @@ export function buildDefaultSettings(args: {
     claudeAutoSwitchEnabled: false,
     claudeSessionMover: 'ask',
     claudeAuthProxy: false,
+    claudeAccountTokenRefresh: true,
     claudeAccountPool: 'off',
     claudeModelPolicy: { enabled: true, fableLine: 90, weeklyGuard: 91 },
     terminalScopeHistoryByWorktree: true,

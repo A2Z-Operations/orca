@@ -150,6 +150,10 @@ export class ClaudeAccountService {
     return this.selection.setAuthProxy(enabled)
   }
 
+  setTokenRefresh(enabled: boolean): ClaudeRateLimitAccountsState {
+    return this.selection.setTokenRefresh(enabled)
+  }
+
   setAccountPool(enabled: boolean): ClaudeRateLimitAccountsState {
     return this.selection.setAccountPool(enabled)
   }

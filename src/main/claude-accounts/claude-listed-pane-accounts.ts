@@ -45,3 +45,14 @@ export function claudeListedPaneAccounts(
     })
   }
 }
+
+/** Proxy billing that differs from the folder the pane was spawned in. */
+export function listedPaneAssignments(
+  records: readonly ClaudePaneAccountRecord[]
+): { ptyId: string; accountId: string }[] {
+  return records.flatMap((record) =>
+    record.assignedAccountId && record.assignedAccountId !== record.accountId
+      ? [{ ptyId: record.ptyId, accountId: record.assignedAccountId }]
+      : []
+  )
+}

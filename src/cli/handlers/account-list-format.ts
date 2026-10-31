@@ -28,6 +28,8 @@ type AccountsBlock = {
   assignedSessions?: readonly { accountId: string; count: number; chatCount?: number }[]
   /** Claude only: whether the host bills requests through the local auth proxy (absent from older hosts). */
   authProxy?: 'on' | 'off'
+  /** Claude only: whether idle accounts refresh access tokens (absent from older hosts). */
+  tokenRefresh?: 'on' | 'off'
   /** Claude only: whether a WSL guest can bill through its own listener (absent when this host has no WSL accounts). */
   wslAuthProxy?: 'on' | 'unsupported:wsl'
   /** Claude only: panes whose billed account differs from the folder they launched in. */
@@ -114,8 +116,11 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
     const windowText = windows
       ? `  weekly ${formatWindowPercent(windows.weekly, windows.unavailable)} · fable ${formatWindowPercent(windows.fable, windows.unavailable)}`
       : ''
+    const lapsed = windows?.unavailable === 'lapsed'
     return `  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
-      account.needsSignIn ? ' (sign in again in Orca Settings > AI Provider Accounts)' : ''
+      account.needsSignIn || lapsed
+        ? ' (sign in again in Orca Settings > AI Provider Accounts)'
+        : ''
     }${sessions}${windowText}`
   })
   if (block.autoSwitchEnabled !== undefined) {
@@ -135,6 +140,9 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   }
   if (block.authProxy !== undefined) {
     lines.push(`  auth-proxy: ${block.authProxy}`)
+  }
+  if (block.tokenRefresh !== undefined) {
+    lines.push(`  token-refresh: ${block.tokenRefresh}`)
   }
   if (block.wslAuthProxy !== undefined) {
     lines.push(`  wsl auth-proxy: ${block.wslAuthProxy}`)
