@@ -1,5 +1,6 @@
 import { fetchManagedAccountUsage } from '../claude-fetcher'
 import { beginClaudeOAuthRefreshCycle } from '../claude-oauth-refresh'
+import { orderInactiveClaudeRefreshAccounts } from '../claude-oauth-refresh-state'
 import { fetchCodexRateLimits } from '../codex-fetcher'
 import { makeClaudeUsageResult } from '../claude-usage-result'
 import {
@@ -53,6 +54,7 @@ export abstract class RateLimitServiceInactiveAccounts extends RateLimitServiceS
     }
     console.info(`[claude-usage] inactive fetch start n=${count}`)
     beginClaudeOAuthRefreshCycle()
+    const orderedAccounts = orderInactiveClaudeRefreshAccounts(accounts, activeAccount)
     const fetchGeneration = this.inactiveClaudeAccountsGeneration
     const controller = this.beginFetchCycle()
     const signal = controller.signal
@@ -65,7 +67,7 @@ export abstract class RateLimitServiceInactiveAccounts extends RateLimitServiceS
     this.pushToRenderer()
 
     try {
-      for (const account of accounts) {
+      for (const account of orderedAccounts) {
         if (
           signal.aborted ||
           fetchGeneration !== this.inactiveClaudeAccountsGeneration ||

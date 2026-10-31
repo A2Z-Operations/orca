@@ -11,12 +11,19 @@ import {
 import type { ClaudeOAuthCredentialReadOptions } from './claude-oauth-credentials'
 import { scopesToSend } from './claude-oauth-refresh-scopes'
 import {
+  CLAUDE_OAUTH_REFRESH_JITTER_MS,
+  claudeOAuthRefreshGate,
+  paceClaudeOAuthRefreshPost
+} from './claude-oauth-refresh-pacing'
+import {
   claudeOAuthRefreshBook,
   claudeOAuthRefreshInflight,
   claudeOAuthRefreshIsEnabled,
   hashClaudeOAuthRefreshToken,
   logClaudeOAuthRefresh,
   noteClaudeOAuthRefreshFailure,
+  noteClaudeOAuthRefreshGate,
+  noteClaudeOAuthRefreshPace,
   noteClaudeOAuthRefreshSuccess,
   type AccountBook,
   type ClaudeOAuthRefreshDeps,
@@ -35,17 +42,6 @@ export {
 } from './claude-oauth-refresh-state'
 export { readClaudeOAuthCredentialDocument } from './claude-oauth-credential-document'
 export { CLAUDE_OAUTH_DEFAULT_SCOPES } from './claude-oauth-refresh-scopes'
-export type {
-  AccountBook,
-  ClaudeOAuthRefreshAccountStatus,
-  ClaudeOAuthRefreshDeps,
-  ClaudeOAuthRefreshResult,
-  PendingWrite
-} from './claude-oauth-refresh-state'
-export type {
-  ClaudeOAuthCredentialDocument,
-  ClaudeOAuthCredentialStore
-} from './claude-oauth-credential-document'
 
 /** Claude Code 2.1.316 `Xae` posts here. Header is JSON only; timeout is 30s. */
 export const CLAUDE_OAUTH_TOKEN_URL = 'https://platform.claude.com/v1/oauth/token'
@@ -57,6 +53,7 @@ const TOKEN_TIMEOUT_MS = 30_000
 export function refreshClaudeOAuthAccessToken(input: {
   accountId: string
   readOptions?: ClaudeOAuthCredentialReadOptions
+  force?: boolean
   deps?: Partial<ClaudeOAuthRefreshDeps>
 }): Promise<ClaudeOAuthRefreshResult> {
   return claudeOAuthRefreshInflight(input.accountId, () => refreshOne(input))
@@ -65,6 +62,7 @@ export function refreshClaudeOAuthAccessToken(input: {
 async function refreshOne(input: {
   accountId: string
   readOptions?: ClaudeOAuthCredentialReadOptions
+  force?: boolean
   deps?: Partial<ClaudeOAuthRefreshDeps>
 }): Promise<ClaudeOAuthRefreshResult> {
   const deps = resolveDeps(input.deps)
@@ -94,25 +92,34 @@ async function refreshOne(input: {
     book.lapsed = false
     book.lapsedHash = null
     book.failures = 0
+    book.backoffLevel = 0
     book.nextRetryAt = null
   }
   const now = deps.now()
-  if (book.nextRetryAt !== null && now < book.nextRetryAt) {
+  if (!input.force && book.nextRetryAt !== null && now < book.nextRetryAt) {
     return { outcome: 'skipped', reason: 'backoff' }
   }
-  let response: Response
-  try {
-    response = await deps.fetch(CLAUDE_OAUTH_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tokenRequestBody(read.document.oauth)),
-      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS)
-    })
-  } catch {
-    noteClaudeOAuthRefreshFailure(book, now)
-    logClaudeOAuthRefresh(input.accountId, 'failed=network')
-    return { outcome: 'failed', reason: 'network' }
+  const gate = claudeOAuthRefreshGate(now)
+  if (!input.force && gate.active) {
+    return noteClaudeOAuthRefreshGate(book, gate)
   }
+  const paced = await paceClaudeOAuthRefreshPost({
+    now: deps.now,
+    delay: deps.delay,
+    jitterMs: deps.jitterMs,
+    force: input.force === true,
+    post: () =>
+      deps.fetch(CLAUDE_OAUTH_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tokenRequestBody(read.document.oauth)),
+        signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS)
+      })
+  })
+  if (paced.outcome !== 'posted') {
+    return noteClaudeOAuthRefreshPace(input.accountId, book, now, paced)
+  }
+  const response = paced.response
   if (!response.ok) {
     const invalidGrant = await invalidGrantResponse(response)
     if (invalidGrant) {
@@ -120,6 +127,7 @@ async function refreshOne(input: {
       book.lapsedHash = hash
       book.nextRetryAt = null
       book.failures = 0
+      book.backoffLevel = 0
       logClaudeOAuthRefresh(input.accountId, 'failed=lapsed')
       return { outcome: 'lapsed' }
     }
@@ -189,7 +197,10 @@ function resolveDeps(partial: Partial<ClaudeOAuthRefreshDeps> | undefined): Clau
     hasLiveSession:
       partial?.hasLiveSession ??
       ((accountId) => listClaudePaneAccounts().some((record) => record.accountId === accountId)),
-    enabled: partial?.enabled ?? claudeOAuthRefreshIsEnabled
+    enabled: partial?.enabled ?? claudeOAuthRefreshIsEnabled,
+    delay: partial?.delay ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    jitterMs:
+      partial?.jitterMs ?? (() => Math.floor(Math.random() * (CLAUDE_OAUTH_REFRESH_JITTER_MS + 1)))
   }
 }
 

@@ -28,12 +28,22 @@ import {
   CLAUDE_CODE_OAUTH_CLIENT_ID,
   CLAUDE_OAUTH_DEFAULT_SCOPES,
   CLAUDE_OAUTH_TOKEN_URL,
+  beginClaudeOAuthRefreshCycle,
   claudeOAuthRefreshStatus,
   refreshClaudeOAuthAccessToken,
-  resetClaudeOAuthRefreshStateForTests,
-  type ClaudeOAuthCredentialDocument,
-  type ClaudeOAuthRefreshDeps
+  resetClaudeOAuthRefreshStateForTests
 } from './claude-oauth-refresh'
+import type { ClaudeOAuthCredentialDocument } from './claude-oauth-credential-document'
+import type { ClaudeOAuthRefreshDeps } from './claude-oauth-refresh-state'
+import {
+  CLAUDE_OAUTH_REFRESH_MIN_GAP_MS,
+  planClaudeUsageRefreshSlice
+} from './claude-oauth-refresh-pacing'
+import {
+  claimClaudeUsageRefresh,
+  claudeOAuthRefreshCycleId,
+  claudeOAuthRefreshRows
+} from './claude-oauth-refresh-state'
 
 const NOW = 1_700_000_000_000
 const FIVE_MIN = 5 * 60 * 1000
@@ -103,6 +113,8 @@ function harness(options?: {
   live?: boolean
   enabled?: boolean
   read?: ClaudeOAuthRefreshDeps['readDocument']
+  delay?: ClaudeOAuthRefreshDeps['delay']
+  jitterMs?: ClaudeOAuthRefreshDeps['jitterMs']
 }): { calls: FetchCall[]; writes: { json: string }[]; deps: Partial<ClaudeOAuthRefreshDeps> } {
   const calls: FetchCall[] = []
   const writes: { json: string }[] = []
@@ -125,7 +137,9 @@ function harness(options?: {
         (async (url, init) => {
           calls.push({ url, init })
           return tokenResponse(successBody())
-        })
+        }),
+      delay: options?.delay ?? (async () => {}),
+      jitterMs: options?.jitterMs ?? (() => 0)
     }
   }
 }
@@ -177,7 +191,14 @@ it('posts Claude Code’s refresh body and writes every other field back first',
   expect(info.mock.calls.flat().join(' ')).not.toContain('old-refresh')
   expect(info.mock.calls.flat().join(' ')).not.toContain('new-access')
   expect(claudeOAuthRefreshStatus()).toEqual([
-    { accountId: 'acct', lastRefreshAt: NOW, nextRetryAt: null, lapsed: false }
+    {
+      accountId: 'acct',
+      lastRefreshAt: NOW,
+      nextRetryAt: null,
+      lapsed: false,
+      queuePosition: null,
+      backoffLevel: 0
+    }
   ])
 })
 
@@ -307,7 +328,14 @@ it('treats invalid_grant as lapsed and does not retry that refresh token', async
   })
   expect(posts).toBe(1)
   expect(claudeOAuthRefreshStatus()).toEqual([
-    { accountId: 'acct', lastRefreshAt: null, nextRetryAt: null, lapsed: true }
+    {
+      accountId: 'acct',
+      lastRefreshAt: null,
+      nextRetryAt: null,
+      lapsed: true,
+      queuePosition: null,
+      backoffLevel: 0
+    }
   ])
   doc.oauth.refreshToken = 'signed-in-again'
   doc.refreshToken = 'signed-in-again'
@@ -395,6 +423,8 @@ it('does not fall through to a credentials file when the keychain read is denied
       readOptions: { credentialsFileConfigDir: home, keychainConfigDir: home },
       deps: {
         now: () => NOW,
+        delay: async () => {},
+        jitterMs: () => 0,
         fetch: async () => tokenResponse(successBody())
       }
     })
@@ -435,6 +465,8 @@ it('round-trips a credentials file and updates a keychain item in place', async 
       readOptions: { credentialsFileConfigDir: home, keychainConfigDir: home },
       deps: {
         now: () => NOW,
+        delay: async () => {},
+        jitterMs: () => 0,
         fetch: async () =>
           tokenResponse({
             access_token: 'new-access',
@@ -468,6 +500,8 @@ it('round-trips a credentials file and updates a keychain item in place', async 
       accountId: 'keychain-acct',
       deps: {
         now: () => NOW,
+        delay: async () => {},
+        jitterMs: () => 0,
         readDocument: async () => ({ ok: true, document: keychainDoc }),
         fetch: async () => tokenResponse(successBody())
       }
@@ -487,4 +521,198 @@ it('round-trips a credentials file and updates a keychain item in place', async 
   } finally {
     rmSync(home, { recursive: true, force: true })
   }
+})
+
+it('posts two accounts one at a time and waits out the gap', async () => {
+  const order: string[] = []
+  const delays: number[] = []
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let started: () => void = () => {}
+  const startedGate = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const first = harness({
+    delay: async (ms) => {
+      delays.push(ms)
+    },
+    fetch: async () => {
+      order.push('a')
+      started()
+      await gate
+      return tokenResponse(successBody())
+    }
+  })
+  const second = harness({
+    delay: async (ms) => {
+      delays.push(ms)
+    },
+    fetch: async () => {
+      order.push('b')
+      return tokenResponse(successBody())
+    }
+  })
+  const pendingA = refreshClaudeOAuthAccessToken({ accountId: 'a', deps: first.deps })
+  await startedGate
+  const pendingB = refreshClaudeOAuthAccessToken({ accountId: 'b', deps: second.deps })
+  expect(order).toEqual(['a'])
+  release()
+  await Promise.all([pendingA, pendingB])
+  expect(order).toEqual(['a', 'b'])
+  expect(delays).toEqual([CLAUDE_OAUTH_REFRESH_MIN_GAP_MS])
+  expect(delays[0]).toBeGreaterThanOrEqual(CLAUDE_OAUTH_REFRESH_MIN_GAP_MS)
+})
+
+it('honors Retry-After seconds and an HTTP date, and caps the wait at 30 minutes', async () => {
+  const seconds = harness({
+    fetch: async () => new Response('', { status: 429, headers: { 'retry-after': '10' } })
+  })
+  expect(await refreshClaudeOAuthAccessToken({ accountId: 'sec', deps: seconds.deps })).toEqual({
+    outcome: 'failed',
+    reason: 'http-429'
+  })
+  expect(claudeOAuthRefreshStatus()[0]).toMatchObject({
+    nextRetryAt: NOW + 10_000,
+    backoffLevel: 1,
+    queuePosition: 1
+  })
+
+  resetClaudeOAuthRefreshStateForTests()
+  const dated = harness({
+    fetch: async () =>
+      new Response('', {
+        status: 429,
+        headers: { 'retry-after': new Date(NOW + 15_000).toUTCString() }
+      })
+  })
+  await refreshClaudeOAuthAccessToken({ accountId: 'date', deps: dated.deps })
+  expect(claudeOAuthRefreshStatus()[0]?.nextRetryAt).toBe(NOW + 15_000)
+
+  resetClaudeOAuthRefreshStateForTests()
+  const huge = harness({
+    fetch: async () => new Response('', { status: 429, headers: { 'retry-after': '100000' } })
+  })
+  await refreshClaudeOAuthAccessToken({ accountId: 'huge', deps: huge.deps })
+  expect(claudeOAuthRefreshStatus()[0]?.nextRetryAt).toBe(NOW + 30 * 60 * 1000)
+})
+
+it('raises the shared 429 backoff across polls and does not reset it on a burst', async () => {
+  let now = NOW
+  let posts = 0
+  const { deps } = harness({
+    now: () => now,
+    fetch: async () => {
+      posts += 1
+      return new Response('', { status: 429 })
+    }
+  })
+  const refresh = () => refreshClaudeOAuthAccessToken({ accountId: 'acct', deps })
+  expect(await refresh()).toEqual({ outcome: 'failed', reason: 'http-429' })
+  expect(claudeOAuthRefreshStatus()[0]).toMatchObject({
+    nextRetryAt: NOW + 60_000,
+    backoffLevel: 1
+  })
+  beginClaudeOAuthRefreshCycle()
+  expect(await refresh()).toEqual({ outcome: 'skipped', reason: 'backoff' })
+  expect(await refresh()).toEqual({ outcome: 'skipped', reason: 'backoff' })
+  expect(posts).toBe(1)
+  expect(claudeOAuthRefreshStatus()[0]?.backoffLevel).toBe(1)
+
+  now = NOW + 60_000
+  beginClaudeOAuthRefreshCycle()
+  expect(await refresh()).toEqual({ outcome: 'failed', reason: 'http-429' })
+  expect(claudeOAuthRefreshStatus()[0]?.nextRetryAt).toBe(now + 5 * 60 * 1000)
+  expect(claudeOAuthRefreshStatus()[0]?.backoffLevel).toBe(2)
+
+  now = NOW + 60_000 + 5 * 60 * 1000
+  expect(await refresh()).toEqual({ outcome: 'failed', reason: 'http-429' })
+  expect(claudeOAuthRefreshStatus()[0]?.nextRetryAt).toBe(now + 30 * 60 * 1000)
+  expect(claudeOAuthRefreshStatus()[0]?.backoffLevel).toBe(3)
+  expect(posts).toBe(3)
+
+  now += 30 * 60 * 1000
+  expect(await refresh()).toEqual({ outcome: 'failed', reason: 'http-429' })
+  expect(claudeOAuthRefreshStatus()[0]?.backoffLevel).toBe(3)
+  expect(claudeOAuthRefreshStatus()[0]?.nextRetryAt).toBe(now + 30 * 60 * 1000)
+  expect(posts).toBe(4)
+})
+
+it('lets --force post during the shared backoff and still skips a live session', async () => {
+  let posts = 0
+  const blocked = harness({
+    fetch: async () => {
+      posts += 1
+      return new Response('', { status: 429 })
+    }
+  })
+  await refreshClaudeOAuthAccessToken({ accountId: 'acct', deps: blocked.deps })
+  expect(
+    await refreshClaudeOAuthAccessToken({ accountId: 'acct', deps: blocked.deps, force: true })
+  ).toEqual({ outcome: 'failed', reason: 'http-429' })
+  expect(posts).toBe(2)
+  expect(claudeOAuthRefreshStatus()[0]?.backoffLevel).toBe(1)
+
+  const live = harness({ live: true })
+  expect(
+    await refreshClaudeOAuthAccessToken({ accountId: 'live', deps: live.deps, force: true })
+  ).toEqual({ outcome: 'skipped', reason: 'live-session' })
+  expect(live.calls).toHaveLength(0)
+})
+
+it('reserves three accounts per cycle and continues with the rest', () => {
+  const accounts = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, index) => ({
+    id,
+    recentAt: 6 - index
+  }))
+  const plan = () => {
+    beginClaudeOAuthRefreshCycle()
+    return planClaudeUsageRefreshSlice({
+      cycleId: claudeOAuthRefreshCycleId(),
+      accounts,
+      liveIds: [],
+      now: NOW,
+      mayRefresh: (id) => id !== 'b'
+    })
+  }
+  expect(plan()).toEqual(['a', 'c', 'd'])
+  expect(accounts.map((account) => claimClaudeUsageRefresh(account.id))).toEqual([
+    true,
+    false,
+    true,
+    true,
+    false,
+    false
+  ])
+  expect(plan()).toEqual(['e', 'f', 'a'])
+  expect(plan()).toEqual(['c', 'd', 'e'])
+})
+
+it('numbers waiting accounts after the last account the cycle took', () => {
+  const accounts = ['w', 'x', 'y', 'z'].map((id, index) => ({
+    id,
+    lastAuthenticatedAt: 4 - index
+  }))
+  beginClaudeOAuthRefreshCycle()
+  expect(
+    planClaudeUsageRefreshSlice({
+      cycleId: claudeOAuthRefreshCycleId(),
+      accounts: accounts.map((account) => ({
+        id: account.id,
+        recentAt: account.lastAuthenticatedAt
+      })),
+      liveIds: [],
+      now: NOW,
+      mayRefresh: () => true
+    })
+  ).toEqual(['w', 'x', 'y'])
+  expect(claudeOAuthRefreshRows(accounts).map((row) => [row.accountId, row.queuePosition])).toEqual(
+    [
+      ['w', 2],
+      ['x', 3],
+      ['y', 4],
+      ['z', 1]
+    ]
+  )
 })

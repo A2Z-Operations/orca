@@ -4,7 +4,7 @@ import {
   claudeAuthProxyEnabled
 } from '../../shared/claude-account-switch-settings'
 import {
-  claudeOAuthRefreshStatus,
+  claudeOAuthRefreshRows,
   setClaudeOAuthRefreshEnabled
 } from '../rate-limits/claude-oauth-refresh-state'
 
@@ -21,21 +21,13 @@ export function installClaudeTokenRefresh(store: {
 
 export function claudeTokenRefreshFields(
   settings: AccountControlSettings,
-  accounts: readonly { id: string }[]
+  accounts: readonly { id: string; lastAuthenticatedAt?: number | null }[]
 ): Required<
   Pick<ClaudeRateLimitAccountsState, 'authProxy' | 'tokenRefresh' | 'tokenRefreshAccounts'>
 > {
   return {
     authProxy: claudeAuthProxyEnabled(settings) ? 'on' : 'off',
     tokenRefresh: claudeAccountTokenRefreshEnabled(settings) ? 'on' : 'off',
-    tokenRefreshAccounts: accounts.map((account) => {
-      const status = claudeOAuthRefreshStatus().find((row) => row.accountId === account.id)
-      return {
-        accountId: account.id,
-        lastRefreshAt: status?.lastRefreshAt ?? null,
-        nextRetryAt: status?.nextRetryAt ?? null,
-        lapsed: status?.lapsed ?? false
-      }
-    })
+    tokenRefreshAccounts: claudeOAuthRefreshRows(accounts)
   }
 }

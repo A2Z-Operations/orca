@@ -37,6 +37,11 @@ export const SetClaudeAuthProxyParams = z.object({ enabled: z.boolean() })
 
 export const SetClaudeAccountTokenRefreshParams = z.object({ enabled: z.boolean() })
 
+export const RefreshClaudeAccountTokenNowParams = z.object({
+  account: z.string().trim().min(1),
+  force: z.boolean().optional()
+})
+
 export const ClaudeAuthProxyStatusParams = z.object({}).strict()
 
 export const SetClaudeAccountPoolParams = z.object({ enabled: z.boolean() })
