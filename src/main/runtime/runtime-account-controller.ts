@@ -220,9 +220,11 @@ export class RuntimeAccountController {
     return this.requireServices().claudeAccounts.setAutoSwitch(enabled)
   }
 
-  setClaudeAuthProxy(enabled: boolean): ClaudeRateLimitAccountsState {
-    return this.requireServices().claudeAccounts.setAuthProxy(enabled)
-  }
+  setClaudeAuthProxy = (enabled: boolean): ClaudeRateLimitAccountsState =>
+    this.requireServices().claudeAccounts.setAuthProxy(enabled)
+
+  setClaudeAccountTokenRefresh = (enabled: boolean): ClaudeRateLimitAccountsState =>
+    this.requireServices().claudeAccounts.setTokenRefresh(enabled)
 
   /** Live listener. Does not require the account service: the proxy is process-global. */
   claudeAuthProxyStatus(): ClaudeAuthProxyStatus {

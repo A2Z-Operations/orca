@@ -25,6 +25,9 @@ export function claudeUsageWindowUnavailable(
   }
   const kind = limits.usageMetadata?.failureKind
   const http = limits.usageMetadata?.httpStatus
+  if (kind === 'lapsed') {
+    return 'lapsed'
+  }
   if (kind === 'keychain-unavailable') {
     return 'keychain denied'
   }

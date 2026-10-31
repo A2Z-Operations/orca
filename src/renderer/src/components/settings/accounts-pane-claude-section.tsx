@@ -6,6 +6,7 @@ import { Button } from '../ui/button'
 import { ButtonGroup } from '../ui/button-group'
 import { Label } from '../ui/label'
 import { ClaudeIcon } from '../status-bar/icons'
+import { claudeAccountNeedsSignIn } from '../status-bar/usage-error-copy'
 import { SearchableSetting } from './SearchableSetting'
 import { renderClaudeAutoSwitchSetting } from './accounts-pane-claude-auto-switch'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
@@ -269,6 +270,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
               )
               const isReauthing = claudeAction === `reauth:${account.id}`
               const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
+              const signInAgain = claudeAccountNeedsSignIn(account, claudeAccounts.usageWindows)
               const accountRuntimeView = getProviderAccountRuntime(account)
               const reauthenticate = (copyLink: boolean): Promise<void> =>
                 runClaudeAccountAction(
@@ -304,7 +306,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
                           accountRuntimeView
                         )
                       }}
-                      disabled={isBusy || account.needsSignIn}
+                      disabled={isBusy || signInAgain}
                       className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default"
                     >
                       <div className="flex min-w-0 items-center gap-2">
@@ -328,7 +330,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
                         ) : null}
                       </div>
                       <span className="truncate text-[11px] text-muted-foreground">
-                        {account.needsSignIn
+                        {signInAgain
                           ? translate(
                               'accounts.claude.signInRequired',
                               'Sign in again to use this account'

@@ -12,7 +12,8 @@ export const ACCOUNT_HANDLER_GROUP: HandlerGroup = {
     'account model-policy',
     'account moves',
     'account pool',
-    'account session-mover'
+    'account session-mover',
+    'account token-refresh'
   ],
   load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
 }

@@ -1,6 +1,10 @@
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
 import { listRegisteredPtys } from '../../memory/pty-registry'
-import { readClaudeOAuthCredentials } from '../../rate-limits/claude-oauth-credentials'
+import {
+  readClaudeOAuthCredentials,
+  type ClaudeOAuthCredentialReadOptions
+} from '../../rate-limits/claude-oauth-credentials'
+import { refreshClaudeOAuthAccessToken } from '../../rate-limits/claude-oauth-refresh'
 import { getClaudeProfileRouter } from '../claude-profile-installed-router'
 import {
   listClaudePaneAccounts,
@@ -56,6 +60,7 @@ export function startClaudeAuthProxy(): Promise<void> {
   }
   const created = createClaudeAuthProxy({
     readToken: readClaudeAuthProxyAccessToken,
+    refreshAccessToken: refreshClaudeAuthProxyAccessToken,
     log: (line) => console.info(`[claude-auth-proxy] ${line}`),
     modelForSlot: claudeAuthProxySlotModel
   })
@@ -216,33 +221,56 @@ export function claudeAuthProxyBaseUrl(
   return url
 }
 
-/** Cache miss path. Never refresh: a refresh would rotate the token into the spawn folder. */
+/** Cache miss. A 401 refresh is separate and skips an account whose own Claude is running. */
 export async function readClaudeAuthProxyAccessToken(accountId: string): Promise<string | null> {
-  const router = getClaudeProfileRouter()
+  const readOptions = claudeAuthProxyCredentialReadOptions(accountId)
+  if (!readOptions) {
+    return null
+  }
   try {
-    if (router) {
-      const covered = router.coveredBySystemDefault(accountId)
-      const userDir = router.userConfigDir()
-      const configDir = covered
-        ? (userDir ?? router.systemDefaultHome())
-        : router.accountHome(accountId)
-      const result = await readClaudeOAuthCredentials({
-        credentialsFileConfigDir: configDir,
-        keychainConfigDir: configDir,
-        unsuffixedKeychainFallback: covered && !userDir
-      })
-      return result.token || null
-    }
-    const configDir = accountConfigDirs.get(accountId)
-    if (!configDir) {
-      return null
-    }
-    const result = await readClaudeOAuthCredentials({
-      credentialsFileConfigDir: configDir,
-      keychainConfigDir: configDir
-    })
+    const result = await readClaudeOAuthCredentials(readOptions)
     return result.token || null
   } catch {
     return null
+  }
+}
+
+/** Same folder the cache reads. Returns the new access token, or null when refresh does not apply. */
+async function refreshClaudeAuthProxyAccessToken(accountId: string): Promise<string | null> {
+  const readOptions = claudeAuthProxyCredentialReadOptions(accountId)
+  if (!readOptions) {
+    return null
+  }
+  try {
+    const refreshed = await refreshClaudeOAuthAccessToken({ accountId, readOptions })
+    return refreshed.outcome === 'refreshed' ? refreshed.accessToken : null
+  } catch {
+    return null
+  }
+}
+
+function claudeAuthProxyCredentialReadOptions(
+  accountId: string
+): ClaudeOAuthCredentialReadOptions | null {
+  const router = getClaudeProfileRouter()
+  if (router) {
+    const covered = router.coveredBySystemDefault(accountId)
+    const userDir = router.userConfigDir()
+    const configDir = covered
+      ? (userDir ?? router.systemDefaultHome())
+      : router.accountHome(accountId)
+    return {
+      credentialsFileConfigDir: configDir,
+      keychainConfigDir: configDir,
+      unsuffixedKeychainFallback: covered && !userDir
+    }
+  }
+  const configDir = accountConfigDirs.get(accountId)
+  if (!configDir) {
+    return null
+  }
+  return {
+    credentialsFileConfigDir: configDir,
+    keychainConfigDir: configDir
   }
 }

@@ -40,6 +40,7 @@ import { getWslAccountTarget } from './account-wsl-location'
 import { addDataAccount, listDataAccounts, mutateDataAccount } from './data-account-commands'
 import { formatAccountsBlock, formatDataAccounts } from './account-list-format'
 import { setClaudeAuthProxy } from './account-auth-proxy'
+import { setClaudeAccountTokenRefresh } from './account-token-refresh'
 import { setClaudeAutoSwitch } from './account-auto-switch'
 import { printClaudeAccountMoves } from './account-moves'
 import { setClaudeAccountPool } from './account-pool'
@@ -303,5 +304,6 @@ export const ACCOUNT_HANDLERS: Record<string, CommandHandler> = {
   'account moves': printClaudeAccountMoves,
   'account pool': setClaudeAccountPool,
   'account model-policy': setClaudeModelPolicy,
-  'account session-mover': setClaudeSessionMover
+  'account session-mover': setClaudeSessionMover,
+  'account token-refresh': setClaudeAccountTokenRefresh
 }

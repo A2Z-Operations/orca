@@ -31,6 +31,7 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   '  account auto-switch       Turn Claude account switching before a usage limit on or off',
   '  account session-mover     Move running Claude sessions to another account before a usage limit',
   '  account auth-proxy        Bill Claude through a local auth proxy so a session can change accounts without restarting',
+  '  account token-refresh     Refresh access tokens for idle managed Claude accounts',
   '  account pool              Spread new Claude sessions across signed-in accounts',
   '  account model-policy      Spend Fable first, then Opus 5.5, without restarting',
   "  account moves             Show the Claude session mover's last decisions",
