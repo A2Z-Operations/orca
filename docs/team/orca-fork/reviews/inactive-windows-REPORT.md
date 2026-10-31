@@ -1,8 +1,8 @@
 # Inactive Claude windows on Electron serve
 
-Date: 2026-10-30. Branch: `nachumi-a2zoperations/fix-inactive-claude-usage`, off `blowzer/session-mover` at `173c7aa24a0`. Not pushed.
+Date: 2026-10-30. Branch: `nachumi-a2zoperations/fix-inactive-claude-usage`, off `blowzer/session-mover` at `173c7aa24a0`. Code commit: `d2b4528eded`. Not pushed.
 
-`077c2e2dc30` armed inactive Claude usage only on the orcad switch. The Studio process is Electron `orca serve`, so that flag never turned on. This commit starts the same switch from the Electron serve window attach, keeps the timer running while that window is unfocused, and prints the reason a window is blank.
+`077c2e2dc30` armed inactive Claude usage only on the orcad switch. The Studio process is Electron `orca serve`, so that flag never turned on. `d2b4528eded` starts the same switch from the Electron serve window attach, keeps the timer running while that window is unfocused, and prints the reason a window is blank.
 
 The running Studio service was left on `1.4.244-blowzer.10`. It was not restarted and its settings were not changed.
 
@@ -83,7 +83,7 @@ Build `.10` is still what the Studio is running. This worktree was not installed
 
 ## Hand check
 
-Install the build that contains this commit and let that install start `orca serve`. Do not treat a result from `1.4.244-blowzer.10` as this fix. Do not print keychain or token output. On the Studio:
+Install the build that contains `d2b4528eded` and let that install start `orca serve`. Do not treat a result from `1.4.244-blowzer.10` as this fix. Do not print keychain or token output. On the Studio:
 
 ```sh
 export PATH=/Applications/Orca.app/Contents/Resources/bin:$PATH
