@@ -155,6 +155,10 @@ export type ClaudeRateLimitAccountsState = {
     lastRefreshAt: number | null
     nextRetryAt: number | null
     lapsed: boolean
+    /** 1-based place among accounts still waiting. Absent on older hosts. */
+    queuePosition?: number | null
+    /** Shared endpoint backoff step. Absent on older hosts. */
+    backoffLevel?: number
   }[]
   /** Whether Orca-made Claude launches spread across accounts; absent from older hosts means off. */
   accountPool?: 'off' | 'on'
@@ -184,6 +188,14 @@ export type ClaudeRateLimitAccountsState = {
   modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
   /** Last model-policy pass per live pane. Absent from older hosts and when none has run. */
   modelPolicyEvaluations?: ClaudeModelPolicyEvaluation[]
+}
+
+/** One-shot refresh. The access token stays on the runtime. */
+export type ClaudeTokenRefreshNowResult = {
+  accountId: string
+  email?: string
+  outcome: 'ok' | 'skipped' | 'failed' | 'lapsed'
+  reason?: string
 }
 
 /** One live Claude pane and the account its next request bills. */

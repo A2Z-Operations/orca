@@ -34,6 +34,8 @@ import {
   beginClaudeOAuthRefreshCycle,
   resetClaudeOAuthRefreshStateForTests
 } from './claude-oauth-refresh'
+import { planClaudeUsageRefreshSlice } from './claude-oauth-refresh-pacing'
+import { claudeOAuthRefreshCycleId } from './claude-oauth-refresh-state'
 
 const roots: string[] = []
 const posts: string[] = []
@@ -206,4 +208,26 @@ it('does not refresh an account whose own Claude pane is running', async () => {
   })
   expect(posts).toHaveLength(0)
   expect(usage).toHaveBeenCalledTimes(1)
+})
+
+it('leaves a 401 stale when this usage cycle did not reserve the account', async () => {
+  const { options } = homeFor('capped')
+  beginClaudeOAuthRefreshCycle()
+  planClaudeUsageRefreshSlice({
+    cycleId: claudeOAuthRefreshCycleId(),
+    accounts: [
+      { id: 'a', recentAt: 4 },
+      { id: 'b', recentAt: 3 },
+      { id: 'c', recentAt: 2 },
+      { id: 'capped', recentAt: 1 }
+    ],
+    liveIds: [],
+    now: Date.now(),
+    mayRefresh: () => true
+  })
+  usage.mockRejectedValue(unauthorized())
+  expect(await fetchActiveClaudeRateLimits(options)).toMatchObject({
+    usageMetadata: { failureKind: 'stale-token' }
+  })
+  expect(posts).toHaveLength(0)
 })
