@@ -103,7 +103,7 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'Writes claudeModelPolicy (accounts.setClaudeModelPolicy). Default on: Fable while Fable is under 90% and the regular weekly window is under 91%. Otherwise that account runs Opus 5.5.',
       '--set accepts fable-line and weekly-guard, repeated or comma-separated (fable-line=80,weekly-guard=85). Lines clamp to 1–100.',
-      '--status reads accounts.list and does not change the setting. A running session switches models through the auth proxy, without a restart, at most once per 10 minutes.',
+      '--status reads accounts.list and does not change the setting. It prints the lines and the last evaluation per live pane (pane, account, model, source, choice, reason, when). A running session switches models through the auth proxy, without a restart, at most once per 10 minutes. Changing the lines re-evaluates immediately.',
       'With --environment the setting is written on that paired Orca server. An explicit --model or ANTHROPIC_MODEL on a launch stays pinned.'
     ],
     examples: [

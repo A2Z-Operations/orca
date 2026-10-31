@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { formatClaudeSessionMoveLine } from '../../shared/claude-session-move-line'
-import { formatAccountsBlock, formatClaudeModelPolicyLine } from './account-list-format'
+import {
+  formatAccountsBlock,
+  formatClaudeModelPolicyEvaluationLine,
+  formatClaudeModelPolicyLine
+} from './account-list-format'
 
 describe('formatAccountsBlock', () => {
   it('prints the WSL guest proxy status without changing the host proxy line', () => {
@@ -42,6 +46,21 @@ describe('formatAccountsBlock', () => {
     expect(text).toContain('  pool: on\n  model-policy: on (fable<90, weekly<91)')
     expect(formatClaudeModelPolicyLine({ enabled: false, fableLine: 80, weeklyGuard: 70 })).toBe(
       'model-policy: off'
+    )
+    expect(
+      formatClaudeModelPolicyEvaluationLine({
+        ptyId: 'pty-1',
+        paneKey: 'reports',
+        accountId: 'acct',
+        model: 'fable',
+        source: 'policy',
+        choice: 'opus',
+        reason: 'weekly-guard',
+        skip: 'cooldown',
+        at: Date.parse('2026-10-30T00:00:00.000Z')
+      })
+    ).toBe(
+      'pane reports  account acct  model fable  source policy  choice opus  reason weekly-guard  skip cooldown  at 2026-10-30T00:00:00.000Z'
     )
   })
 

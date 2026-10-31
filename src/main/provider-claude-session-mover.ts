@@ -25,7 +25,10 @@ import {
   rememberClaudeModelFlip
 } from './claude-accounts/claude-model-flip-history'
 import { createClaudeModelPolicyTicker } from './claude-accounts/claude-model-policy-ticker'
-import { isClaudeUsageReadingOf } from './claude-accounts/claude-account-auto-switch'
+import {
+  claudeAccountUsageReading,
+  claudeAccountUsageWindows
+} from './claude-accounts/claude-account-usage-windows'
 import { getSelectedClaudeAccountIdForTarget } from './claude-accounts/runtime-selection'
 import { getPtyIdForPaneKey, ptyPaneKey } from './ipc/pty/pane/key-state'
 import { listRegisteredPtys } from './memory/pty-registry'
@@ -98,19 +101,11 @@ export function createProviderClaudeSessionMover(
   claudeAccounts.setUsageWindowsProvider((accounts) => {
     const settings = store.getSettings()
     const state = rateLimits.getState()
-    const selectedId = getSelectedClaudeAccountIdForTarget(settings, state.claudeTarget)
-    return accounts.map((account) => {
-      const limits =
-        account.id === selectedId && state.claude && isClaudeUsageReadingOf(state.claude, account)
-          ? state.claude
-          : (state.inactiveClaudeAccounts.find((row) => row.accountId === account.id)?.rateLimits ??
-            null)
-      const readable = limits?.status === 'ok' ? limits : null
-      return {
-        accountId: account.id,
-        weekly: readable?.weekly ? readable.weekly.usedPercent : null,
-        fable: readable?.fableWeekly ? readable.fableWeekly.usedPercent : null
-      }
+    return claudeAccountUsageWindows({
+      accounts,
+      selectedAccountId: getSelectedClaudeAccountIdForTarget(settings, state.claudeTarget),
+      selectedLimits: state.claude,
+      inactiveAccounts: state.inactiveClaudeAccounts
     })
   })
   stopClaudeModelPolicyTicker()
@@ -126,18 +121,21 @@ export function createProviderClaudeSessionMover(
       if (!account) {
         return null
       }
-      const selectedId = getSelectedClaudeAccountIdForTarget(settings, state.claudeTarget)
-      if (
-        account.id === selectedId &&
-        state.claude &&
-        isClaudeUsageReadingOf(state.claude, account)
-      ) {
-        return { rateLimits: state.claude, updatedAt: state.claude.updatedAt }
-      }
-      const inactive = state.inactiveClaudeAccounts.find((row) => row.accountId === account.id)
-      return inactive ? { rateLimits: inactive.rateLimits, updatedAt: inactive.updatedAt } : null
+      return claudeAccountUsageReading({
+        account,
+        selectedAccountId: getSelectedClaudeAccountIdForTarget(settings, state.claudeTarget),
+        selectedLimits: state.claude,
+        inactiveAccounts: state.inactiveClaudeAccounts
+      })
     },
     subscribe: (listener) => rateLimits.onStateChange(() => listener()),
+    subscribeSettings: (listener) =>
+      store.onSettingsChanged((updates) => {
+        if (updates && !('claudeModelPolicy' in updates)) {
+          return
+        }
+        listener()
+      }),
     apply: (flip) => {
       setClaudePaneModel(flip.ptyId, flip.to, 'policy')
       rememberClaudeModelFlip(flip)

@@ -17,6 +17,7 @@ import {
 } from './claude-account-summary'
 import { wslAuthProxyStatus } from './wsl-auth-proxy-status'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
+import { claudeModelPolicyEvaluations } from './claude-model-policy-evaluations'
 import { resolveClaudeModelPolicy, type ClaudeModelPolicyPatch } from './claude-model-policy'
 import { claudeListedPaneAccounts } from './claude-listed-pane-accounts'
 import { listClaudePaneAccounts } from './claude-pane-account-registry'
@@ -157,6 +158,7 @@ export class ClaudeAccountSelection {
       accounts.length > 0 ? readClaudeFolderLogin(claudeStateFile(userConfigDir), 5_000) : null
     const wslAuthProxy =
       process.platform === 'win32' ? wslAuthProxyStatus(settings.claudeManagedAccounts) : undefined
+    const modelPolicyEvaluations = claudeModelPolicyEvaluations()
     return {
       accounts,
       activeAccountId: selection.host,
@@ -168,6 +170,7 @@ export class ClaudeAccountSelection {
       pool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       modelPolicy: resolveClaudeModelPolicy(settings),
       ...(this.usageWindowsProvider ? { usageWindows: this.usageWindowsProvider(accounts) } : {}),
+      ...(modelPolicyEvaluations.length > 0 ? { modelPolicyEvaluations } : {}),
       assignedSessions,
       paneAccounts,
       sessionMoves: this.sessionMovesProvider?.() ?? [],
