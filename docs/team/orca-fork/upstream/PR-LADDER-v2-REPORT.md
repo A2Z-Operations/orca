@@ -173,3 +173,43 @@ Typecheck (node, web, cli) passes on every final sha. Logs: `/tmp/prv2-<branch>-
 - E depends on the pool (`claude-structured-pane-account.ts` imports `claude-account-pool-launch`), so E lands after F, not after D as the brief's table had it.
 - A/B/C share the four registry commits; after the first of them lands, rebase the other two and those commits drop out.
 - The v1 branches are not deleted; `pr-v1/*` tags point at them. The `pr-pool` and `pr-proxy` worktrees are detached.
+
+## PR 0: `pr/claude-pane-account-registry-v2` (2026-11-02 follow-up)
+
+Upstream #28044 is 2443 commits behind `main`; PR 0 is its refreshed replacement and the base the other six now share. Cut on `upstream/main` `8bb3b8bb931`, pushed to `origin`, tracking unset. Diff vs base: 93 files, +3774/−162.
+
+| sha                                                        | content                                                                                                                                                                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0db4fc68236`, `c7ddab0db13`, `7f0a1586872`, `d6137a0c285` | the four registry commits A/B/C shared, unchanged objects                                                                                                                                                          |
+| `9e6c4380485`                                              | the `CLI_BOOLEAN_FLAGS` fix (cherry-picked from the former A commit; the copies on A and C dropped out as already upstream)                                                                                        |
+| `d213bad0959`                                              | `--environment macstudio` → `--environment build-box` in `src/cli/specs/account.ts` (`build-box` is upstream's own example name)                                                                                   |
+| `31947597645`                                              | `runtime-account-data-snapshot.ts` split out of `runtime-account-controller.ts`; the registry alone put the controller at 301 lines, which `max-lines` refuses, so PR 0 carries the split that A and C used to add |
+
+Gate on `31947597645` (`/tmp/prv2-registry-v2-check.log`, typecheck `/tmp/prv2-registry-v2-typecheck.log`): typecheck node/web/cli `EXIT 0`; `✗ 1 of 30 check(s) failed in 3336.9s: unit tests`, 29 static checks pass; unit failures env-only (`wsl-host-agent-launch-paths` 5, `pty-attach-view-joins-main-start` 3, `persisted-profile-state.unit` 2, the six single pty flakes). **Green apart from the env list.**
+
+### The six rebased on PR 0
+
+Each branch's tree is byte-identical to its previous HEAD apart from the example rename (verified with `git diff <old> <new>` = empty before the rename commits). The rename is applied in one commit per branch that introduced further `macstudio` examples (B: token-refresh spec; C: auth-proxy spec and `wsl-guest-auth-proxy-env.test.ts`; D: mover specs; F's pool commit took the neutral name during the rebase). `git grep macstudio -- src` is empty on all seven.
+
+| PR  | branch                               | HEAD                                       | base            | own diff vs base     | own commits |
+| --- | ------------------------------------ | ------------------------------------------ | --------------- | -------------------- | ----------- |
+| 0   | `pr/claude-pane-account-registry-v2` | `319475976458cc9328096a2591e99b62111ab6a0` | `upstream/main` | 93 files, +3774/−162 | 7           |
+| A   | `pr/serve-usage-polling`             | `6dcef705dc5d54729d0f496af6c3e02b436f63f5` | PR 0            | 21 files, +798/−21   | 5           |
+| B   | `pr/idle-token-refresh`              | `0d049a840eb44b773cdbe03225106ebb1f26a542` | A               | 43 files, +3146/−23  | 3           |
+| C   | `pr/claude-auth-proxy`               | `11a977c2c6fd2dd3997be846399520eac1f4040f` | PR 0            | 69 files, +3109/−48  | 6           |
+| D   | `pr/claude-session-mover-proxy`      | `7bfbacd8a7d8824a88e1c5c9d168a9b02f349764` | C               | 93 files, +6533/−82  | 6           |
+| F   | `pr/claude-account-pool`             | `f3aaeacfb4ed0a65f10f38201f029bff6460815a` | D               | 63 files, +1612/−128 | 2           |
+| E   | `pr/native-chat-account-coverage`    | `408c05f034c16bdbea6dcbaa8cb5fd21cd0c004a` | F               | 23 files, +968/−32   | 2           |
+
+Per the task, the six had typecheck node/web/cli plus targeted suites only (their content did not change): each branch's own `*.test.ts(x)` files vs its base plus the four CLI-flag suites (`args`, `cli-argument-boundary`, `index-local-command-routing-flags`, `helper-follow-up-cli.integration`). Logs `/tmp/prv2-<branch>-v3-targeted.log`:
+
+| branch | typecheck | targeted vitest          |
+| ------ | --------- | ------------------------ |
+| A      | `EXIT 0`  | 10 files, 150 tests pass |
+| B      | `EXIT 0`  | 11 files, 173 tests pass |
+| C      | `EXIT 0`  | 20 files, 187 tests pass |
+| D      | `EXIT 0`  | 28 files, 297 tests pass |
+| F      | `EXIT 0`  | 15 files, 197 tests pass |
+| E      | `EXIT 0`  | 10 files, 129 tests pass |
+
+**Land order: 0, A, B, C, D, F, E.** After PR 0 lands, A and C rebase onto `main` with no change; B, D, F, E follow their parents. Author and committer on every commit is Nachumi Eliyahu <nachumi@a2zoperations.com>; no trailers; no `docs/team/**`; `pnpm-lock.yaml` untouched.
