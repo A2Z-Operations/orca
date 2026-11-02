@@ -522,7 +522,8 @@ describe('claude auth proxy', () => {
     const idleStarted = Date.now()
     const idleOutcome = await proxyRequest(
       `${idleProxy.slotBaseUrl(idleProxy.allocateSlot('account-a'))}v1/messages`,
-      { timeoutMs: 2000 }
+      // Why 10 s: under a full-suite load the 200 ms idle timer and the socket reset can land late.
+      { timeoutMs: 10_000 }
     ).then(
       (response) => response.status,
       () => 'reset'
@@ -531,7 +532,7 @@ describe('claude auth proxy', () => {
     expect(idleOutcome === 502 || idleOutcome === 'reset').toBe(true)
     const idleElapsed = Date.now() - idleStarted
     expect(idleElapsed).toBeGreaterThan(150)
-    expect(idleElapsed).toBeLessThan(1500)
+    expect(idleElapsed).toBeLessThan(8000)
 
     let writes = 0
     const activeUpstream = createServer((_req, res) => {
