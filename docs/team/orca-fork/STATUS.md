@@ -137,3 +137,23 @@ Owner ran open-prs.sh (after a bash-3.2 fix: no associative arrays) and comment-
 
 ## 2026-11-03 — ladder rebased onto 5e02b47d114 and force-pushed; CodeRabbit's three PR 0 findings fixed
 Worker task_42251369e551 done. New HEADs: 0 45b20e30523 · A a3d1068e7bd · B 990bd8ec2f1 · C 80f72b89483 · D 6b4adf7e354 · F d8c80f7385f · E 18ba2dec203. Leader-verified: merge-tree 0 conflicts on all seven, authors/committers Nachumi only, no trailers, forbidden-word grep empty. CodeRabbit fixes = one commit on PR 0 (setAutoSwitch boolean guard + test; billed-reading selected-account check + two tests; 95%/90% copy in both renderer files + en.json), re-stacked under all children. Gates: typecheck + quality green on all seven; full check-changed 29/30 on PR 0 and E (env-only unit failures). Report section on blowzer/fork-only c3697e97868. Bot-thread replies drafted in scratchpad upstream-drafts/coderabbit-replies-37567.md, HELD for owner yes.
+
+## 2026-11-02/03 — catch-up from the BLOWzer STATUS (entries written there before the move)
+- CodeRabbit's three threads on #37567 answered after the owner's "post replies" (replies r4449993839 / r4449994122 / r4449994384); CodeRabbit resolved all three. #28044 carries our pointer comment to #37567.
+- Light rebases onto upstream 900146b9da7, then aaf4a5d9539a (upstream #37612 moved provider-account-services into src/main/providers/accounts/). Seven PRs clean on GitHub afterwards.
+- Set-hooks (`orca repo set-hooks`) landed anyway: the worker finished before the abandon took effect. fork-only 5d8f095ce65 (merge of c55b5ac6596), session-mover dbc498cf316; 11 tests; zip Orca-1.4.244-blowzer.16-arm64-mac.zip (sha256 4d780910…) codesign OK; NOT installed, both Macs on .15.
+
+## 2026-11-03 — set-hooks decision: KEEP (Nacho for Nachumi, decide-and-log rule)
+Finished, tested, harmless while uninstalled. Hold: do NOT install .16 on either Mac; do NOT open an upstream PR for set-hooks until Nachumi says.
+
+## 2026-11-03 — ladder rebase #4 dispatched (upstream af6cb2cf8c3, +53 past aaf4a5d9539a)
+All seven PRs CONFLICTING: one file, `src/renderer/src/web/web-preload-api-rate-limits.test.ts` (upstream 44e63bb18e6 removed 140 lines of low-value renderer tests; PR 0 had added two tests there → drop them, take upstream). Worker task_b4f886169d51 rebasing 0→A→B, 0→C→D→F→E, light gate, force-with-lease on pr/*. No maintainer activity on #37567–#37573 or #28044.
+
+## 2026-11-03 — clean-flow rule (Nacho for Nachumi)
+Fork-session work never commits in the shared BLOWzer checkout; all work in Orca worktrees; docs land on this repo's main only through PRs that reference an issue (tracking issue #2); no --admin, no --no-verify, no force-push to main. pr/* ladder branches keep force-with-lease (that is the upstream PR mechanism). Worker amended mid-task for its push/docs steps.
+
+## 2026-11-03 — ladder rebase #4 DONE (upstream af6cb2cf8c3)
+Worker task_b4f886169d51. New heads (all force-with-lease on origin): 0=7e4c2859da3 A=00e0c396fb1 B=46fdb2215f3 C=9d0edf9c67c D=d71e1c88c45 F=d7df158ab79 E=9621971791e. Leader-verified: merge-tree 0 conflicts vs af6cb2cf8c3 on all seven, Nachumi-only author+committer, 0 trailers. Conflict resolved by taking upstream's web-preload-api-rate-limits.test.ts (our two tests dropped). Two oxlint max-lines fix-ups folded into C (claude-session-account-move.ts → helpers in claude-pane-account-folder.ts) and D (server-listeners.ts). Gate: typecheck web/cli green everywhere; typecheck:node fails only on upstream's own query-selections.test.ts (fixed upstream in #37711); full check-changed 28/30 on PR 0 and E with the known env-only unit set. GitHub: #37567/#37568/#37569 MERGEABLE; #37570–#37573 CONFLICTING only against upstream commits newer than the base (#37722 touched runtime-auth-service.ts, main-process-quit.ts, cli/handlers/account.ts) → HOLD per the standing rule (drafts; rebase when a maintainer engages or PR 0 is about to merge). Report PR opened on this repo (Refs #2). Still no maintainer activity.
+
+## 2026-11-03 — docs PRs #4 and #3 reviewed (independent reviewer subagent, Nacho's order 03:58 PT)
+#4 (PR-LADDER-v2-REPORT.md, +338) PASS; #3 (STATUS.md) PASS. Checks: only docs/team/orca-fork/ touched, no secrets, Nachumi-only authors, no AI trailers, "Refs #2" present, content coherent. The "detect changes and check repository guards" check stays queued forever on this fork (upstream's blacksmith runner label; not required, main has no protection; same state as when #1 merged). Merge order: #4 then #3, normal merge.
