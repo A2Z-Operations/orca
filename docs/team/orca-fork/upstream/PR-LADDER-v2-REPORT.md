@@ -267,3 +267,28 @@ The one real finding was the quality gate's `typescript(consistent-type-assertio
 Unit-test failures, all env-only on this Mac: `wsl-host-agent-launch-paths` ×5, `pty-attach-view-joins-main-start` ×3, `persisted-profile-state.unit` ×2, the single pty flakes (`pty-claude-agent-view-readiness`, `pty-runtime-hidden-at-spawn-mark`, `pty-launch-race-parity`, `pty-hidden-at-spawn-mark`, `pty-spawn-scaling.performance`, `pty-pane-materialization-race`). **New since the last report:** `src/main/runtime/runtime-failed-local-worktree-removal.test.ts` (15 tests) failed in PR 0's full run because the global `commit-msg` identity hook refuses the fixture's `Worktree Removal <removal@example.invalid>` author on its `git commit -qm seed`; env-only (upstream CI has no such hook). The cross-version harness also cannot resolve tags `v1.4.244`/`v1.4.245` here.
 
 **Land order unchanged: 0, A, B, C, D, F, E.**
+
+## Light rebase onto `aaf4a5d9539a` (2026-11-03, task_96287b1293af)
+
+Brief asked for `900146b9da7`; upstream moved to `aaf4a5d9539a` (11 more commits, owner-grouping refactors) before the push, so the coordinator redirected to that and the ladder was rebased twice in stack order. All seven force-pushed with lease. **Standing rule: no further rebases on my own; the leader asks when a maintainer engages or PR 0 is about to merge.**
+
+| PR  | branch                               | old HEAD      | new HEAD       |
+| --- | ------------------------------------ | ------------- | -------------- |
+| 0   | `pr/claude-pane-account-registry-v2` | `45b20e30523` | `69e2f3381182` |
+| A   | `pr/serve-usage-polling`             | `a3d1068e7bd` | `b603a4dd7e95` |
+| B   | `pr/idle-token-refresh`              | `990bd8ec2f1` | `c9bbdd1fceaa` |
+| C   | `pr/claude-auth-proxy`               | `80f72b89483` | `d26005d993cf` |
+| D   | `pr/claude-session-mover-proxy`      | `6b4adf7e354` | `f753a197baad` |
+| F   | `pr/claude-account-pool`             | `d8c80f7385f` | `0502db183ee5` |
+| E   | `pr/native-chat-account-coverage`    | `18ba2dec203` | `6b33f7eae53b` |
+
+Commit counts unchanged (8/13/16/14/20/22/24); merge-tree clean, forbidden-word grep empty, Nachumi-only author/committer, no trailers.
+
+Conflicts and import moves (all mechanical, folded into the commits that introduced the lines):
+
+- C `src/main/startup/main-process-quit.ts` (upstream `b89cfbd09d6` moved the quit imports under `./quit/`): upstream paths kept, our `stopClaudeAuthProxy` import and call kept.
+- PR 0 `src/main/provider-account-services.ts` → `src/main/providers/accounts/provider-account-services.ts` (upstream #37612) and `src/main/orcad/orcad-account-services.ts`: upstream path taken, our registry/auto-switch/home-attribution imports re-pointed with `../../`.
+- B `claude-oauth-refresh.ts`: `integration-credential-file` moved to `src/main/credentials/` (upstream #37606); fixup into the token-refresh commit.
+- D: `orcad-account-services.ts` and `provider-claude-session-mover.ts` import the moved provider file; the provider file's `./provider-claude-session-mover` import became `../../provider-claude-session-mover` (caught by E's typecheck). F: `claude-account-pool-launch` import re-pointed.
+
+Gate (coordinator-reduced): typecheck node/web/cli `EXIT 0` on PR 0 and E; PR 0 targeted suites 240/240 pass; `oxlint src/main/startup/main-process-quit.ts` clean on C. The `run-vitest.mjs related` selection from the brief was dropped on the coordinator's instruction (it pulled in unrelated runtime/persistence specs that fail for environment reasons here).
