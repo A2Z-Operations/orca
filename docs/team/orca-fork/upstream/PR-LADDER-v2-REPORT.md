@@ -213,3 +213,57 @@ Per the task, the six had typecheck node/web/cli plus targeted suites only (thei
 | E      | `EXIT 0`  | 10 files, 129 tests pass |
 
 **Land order: 0, A, B, C, D, F, E.** After PR 0 lands, A and C rebase onto `main` with no change; B, D, F, E follow their parents. Author and committer on every commit is Nachumi Eliyahu <nachumi@a2zoperations.com>; no trailers; no `docs/team/**`; `pnpm-lock.yaml` untouched.
+
+## Rebase onto `5e02b47d114` (2026-11-02, task_42251369e551)
+
+All seven open PRs (#37567–#37573) were "dirty" against upstream/main `5e02b47d1140` (175 commits past `8bb3b8bb931`). Rebased in stack order 0 → A → B and 0 → C → D → F → E in `~/orca/workspaces/orca-fork/pr-ladder-v2-claude`; every commit kept (no squash), author and committer Nachumi Eliyahu <nachumi@a2zoperations.com>, no trailers. All seven pushed with `--force-with-lease`; GitHub updated the open PRs in place.
+
+### New HEADs
+
+| PR  | branch                               | old HEAD      | new HEAD                                   | base            | own diff vs base     | own commits |
+| --- | ------------------------------------ | ------------- | ------------------------------------------ | --------------- | -------------------- | ----------- |
+| 0   | `pr/claude-pane-account-registry-v2` | `31947597645` | `45b20e30523fecc28de13a999a5028f1174f7c7a` | `upstream/main` | 94 files, +3897/−167 | 8           |
+| A   | `pr/serve-usage-polling`             | `6dcef705dc5` | `a3d1068e7bdcc568b0344c5ff4355efc2ba711b7` | PR 0            | 21 files, +798/−21   | 5           |
+| B   | `pr/idle-token-refresh`              | `0d049a840eb` | `990bd8ec2f137ee549a29cd2fcd6cc5413edc4ea` | A               | 43 files, +3146/−23  | 3           |
+| C   | `pr/claude-auth-proxy`               | `11a977c2c6f` | `80f72b89483b6b16d787945903b932e0f1032161` | PR 0            | 69 files, +3109/−48  | 6           |
+| D   | `pr/claude-session-mover-proxy`      | `7bfbacd8a7d` | `6b4adf7e354cbbcb242ec12e259c29ab300f7788` | C               | 93 files, +6533/−82  | 6           |
+| F   | `pr/claude-account-pool`             | `f3aaeacfb4e` | `d8c80f7385fee75422f48d920d03943e994efe56` | D               | 63 files, +1612/−128 | 2           |
+| E   | `pr/native-chat-account-coverage`    | `408c05f034c` | `18ba2dec20350dc0d6cf67fc5117011c90897ed1` | F               | 23 files, +968/−32   | 2           |
+
+`git merge-tree --write-tree upstream/main <branch>`: no CONFLICT on any of the seven. `git diff upstream/main <branch> | grep -iE 'blowzer|macstudio|a2z|sabrent'`: empty on all seven. Stack ancestry verified (`merge-base --is-ancestor`).
+
+### Conflicts resolved
+
+- **Every branch** — `src/renderer/src/components/native-chat/agent-session-failure-words-text.ts`: upstream `4343dc212a2` split the start-failure pieces into `agent-session-start-failure-words-text.ts`; we had split the chosen-account pieces into `agent-session-chosen-account-words-text.ts`. Kept both imports and both spreads; neither file defines the other's keys, the `AgentSessionFailureCopyId` union compiles.
+- **PR 0** — upstream moved `shared/agent-session-failure-copy` → `shared/agent-session/failures/agent-session-failure-copy` and `shared/agent-session-acquired-account` → `shared/agent-session/lifecycle/agent-session-acquired-account`; import paths followed. Upstream deleted the `REMOTE` const from `runtime-provider-accounts-client.test.ts`; our registry test still needs it, so it is re-added inside the registry commit. `agent-session-refusal-details.ts` hit `max-lines` (302 code lines) after the move; the 4-line `RewindFacts` type is now one line.
+- **C, D, F, E** — `src/renderer/src/lib/claude-session-account-move.test.ts`: kept our appended `describe('a pane the auth proxy has moved')`, dropped the `claudeLaunchAccountId` describe upstream deleted.
+- **D** — `src/main/provider-account-services.ts`: the new System Default coverage resolver (below) and the session mover both touch the wiring; both kept, resolver registered before `createProviderClaudeSessionMover`.
+- **E** — `claude-structured-launch-resolution.ts` and `claude-structured-launch-home.ts`: single `ClaudeAccountRecipe` import from the moved lifecycle path, no `prepareClaudeLaunchAccount` import, no duplicate launch-home import (the earlier duplicate-import regression did not recur).
+
+### CodeRabbit findings on PR 0 (coordinator addendum)
+
+One extra commit on PR 0, re-stacked under all six children before any gate: **`45b20e30523`** "Reject non-boolean auto-switch toggles, keep foreign billed posts off the bar, and state the real switch lines."
+
+1. `src/main/ipc/claude-accounts.ts` — `claudeAccounts:setAutoSwitch` throws `TypeError` unless `args.enabled` is a boolean. New `src/main/ipc/claude-accounts.test.ts`: `claudeAccounts:setAutoSwitch › passes a boolean through and rejects anything else without touching the setting` (`true` passes; `'true'`, `1`, `null`, `undefined`, `{}` and missing args throw; `setAutoSwitch` called once).
+2. `src/main/rate-limits/service/service-fetch-policy.ts` — a billed live reading updates `state.claude` only when the billed account is the selected one: `profile:<id>` provenance compares ids; `system` / `wsl:<distro>:system` provenance asks the new `claudeSystemDefaultCoverageResolver` (wired in `provider-account-services.ts` to `router.coveredBySystemDefault`). A billed account that is neither inactive nor selected is dropped with a debug line. New tests in `service-live-claude-usage-routing.test.ts`: `leaves the bar alone when a billed post names an account that is neither inactive nor selected` and `accepts a billed post on System Default only for an account the user folder covers`.
+3. Copy in `accounts-pane-claude-auto-switch.tsx`, `accounts-claude-search.ts` and `en.json` (`accounts.claude.autoSwitchDescription`) now reads "passes 95% of its 5-hour limit or 90% of its weekly limit"; policy unchanged at 95/90. The runtime-required catalog does not list this key, so `en-runtime-required.json` is unchanged (the `--fix` run only produced unrelated upstream ordering drift, reverted).
+
+### Gate results
+
+Strategy: PR 0 and E (the two ends of the long stack) got the full `check-changed.mjs --base=upstream/main --maxWorkers=2 --timeout=120`; A, B, C, D, F got typecheck node/web/cli, `check-changed-code-quality.mjs upstream/main`, `oxlint` on their changed `src` files, and vitest on their own changed test files plus the four CLI-flag suites (the full gate takes ~60 min per branch on this Mac).
+
+| branch | typecheck node/web/cli | quality gate | oxlint | targeted vitest / full gate                                                                 |
+| ------ | ---------------------- | ------------ | ------ | ------------------------------------------------------------------------------------------- |
+| 0      | `EXIT 0`               | pass         | —      | full: 29/30 static checks pass; unit tests fail env-only (list below)                       |
+| A      | `EXIT 0`               | pass         | pass   | pass                                                                                        |
+| B      | `EXIT 0`               | pass         | pass   | pass                                                                                        |
+| C      | `EXIT 0`               | pass         | pass   | pass                                                                                        |
+| D      | `EXIT 0`               | pass         | pass   | pass                                                                                        |
+| F      | `EXIT 0`               | pass         | pass   | pass                                                                                        |
+| E      | `EXIT 0`               | pass         | —      | full: `✗ 2 of 30 … changed-code quality, unit tests` → quality fixed (below), unit env-only |
+
+The one real finding was the quality gate's `typescript(consistent-type-assertions)` on `src/main/ipc/claude-accounts.test.ts:24`: the `as unknown as ClaudeAccountService` cast spanned a multi-line object literal, so the `SAFETY` disable comment was not on the line above the expression. Fixed on PR 0 (cast moved to one annotated line), fixup-squashed into `45b20e30523`, six children re-stacked, then `check-changed-code-quality.mjs upstream/main` re-run on all seven (all pass) plus `typecheck:node` on PR 0 (`EXIT 0`). The first gate queue's per-branch logs were overwritten by a shell-variable bug in the queue script, so only E's full log (`/tmp/prv2-5e--check.log`) and the re-gate logs (`/tmp/prv2-regate-*`) survive.
+
+Unit-test failures, all env-only on this Mac: `wsl-host-agent-launch-paths` ×5, `pty-attach-view-joins-main-start` ×3, `persisted-profile-state.unit` ×2, the single pty flakes (`pty-claude-agent-view-readiness`, `pty-runtime-hidden-at-spawn-mark`, `pty-launch-race-parity`, `pty-hidden-at-spawn-mark`, `pty-spawn-scaling.performance`, `pty-pane-materialization-race`). **New since the last report:** `src/main/runtime/runtime-failed-local-worktree-removal.test.ts` (15 tests) failed in PR 0's full run because the global `commit-msg` identity hook refuses the fixture's `Worktree Removal <removal@example.invalid>` author on its `git commit -qm seed`; env-only (upstream CI has no such hook). The cross-version harness also cannot resolve tags `v1.4.244`/`v1.4.245` here.
+
+**Land order unchanged: 0, A, B, C, D, F, E.**
