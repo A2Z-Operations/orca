@@ -17,6 +17,14 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     'include-archived': '--include-archived     Include archived workspaces',
     limit: '--limit <n>            Maximum matching workspaces (default 50)'
   },
+  'repo set-hooks': {
+    setup: '--setup <cmd>          Shell command to run after a worktree is created',
+    archive: '--archive <cmd>        Shell command to run before a worktree is archived or removed',
+    'setup-policy':
+      '--setup-policy ask|run-by-default|skip-by-default Whether new worktrees run the setup script',
+    'clear-setup': '--clear-setup          Remove the stored setup script',
+    'clear-archive': '--clear-archive        Remove the stored archive script'
+  },
   'worktree create': {
     reference:
       '--reference <url-or-jira-key> Attach an issue/review URL or Jira key; repeat for several',

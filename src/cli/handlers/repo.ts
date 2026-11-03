@@ -4,6 +4,7 @@ import { formatRepoList, formatRepoRefs, formatRepoShow, printResult } from '../
 import { getOptionalPositiveIntegerFlag, getRequiredStringFlag } from '../flags'
 import { resolveRepoPathArgument } from '../repo-path-arguments'
 import { RuntimeClientError } from '../runtime/types'
+import { REPO_SET_HOOKS_HANDLERS } from './repo-set-hooks'
 
 export const REPO_HANDLERS: Record<string, CommandHandler> = {
   'repo list': async ({ client, json }) => {
@@ -52,5 +53,6 @@ export const REPO_HANDLERS: Record<string, CommandHandler> = {
       limit: getOptionalPositiveIntegerFlag(flags, 'limit')
     })
     printResult(result, json, formatRepoRefs)
-  }
+  },
+  ...REPO_SET_HOOKS_HANDLERS
 }

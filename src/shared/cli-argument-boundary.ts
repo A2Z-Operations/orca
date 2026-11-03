@@ -8,6 +8,8 @@ export const CLI_BOOLEAN_FLAGS = new Set([
   'ask',
   'attachments',
   'children',
+  'clear-archive',
+  'clear-setup',
   'comments',
   'connect',
   'current',
