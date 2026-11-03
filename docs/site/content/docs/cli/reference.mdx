@@ -84,10 +84,15 @@ orca repo list --json
 orca repo add --path /abs/path/to/repo --json
 orca repo show --repo id:<repoId> --json
 orca repo set-base-ref --repo id:<repoId> --ref origin/main --json
+orca repo set-hooks --repo id:<repoId> --setup "bash scripts/orca-setup.sh" --archive "bash scripts/orca-archive.sh" --setup-policy run-by-default --json
 orca repo search-refs --repo id:<repoId> --query main --limit 10 --json
 ```
 
 Set the repo base ref before creating lots of worktrees so new tasks branch from the right place by default.
+
+### Repo hooks from the CLI
+
+`repo set-hooks` binds the setup and archive hook scripts that the app's repository settings → Hooks pane edits, so a headless host can set them without the GUI. Pass any of `--setup "<cmd>"`, `--archive "<cmd>"`, `--setup-policy ask|run-by-default|skip-by-default`, `--clear-setup`, or `--clear-archive`; at least one is required. The verb merges into the stored `hookSettings`, so a script or policy you leave out keeps its value. `--json` prints the stored `hookSettings` after the write, and `orca repo show --repo … --json` carries the same object.
 
 ## Worktrees
 

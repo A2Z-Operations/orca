@@ -33,6 +33,31 @@ export const REPO_COMMAND_SPECS: CommandSpec[] = [
     examples: ['orca repo set --repo path:/path/to/repo --external-worktree-visibility show --json']
   },
   {
+    path: ['repo', 'set-hooks'],
+    summary: 'Bind the setup and archive hook scripts for a repo without the app',
+    usage:
+      'orca repo set-hooks --repo <selector> [--setup "<cmd>"] [--archive "<cmd>"] [--setup-policy ask|run-by-default|skip-by-default] [--clear-setup] [--clear-archive] [--json]',
+    allowedFlags: [
+      ...GLOBAL_FLAGS,
+      'repo',
+      'setup',
+      'archive',
+      'setup-policy',
+      'clear-setup',
+      'clear-archive'
+    ],
+    notes: [
+      'Requires at least one of --setup, --archive, --setup-policy, --clear-setup, or --clear-archive.',
+      'Merges into the stored hookSettings: a script or policy you leave out keeps its current value.',
+      'The setup script runs after a worktree is created; the archive script runs before a worktree is archived or removed.',
+      '--json prints the stored hookSettings after the write; orca repo show --json carries the same object.'
+    ],
+    examples: [
+      'orca repo set-hooks --repo path:/path/to/repo --setup "bash scripts/orca-setup.sh" --archive "bash scripts/orca-archive.sh" --setup-policy run-by-default --json',
+      'orca repo set-hooks --repo id:<repoId> --clear-archive --json'
+    ]
+  },
+  {
     path: ['repo', 'set-base-ref'],
     summary: "Set the repo's default base ref for future worktrees",
     usage: 'orca repo set-base-ref --repo <selector> --ref <ref> [--json]',
