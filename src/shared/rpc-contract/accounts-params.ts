@@ -58,14 +58,16 @@ export const SetClaudeModelPolicyParams = z
   .object({
     enabled: z.boolean().optional(),
     fableLine: z.number().min(1).max(100).optional(),
-    weeklyGuard: z.number().min(1).max(100).optional()
+    weeklyGuard: z.number().min(1).max(100).optional(),
+    coversExplicit: z.boolean().optional()
   })
   .refine(
     (value) =>
       value.enabled !== undefined ||
       value.fableLine !== undefined ||
-      value.weeklyGuard !== undefined,
-    { message: 'Set enabled, fableLine, or weeklyGuard.' }
+      value.weeklyGuard !== undefined ||
+      value.coversExplicit !== undefined,
+    { message: 'Set enabled, fableLine, weeklyGuard, or coversExplicit.' }
   )
 
 /** Tell the execution host which account a live pane's proxy slot bills. configDir is required on a WSL guest. */

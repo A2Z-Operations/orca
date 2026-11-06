@@ -25,11 +25,14 @@ export function applyClaudeModelFlip(flip: ClaudeModelPolicyFlip): void {
     kind: 'model',
     ...(strategy ? { strategy } : {})
   })
-  publishClaudeAccountModelChanged({
-    ptyId: flip.ptyId,
-    accountId: flip.accountId,
-    from: flip.from,
-    to: flip.to,
-    reason: flip.reason
-  })
+  // The plugin contract names two models. A takeover from an unrecorded model is not a change it can name.
+  if (flip.from !== 'unset') {
+    publishClaudeAccountModelChanged({
+      ptyId: flip.ptyId,
+      accountId: flip.accountId,
+      from: flip.from,
+      to: flip.to,
+      reason: flip.reason
+    })
+  }
 }

@@ -9,7 +9,7 @@ export type ClaudeModelFlipRecord = {
   ptyId: string
   paneKey: string | null
   accountId: string
-  from: ClaudePolicyModel
+  from: ClaudePolicyModel | 'unset'
   to: ClaudePolicyModel
   reason: string
   at: number

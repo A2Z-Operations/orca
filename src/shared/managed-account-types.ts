@@ -186,7 +186,13 @@ export type ClaudeRateLimitAccountsState = {
     unavailable?: string
   }[]
   /** Spend Fable first, then Opus. Absent from older hosts. */
-  modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
+  modelPolicy?: {
+    enabled: boolean
+    fableLine: number
+    weeklyGuard: number
+    /** Explicit-model sessions follow the policy too. Absent from older hosts means off. */
+    coversExplicit?: boolean
+  }
   /** Last model-policy pass per live pane. Absent from older hosts and when none has run. */
   modelPolicyEvaluations?: ClaudeModelPolicyEvaluation[]
   /** Auth-proxy trouble since the listener started. Absent from older hosts and with no listener. */

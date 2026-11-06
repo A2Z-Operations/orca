@@ -127,7 +127,11 @@ export function createProviderClaudeSessionMover(
     subscribe: (listener) => rateLimits.onStateChange(() => listener()),
     subscribeSettings: (listener) =>
       store.onSettingsChanged((updates) => {
-        if (updates && !('claudeModelPolicy' in updates)) {
+        if (
+          updates &&
+          !('claudeModelPolicy' in updates) &&
+          !('claudeModelPolicyCoversExplicit' in updates)
+        ) {
           return
         }
         listener()

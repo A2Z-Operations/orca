@@ -21396,7 +21396,10 @@
       },
       "modelPolicy": {
         "settingTitle": "Spend Fable first",
-        "settingDescription": "Run Fable while its window is under {{fable}}% and the weekly window is under {{weekly}}%. Otherwise run Opus 5.5. A running session switches without a restart."
+        "settingDescription": "Run Fable while its window is under {{fable}}% and the weekly window is under {{weekly}}%. Otherwise run Opus 5.5. A running session switches without a restart.",
+        "coversExplicitTitle": "Also switch sessions launched with a fixed model",
+        "coversExplicitDescription": "A session started with --model or ANTHROPIC_MODEL set to Fable or Opus follows the same lines. Other models are never switched.",
+        "fixedModelSessions": "{{count}} live sessions were launched with a fixed model."
       }
     },
     "managedData": {

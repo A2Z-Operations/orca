@@ -3,6 +3,7 @@ import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-ac
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
 import { ClaudeAccountPoolSetting } from './claude-account-pool-setting'
 import { ClaudeModelPolicySetting } from './claude-model-policy-setting'
+import { ClaudeModelPolicyCoversExplicitSetting } from './claude-model-policy-covers-explicit-setting'
 import { ClaudeAuthProxySetting } from './claude-auth-proxy-setting'
 import { ClaudeSessionMoverSetting } from './claude-session-mover-setting'
 import { ClaudeRecentMoves } from './claude-recent-moves'
@@ -30,6 +31,11 @@ export function ClaudeAccountBehaviorSettings({
           <ClaudeSessionMoverSetting settings={settings} updateSettings={updateSettings} />
           <ClaudeAccountPoolSetting settings={settings} updateSettings={updateSettings} />
           <ClaudeModelPolicySetting settings={settings} updateSettings={updateSettings} />
+          <ClaudeModelPolicyCoversExplicitSetting
+            settings={settings}
+            updateSettings={updateSettings}
+            evaluations={accounts.modelPolicyEvaluations}
+          />
           <ClaudeAuthProxySetting
             settings={settings}
             updateSettings={updateSettings}

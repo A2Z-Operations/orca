@@ -90,4 +90,39 @@ describe('account model-policy status', () => {
       evaluations: []
     })
   })
+
+  it('writes covers-explicit=on|off and prints it on the policy line', async () => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    callMock.mockResolvedValue({
+      id: 'test',
+      ok: true,
+      result: {
+        accounts: [],
+        activeAccountId: null,
+        modelPolicy: { enabled: true, fableLine: 90, weeklyGuard: 91, coversExplicit: true }
+      },
+      _meta: { runtimeId: 'test-runtime' }
+    })
+    await ACCOUNT_HANDLERS['account model-policy'](
+      context([
+        ['agent', 'claude'],
+        ['set', 'covers-explicit=on,fable-line=80']
+      ])
+    )
+    expect(callMock).toHaveBeenCalledWith('accounts.setClaudeModelPolicy', {
+      coversExplicit: true,
+      fableLine: 80
+    })
+    expect(String(logSpy.mock.calls[0]?.[0])).toBe(
+      'model-policy: on (fable<90, weekly<91, covers explicit --model)'
+    )
+    await expect(
+      ACCOUNT_HANDLERS['account model-policy'](
+        context([
+          ['agent', 'claude'],
+          ['set', 'covers-explicit=maybe']
+        ])
+      )
+    ).rejects.toThrow('covers-explicit must be on or off')
+  })
 })
