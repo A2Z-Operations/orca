@@ -5,8 +5,14 @@ type UsageAccount = { id: string; runsOnSystemDefault?: true }
 
 export type ClaudeUsageWindowRow = {
   accountId: string
+  /** 5-hour window percent. Null when not readable. */
+  session: number | null
   weekly: number | null
   fable: number | null
+  /** When the reading was taken. Null when there is none. */
+  readAt: number | null
+  /** `selected`: the active reading. `cached`: the inactive-account cache. */
+  source: 'selected' | 'cached' | null
   /** Why the percent is blank. Omitted when the window was simply not read yet. */
   unavailable?: string
 }
@@ -49,7 +55,11 @@ export function claudeUsageWindowUnavailable(
   return undefined
 }
 
-type UsageReading = { rateLimits: ProviderRateLimits | null; updatedAt: number }
+type UsageReading = {
+  rateLimits: ProviderRateLimits | null
+  updatedAt: number
+  source?: 'selected' | 'cached'
+}
 
 /** The selected account uses the active reading. Every other account uses the inactive cache. */
 export function claudeAccountUsageReading(input: {
@@ -63,10 +73,16 @@ export function claudeAccountUsageReading(input: {
     input.selectedLimits &&
     isClaudeUsageReadingOf(input.selectedLimits, input.account)
   ) {
-    return { rateLimits: input.selectedLimits, updatedAt: input.selectedLimits.updatedAt }
+    return {
+      rateLimits: input.selectedLimits,
+      updatedAt: input.selectedLimits.updatedAt,
+      source: 'selected'
+    }
   }
   const inactive = input.inactiveAccounts.find((row) => row.accountId === input.account.id)
-  return inactive ? { rateLimits: inactive.rateLimits, updatedAt: inactive.updatedAt } : null
+  return inactive
+    ? { rateLimits: inactive.rateLimits, updatedAt: inactive.updatedAt, source: 'cached' }
+    : null
 }
 
 export function claudeAccountUsageWindows(input: {
@@ -86,8 +102,11 @@ export function claudeAccountUsageWindows(input: {
     const unavailable = claudeUsageWindowUnavailable(reading?.rateLimits)
     return {
       accountId: account.id,
+      session: limits?.session ? limits.session.usedPercent : null,
       weekly: limits?.weekly ? limits.weekly.usedPercent : null,
       fable: limits?.fableWeekly ? limits.fableWeekly.usedPercent : null,
+      readAt: reading && reading.updatedAt > 0 ? reading.updatedAt : null,
+      source: reading?.source ?? null,
       ...(unavailable ? { unavailable } : {})
     }
   })

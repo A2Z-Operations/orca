@@ -2,6 +2,11 @@ import type { HandlerContext } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type { ClaudeRateLimitAccountsState } from '../../shared/managed-account-types'
+import {
+  claudeSessionMoverStatus,
+  printClaudeStatus,
+  readClaudeAccountsState
+} from './account-claude-status'
 
 const SETTINGS: readonly ClaudeSessionMoverSetting[] = ['off', 'ask', 'move']
 
@@ -21,8 +26,25 @@ export async function setClaudeSessionMover(ctx: HandlerContext): Promise<void> 
     )
   }
   const picked = SETTINGS.filter((setting) => ctx.flags.get(setting) === true)
-  if (picked.length !== 1) {
-    throw new RuntimeClientError('invalid_argument', 'Pass exactly one of --off, --ask or --move.')
+  const status = ctx.flags.get('status') === true
+  if (picked.length + Number(status) !== 1) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Pass exactly one of --off, --ask, --move, or --status.'
+    )
+  }
+  if (status) {
+    const view = claudeSessionMoverStatus(await readClaudeAccountsState(ctx))
+    const reasons = Object.entries(view.reasons)
+      .sort((left, right) => right[1] - left[1])
+      .map(([reason, count]) => `${reason} ${count}`)
+    printClaudeStatus(ctx, view, [
+      `Claude session-mover: ${view.sessionMover}`,
+      `  sessions: ${view.sessions} (proxy ${view.strategies.proxy}, resume ${view.strategies.resume})`,
+      `  last decisions: ${reasons.length > 0 ? reasons.join(', ') : 'none'}`,
+      `  model flips: ${view.modelFlips}`
+    ])
+    return
   }
   const result = await ctx.client.call<ClaudeRateLimitAccountsState>(
     'accounts.setClaudeSessionMover',

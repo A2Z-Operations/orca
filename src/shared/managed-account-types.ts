@@ -181,8 +181,14 @@ export type ClaudeRateLimitAccountsState = {
   /** Weekly and Fable percents. Absent from older hosts. Null means that window was not readable. `unavailable` names why. */
   usageWindows?: {
     accountId: string
+    /** 5-hour percent. Absent from older hosts. */
+    session?: number | null
     weekly: number | null
     fable: number | null
+    /** When the reading was taken. Absent from older hosts. */
+    readAt?: number | null
+    /** `selected`: the active reading. `cached`: the inactive-account cache. Absent from older hosts. */
+    source?: 'selected' | 'cached' | null
     unavailable?: string
   }[]
   /** Spend Fable first, then Opus. Absent from older hosts. */

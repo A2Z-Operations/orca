@@ -25,6 +25,8 @@ function reading(accountId: string, weekly: number, fable: number): ProviderRate
   }
 }
 
+const blank = { session: null, weekly: null, fable: null, readAt: null, source: null }
+
 describe('claudeAccountUsageWindows', () => {
   it('reads the active account from the selected reading and inactive accounts from the cache', () => {
     const rows = claudeAccountUsageWindows({
@@ -41,8 +43,8 @@ describe('claudeAccountUsageWindows', () => {
       ]
     })
     expect(rows).toEqual([
-      { accountId: 'active', weekly: 64, fable: 63 },
-      { accountId: 'idle', weekly: 12, fable: 8 }
+      { accountId: 'active', session: 1, weekly: 64, fable: 63, readAt: 1, source: 'selected' },
+      { accountId: 'idle', session: 1, weekly: 12, fable: 8, readAt: 2, source: 'cached' }
     ])
   })
 
@@ -53,7 +55,9 @@ describe('claudeAccountUsageWindows', () => {
       selectedLimits: reading('active', 64, 63),
       inactiveAccounts: []
     })
-    expect(rows).toEqual([{ accountId: 'idle', weekly: null, fable: null }])
+    expect(rows).toEqual([
+      { accountId: 'idle', session: null, weekly: null, fable: null, readAt: null, source: null }
+    ])
   })
 
   it('names a keychain denial and an http failure instead of a blank window', () => {
@@ -94,10 +98,16 @@ describe('claudeAccountUsageWindows', () => {
       ]
     })
     expect(rows).toEqual([
-      { accountId: 'keychain', weekly: null, fable: null, unavailable: 'keychain denied' },
-      { accountId: 'http', weekly: null, fable: null, unavailable: '401' },
-      { accountId: 'login', weekly: null, fable: null, unavailable: 'sign in again' },
-      { accountId: 'unread', weekly: null, fable: null }
+      {
+        ...blank,
+        readAt: 1,
+        source: 'cached',
+        accountId: 'keychain',
+        unavailable: 'keychain denied'
+      },
+      { ...blank, readAt: 1, source: 'cached', accountId: 'http', unavailable: '401' },
+      { ...blank, readAt: 1, source: 'cached', accountId: 'login', unavailable: 'sign in again' },
+      { ...blank, accountId: 'unread' }
     ])
   })
 })
