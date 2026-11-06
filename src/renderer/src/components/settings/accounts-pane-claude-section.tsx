@@ -392,6 +392,7 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
         settings={settings}
         updateSettings={updateSettings}
         accounts={claudeAccounts}
+        owner={accountOwner}
         showHostSettings={!isRemoteAccountScope}
       />
     </section>

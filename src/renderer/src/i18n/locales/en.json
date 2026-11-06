@@ -21400,6 +21400,61 @@
         "coversExplicitTitle": "Also switch sessions launched with a fixed model",
         "coversExplicitDescription": "A session started with --model or ANTHROPIC_MODEL set to Fable or Opus follows the same lines. Other models are never switched.",
         "fixedModelSessions": "{{count}} live sessions were launched with a fixed model."
+      },
+      "recentMoves": {
+        "decision": {
+          "underLine": "Stayed: under the line",
+          "noTarget": "Stayed: no account under the line",
+          "cooldown": "Stayed: moved recently",
+          "failedRecently": "Stayed: a move failed recently",
+          "promptCache": "Stayed: turn just ended",
+          "noUsage": "Stayed: no usage reading",
+          "stay": "Stayed",
+          "off": "Mover is off",
+          "pinned": "Pinned",
+          "readUsage": "Reading usage",
+          "waitMidTurn": "Waiting: mid-turn",
+          "waitNoStatus": "Waiting: no status yet",
+          "waitBackgroundWork": "Waiting: background work",
+          "ask": "Asked to move",
+          "moving": "Moving",
+          "failed": "Move failed",
+          "skipped": "Move skipped",
+          "rebalance": "Moved to balance accounts",
+          "flip": "Switched model: {{from}} → {{to}} ({{why}})",
+          "movedProxy": "Moved (no restart)",
+          "movedResume": "Moved (restarted)",
+          "other": "{{reason}}"
+        },
+        "viaProxy": "proxy",
+        "viaRestart": "restart",
+        "when": "When",
+        "session": "Session",
+        "account": "Account",
+        "model": "Model",
+        "decisionColumn": "Decision",
+        "via": "Via",
+        "group": "{{count}} sessions stayed on {{email}} — {{decision}}",
+        "filterAll": "All",
+        "filterMoves": "Moves",
+        "filterFlips": "Flips",
+        "filterStays": "Stays",
+        "search": "Search session or email",
+        "loadOlder": "Load older",
+        "loadFailed": "Could not read the account log.",
+        "count": "{{count}} rows",
+        "description": "What the mover and the model policy decided for each Claude session, newest first."
+      },
+      "usageStrip": {
+        "state": {
+          "ok": "ok",
+          "nearLine": "near line",
+          "atLine": "at line",
+          "signIn": "sign-in needed",
+          "refreshing": "refreshing",
+          "unreadable": "unreadable"
+        },
+        "title": "Accounts"
       }
     },
     "managedData": {

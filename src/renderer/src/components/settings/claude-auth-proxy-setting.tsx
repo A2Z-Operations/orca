@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { claudeAuthProxyEnabled } from '../../../../shared/claude-account-switch-settings'
 import { claudeAuthProxyHealthView } from '../../../../shared/claude-auth-proxy-health'
 import { formatClaudeRelativeAge } from '../../../../shared/claude-relative-age'
@@ -9,16 +8,7 @@ import { cn } from '@/lib/utils'
 import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
 import { SearchableSetting } from './SearchableSetting'
-
-/** Wall clock for "9 minutes ago", refreshed every 30 s while the row is mounted. */
-function useHalfMinuteClock(): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000)
-    return () => clearInterval(timer)
-  }, [])
-  return now
-}
+import { useHalfMinuteClock } from './use-half-minute-clock'
 
 function ClaudeAuthProxyHealthLine({
   health,

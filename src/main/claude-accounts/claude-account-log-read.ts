@@ -39,9 +39,9 @@ function parseLines(raw: string): ClaudeAccountLogEntry[] {
   return entries
 }
 
-/** Oldest first, at or after `since`, the newest `limit` rows across the rotated files. */
+/** Oldest first, at or after `since` and before `before`, the newest `limit` rows across the rotated files. */
 export function readClaudeAccountLog(
-  options: { since?: number; limit?: number; filePath?: string } = {}
+  options: { since?: number; before?: number; limit?: number; filePath?: string } = {}
 ): { path: string; entries: ClaudeAccountLogEntry[] } {
   const path = options.filePath ?? claudeAccountLogPath()
   const limit = Math.min(
@@ -49,6 +49,7 @@ export function readClaudeAccountLog(
     CLAUDE_ACCOUNT_LOG_READ_MAX_LIMIT
   )
   const since = options.since ?? 0
+  const before = options.before ?? Number.POSITIVE_INFINITY
   const entries: ClaudeAccountLogEntry[] = []
   for (const file of listRotatedFiles(path, CLAUDE_ACCOUNT_LOG_MAX_FILES)) {
     let raw: string
@@ -57,7 +58,7 @@ export function readClaudeAccountLog(
     } catch {
       continue
     }
-    entries.push(...parseLines(raw).filter((entry) => entry.at >= since))
+    entries.push(...parseLines(raw).filter((entry) => entry.at >= since && entry.at < before))
   }
   entries.sort((left, right) => left.at - right.at)
   return { path, entries: entries.slice(-limit) }

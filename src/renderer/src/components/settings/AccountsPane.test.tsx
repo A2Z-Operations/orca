@@ -343,7 +343,7 @@ describe('Claude accounts section', () => {
     expect(render({ accounts }, {}, remote)).not.toContain('Switch accounts before a usage limit')
   })
 
-  it('lists recent session moves with the same rows as orca account moves', () => {
+  it('lists recent session moves as a table in plain words, raw ids only in tooltips', () => {
     expect(render({})).not.toContain('Recent moves')
     expect(render({ sessionMoves: [] })).toContain('No Claude session moves.')
     const markup = render(
@@ -367,8 +367,11 @@ describe('Claude accounts section', () => {
       { isRemoteAccountScope: true }
     )
     expect(markup).toContain('Recent moves')
-    expect(markup).toContain(
-      '2026-10-29T15:04:05.000Z  tab-1:leaf-1  acct-a → acct-b  moved  proxy'
-    )
+    expect(markup).toContain('title="2026-10-29T15:04:05.000Z"')
+    expect(markup).toContain('title="pane tab-1:leaf-1 · pty pty-new"')
+    expect(markup).toContain('Session ptynew')
+    expect(markup).toContain('acct-a → acct-b')
+    expect(markup).toContain('Moved (no restart)')
+    expect(markup).not.toContain('2026-10-29T15:04:05.000Z  tab-1:leaf-1')
   })
 })

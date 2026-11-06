@@ -34,7 +34,8 @@ export const claudeAccountLogMethod = defineMethod({
   name: 'accounts.claudeAccountLog',
   permission: 'accounts-admin',
   params: ClaudeAccountLogParams,
-  handler: async (params) => readClaudeAccountLog({ since: params.since, limit: params.limit })
+  handler: async (params) =>
+    readClaudeAccountLog({ since: params.since, before: params.before, limit: params.limit })
 })
 
 export const claudeAccountSettingMethods = [

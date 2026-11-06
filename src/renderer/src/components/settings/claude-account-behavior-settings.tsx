@@ -1,5 +1,6 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
 import { ClaudeAccountPoolSetting } from './claude-account-pool-setting'
 import { ClaudeModelPolicySetting } from './claude-model-policy-setting'
@@ -16,11 +17,14 @@ export function ClaudeAccountBehaviorSettings({
   settings,
   updateSettings,
   accounts,
+  owner,
   showHostSettings
 }: {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
   accounts: ClaudeRateLimitAccountsState
+  /** The runtime listed here; the recent-moves table reads its account log. */
+  owner: RuntimeClientTarget
   showHostSettings: boolean
 }): React.JSX.Element {
   return (
@@ -43,7 +47,7 @@ export function ClaudeAccountBehaviorSettings({
           />
         </>
       ) : null}
-      <ClaudeRecentMoves moves={accounts.sessionMoves} />
+      <ClaudeRecentMoves accounts={accounts} owner={owner} />
     </>
   )
 }
