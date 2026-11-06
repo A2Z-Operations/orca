@@ -18,11 +18,18 @@ describe('account auth-proxy surface', () => {
     }
   }
 
+  const NOW = Date.UTC(2026, 10, 6, 12, 0, 0)
+
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
     callMock.mockReset()
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
   })
-  afterEach(() => logSpy.mockRestore())
+  afterEach(() => {
+    logSpy.mockRestore()
+    vi.useRealTimers()
+  })
 
   it('sets the proxy through accounts.setClaudeAuthProxy and prints it', async () => {
     callMock.mockResolvedValue({
@@ -143,7 +150,7 @@ describe('account auth-proxy surface', () => {
       requestsLastHour: [],
       unknownSlotRequests: 0,
       lastError: {
-        at: Date.now() - 12 * 60_000,
+        at: NOW - 12 * 60_000,
         method: 'POST',
         path: '/v1/messages',
         status: 429,

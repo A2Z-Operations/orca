@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { ClaudeSessionMoveSummary } from '../../../../shared/managed-account-types'
 import { useAppStore, type AppState } from '../../store'
+import { selectWorktreesByRepo } from '../../store/workspace-record-selectors'
 
 export type ClaudeMoveTabName = { title: string; worktree: string | null }
 
@@ -60,7 +61,7 @@ export function useClaudeMoveTabNames(): ReadonlyMap<string, ClaudeMoveTabName> 
   const tabsByWorktree =
     useAppStore((s): AppState['tabsByWorktree'] | undefined => s.tabsByWorktree) ?? NONE
   const worktreesByRepo =
-    useAppStore((s): AppState['worktreesByRepo'] | undefined => s.worktreesByRepo) ?? NONE
+    useAppStore((s): AppState['worktreesByRepo'] | undefined => selectWorktreesByRepo(s)) ?? NONE
   return useMemo(
     () => claudeMoveTabNames(tabsByWorktree, worktreesByRepo),
     [tabsByWorktree, worktreesByRepo]

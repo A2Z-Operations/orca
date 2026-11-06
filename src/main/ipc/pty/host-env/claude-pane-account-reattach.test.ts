@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   _internals,
-  getClaudePaneAccount
+  getClaudePaneAccount,
+  recordClaudePaneAccount
 } from '../../../claude-accounts/claude-pane-account-registry'
 import {
   installClaudePaneAccountPersistence,
@@ -77,7 +78,7 @@ function persistedRow(overrides: Partial<PersistedClaudePaneAccount> = {}) {
 
 function reattach(
   proxy: ReattachSlotProxy | null,
-  readBaseUrl: (pid: number | null | undefined) => string | null = () => null
+  readBaseUrl: (pid: number | null | undefined) => Promise<string | null> = async () => null
 ): void {
   recordClaudePaneAccountForSpawn({
     ptyId: 'pty-1',
@@ -168,18 +169,40 @@ describe('reattach keeps the proxy slot', () => {
     expect(getClaudePaneAccount('pty-1')?.proxySlot).toBeUndefined()
   })
 
-  it('without a persisted row, falls back to the slot in the process environment', () => {
+  it('without a persisted row, falls back to the slot in the process environment', async () => {
     const proxy = fakeProxy(4100, { [SLOT]: 'c' })
     const readBaseUrl = vi.fn(
-      (_pid: number | null | undefined) => `http://127.0.0.1:4100/p/${SLOT}/`
+      async (_pid: number | null | undefined) => `http://127.0.0.1:4100/p/${SLOT}/`
     )
     reattach(proxy, readBaseUrl)
     expect(readBaseUrl).toHaveBeenCalledWith(4242)
-    expect(getClaudePaneAccount('pty-1')).toMatchObject({ accountId: 'c', proxySlot: SLOT })
+    // The row is recorded at once; the slot arrives when the environment read lands.
+    expect(getClaudePaneAccount('pty-1')).toMatchObject({ accountId: 'c' })
+    expect(getClaudePaneAccount('pty-1')?.proxySlot).toBeUndefined()
+    await vi.waitFor(() =>
+      expect(getClaudePaneAccount('pty-1')).toMatchObject({ accountId: 'c', proxySlot: SLOT })
+    )
   })
 
-  it('ignores the slot minted for the reattach itself', () => {
+  it('a slot read after the pane left or already has one does not overwrite it', async () => {
+    const proxy = fakeProxy(4100, { [SLOT]: 'c', other: 'c' })
+    let release: (url: string | null) => void = () => {}
+    const pending = new Promise<string | null>((resolve) => {
+      release = resolve
+    })
+    reattach(proxy, () => pending)
+    const recorded = getClaudePaneAccount('pty-1')
+    expect(recorded).not.toBeNull()
+    if (recorded) {
+      recordClaudePaneAccount({ ...recorded, proxySlot: 'other' })
+    }
+    release(`http://127.0.0.1:4100/p/${SLOT}/`)
+    await pending
+    expect(getClaudePaneAccount('pty-1')?.proxySlot).toBe('other')
+  })
+
+  it('ignores the slot minted for the reattach itself', async () => {
     reattach(fakeProxy(4100, { 'minted-for-this-reattach': 'c' }))
-    expect(getClaudePaneAccount('pty-1')?.proxySlot).toBeUndefined()
+    await vi.waitFor(() => expect(getClaudePaneAccount('pty-1')?.proxySlot).toBeUndefined())
   })
 })

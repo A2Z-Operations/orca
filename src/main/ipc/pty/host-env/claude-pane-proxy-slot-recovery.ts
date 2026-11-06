@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { runProcess } from '@orca/process-host'
 import {
   claudeAuthProxySlotId,
   claudeAuthProxySlotPort
@@ -47,29 +47,37 @@ export function proxySlotFromUrl(url: string | undefined | null): RecoveredProxy
 
 const BASE_URL_IN_ENV = /(?:^|[\s\0])ANTHROPIC_BASE_URL=(\S+?)(?=[\s\0]|$)/
 
+/** Environment block of a live process this user owns; '' where the platform offers none. */
+async function readProcessEnvironment(pid: number, platform: NodeJS.Platform): Promise<string> {
+  if (platform === 'linux') {
+    return readFile(`/proc/${pid}/environ`, 'utf8')
+  }
+  if (platform !== 'darwin') {
+    return ''
+  }
+  const result = await runProcess({
+    program: '/bin/ps',
+    args: ['-wwE', '-o', 'command=', '-p', String(pid)],
+    timeoutMs: 1_000,
+    maxOutputBytes: 256 * 1024
+  })
+  return result.code === 0 ? result.stdout : ''
+}
+
 /**
  * `ANTHROPIC_BASE_URL` of a live process this user owns, read without a shell: `/proc/<pid>/environ`
  * on Linux, `ps -E` on macOS. Null on Windows, on a denied read, or when the variable is absent.
+ * Asynchronous so a reattach never blocks the main thread on `ps`.
  */
-export function readProcessAnthropicBaseUrl(
+export async function readProcessAnthropicBaseUrl(
   pid: number | null | undefined,
   platform: NodeJS.Platform = process.platform
-): string | null {
+): Promise<string | null> {
   if (!pid || !Number.isInteger(pid) || pid <= 1) {
     return null
   }
   try {
-    const env =
-      platform === 'linux'
-        ? readFileSync(`/proc/${pid}/environ`, 'utf8')
-        : platform === 'darwin'
-          ? execFileSync('/bin/ps', ['-wwE', '-o', 'command=', '-p', String(pid)], {
-              encoding: 'utf8',
-              timeout: 1_000,
-              stdio: ['ignore', 'pipe', 'ignore']
-            })
-          : ''
-    return BASE_URL_IN_ENV.exec(env)?.[1] ?? null
+    return BASE_URL_IN_ENV.exec(await readProcessEnvironment(pid, platform))?.[1] ?? null
   } catch {
     return null
   }

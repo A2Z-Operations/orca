@@ -72,21 +72,35 @@ type ReattachSources = {
   /** Defaults to the live listener. Tests pass a fake. */
   proxy?: ReattachSlotProxy | null
   /** Defaults to reading the process environment. Tests pass a fake. */
-  readBaseUrl?: (pid: number | null | undefined) => string | null
+  readBaseUrl?: (pid: number | null | undefined) => Promise<string | null>
 }
 
 function reattachProxy(sources: ReattachSources): ReattachSlotProxy | null {
   return sources.proxy === undefined ? getClaudeAuthProxy() : sources.proxy
 }
 
-/** The slot a reattached process still carries, read from its environment. */
-function slotFromProcessEnv(sources: ReattachSources, accountId: string): string | undefined {
+/**
+ * The slot a reattached process still carries, read from its environment once the read lands. The
+ * row is already recorded without a slot; a pane evaluated in between resumes, as before this fix.
+ * A row that gained a slot or vanished meanwhile is left alone.
+ */
+function adoptSlotFromProcessEnv(sources: ReattachSources, ptyId: string, accountId: string): void {
   const read = sources.readBaseUrl ?? readProcessAnthropicBaseUrl
-  return recoverReattachedProxySlot({
-    recovered: proxySlotFromUrl(read(sources.pid)),
-    accountId,
-    proxy: reattachProxy(sources)
-  })
+  void read(sources.pid).then(
+    (url) => {
+      const slot = recoverReattachedProxySlot({
+        recovered: proxySlotFromUrl(url),
+        accountId,
+        proxy: reattachProxy(sources)
+      })
+      const current = getClaudePaneAccount(ptyId)
+      if (!slot || !current || current.proxySlot) {
+        return
+      }
+      recordClaudePaneAccount({ ...current, proxySlot: slot, assignedAccountId: accountId })
+    },
+    () => {}
+  )
 }
 
 /**
@@ -108,12 +122,15 @@ function recordReattachedFromPersisted(
         accountId: billed,
         proxy: reattachProxy(args)
       })
-    : slotFromProcessEnv(args, billed)
+    : undefined
   recordClaudePaneAccount({
     ...row,
     paneKey: args.paneKey ?? row.paneKey,
     ...(slot ? { proxySlot: slot } : {})
   })
+  if (!proxySlot) {
+    adoptSlotFromProcessEnv(args, args.ptyId, billed)
+  }
   return true
 }
 
@@ -163,9 +180,7 @@ export function recordClaudePaneAccountForSpawn(
     return
   }
   // The slot minted for this reattach never reached the process; only the one it was born with counts.
-  const proxySlot = args.isReattach
-    ? slotFromProcessEnv(args, accountId)
-    : proxySlotFromBaseUrl(args.claudeAuth.envPatch)
+  const proxySlot = args.isReattach ? undefined : proxySlotFromBaseUrl(args.claudeAuth.envPatch)
   const pooled = args.claudeAuth.pooled === true
   recordClaudePaneAccount({
     ptyId: args.ptyId,
@@ -188,4 +203,7 @@ export function recordClaudePaneAccountForSpawn(
       ? { ...(proxySlot ? { proxySlot } : {}), assignedAccountId: accountId }
       : {})
   })
+  if (args.isReattach) {
+    adoptSlotFromProcessEnv(args, args.ptyId, accountId)
+  }
 }

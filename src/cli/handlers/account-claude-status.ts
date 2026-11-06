@@ -91,6 +91,16 @@ export function formatClaudeUsageLine(
   return `${email}  ${windows}  ${read}${source}${unavailable}`
 }
 
-export function printClaudeStatus(ctx: HandlerContext, value: object, lines: string[]): void {
+/** The `--status` views the three Claude switches print: as JSON with `--json`, else as lines. */
+export type ClaudeStatusView =
+  | ReturnType<typeof claudeAutoSwitchStatus>
+  | ReturnType<typeof claudeSessionMoverStatus>
+  | ReturnType<typeof claudePoolStatus>
+
+export function printClaudeStatus(
+  ctx: HandlerContext,
+  value: ClaudeStatusView,
+  lines: string[]
+): void {
   console.log(ctx.json ? JSON.stringify(value, null, 2) : lines.join('\n'))
 }

@@ -21454,7 +21454,12 @@
           "refreshing": "refreshing",
           "unreadable": "unreadable"
         },
-        "title": "Accounts"
+        "title": "Accounts",
+        "window": {
+          "session": "5h",
+          "weekly": "week",
+          "fable": "fable"
+        }
       }
     },
     "managedData": {

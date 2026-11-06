@@ -87,9 +87,20 @@ export function ClaudeAccountUsageStrip({
                 <span className="min-w-0 flex-1 truncate" title={account.email}>
                   {account.email}
                 </span>
-                <Bar label="5h" value={row?.session} />
-                <Bar label="week" value={row?.weekly} />
-                {typeof row?.fable === 'number' ? <Bar label="fable" value={row.fable} /> : null}
+                <Bar
+                  label={translate('accounts.claude.usageStrip.window.session', '5h')}
+                  value={row?.session}
+                />
+                <Bar
+                  label={translate('accounts.claude.usageStrip.window.weekly', 'week')}
+                  value={row?.weekly}
+                />
+                {typeof row?.fable === 'number' ? (
+                  <Bar
+                    label={translate('accounts.claude.usageStrip.window.fable', 'fable')}
+                    value={row.fable}
+                  />
+                ) : null}
                 <span className="w-24 text-[10px] text-muted-foreground">
                   {row?.readAt ? formatClaudeRelativeAge(Math.min(row.readAt, now), now) : '–'}
                 </span>
