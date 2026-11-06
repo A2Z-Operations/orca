@@ -23,6 +23,14 @@ export type ClaudeModelPolicyFlip = {
   at: number
 }
 
+/** A pane the policy covered whose setting turned off: it goes back to the model its launch fixed. */
+export type ClaudeModelPolicyUncover = {
+  ptyId: string
+  paneKey: string | null
+  accountId: string
+  at: number
+}
+
 export type ClaudeModelPolicyTicker = {
   /** One pass. The subscription calls this on each usage publish. */
   evaluate: () => ClaudeModelPolicyFlip[]
@@ -47,6 +55,7 @@ export function createClaudeModelPolicyTicker(deps: {
   /** Fires when `claudeModelPolicy` changes so a line edit does not wait for the next poll. */
   subscribeSettings?: (listener: () => void) => () => void
   apply: (flip: ClaudeModelPolicyFlip) => void
+  uncover: (pane: ClaudeModelPolicyUncover) => void
   onWarning?: (ptyId: string, warning: string) => void
   now?: () => number
 }): ClaudeModelPolicyTicker {
@@ -101,12 +110,18 @@ export function createClaudeModelPolicyTicker(deps: {
           `pty=${record.ptyId} pane=${record.paneKey ?? '-'} account=${accountId} model=${record.model ?? '-'} source=${record.modelSource ?? '-'} weekly=${windows.weekly} fable=${windows.fable} lines=${policy.fableLine}/${policy.weeklyGuard} choice=${choice ?? '-'} reason=${reason}${skip ? ` skip=${skip}` : ''}`
         )
       }
+      // Covered: a launch with its own --model or ANTHROPIC_MODEL follows the lines too.
+      const covered = policy.enabled && settings.claudeModelPolicyCoversExplicit === true
+      // Why: a covered pane keeps rewriting toward the policy's last choice until it is let go.
+      if (!covered && record.modelSource === 'policy' && record.launchModel) {
+        deps.uncover({ ptyId: record.ptyId, paneKey: record.paneKey, accountId, at: now })
+        note(null, 'uncovered', 'uncovered', { weekly: '-', fable: '-' })
+        continue
+      }
       if (!policy.enabled) {
         note(null, 'policy-off', 'policy-off', { weekly: '-', fable: '-' })
         continue
       }
-      // Covered: a launch with its own --model or ANTHROPIC_MODEL follows the lines too.
-      const covered = settings.claudeModelPolicyCoversExplicit === true
       if (record.modelSource !== 'policy' && !covered) {
         const skip = record.modelSource === 'pinned' ? 'pinned' : 'not-policy'
         note(null, skip, skip, { weekly: '-', fable: '-' })

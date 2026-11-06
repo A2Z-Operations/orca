@@ -54,17 +54,21 @@ const panes = [
   pane('unrecorded', {})
 ]
 
-function run(coversExplicit: boolean | undefined): ClaudeModelPolicyFlip[] {
+function run(
+  coversExplicit: boolean | undefined,
+  options: { panes?: ClaudePaneAccountRecord[]; uncover?: (ptyId: string) => void } = {}
+): ClaudeModelPolicyFlip[] {
   const ticker = createClaudeModelPolicyTicker({
     getSettings: () => ({
       claudeModelPolicy: { enabled: true, fableLine: 90, weeklyGuard: 91 },
       ...(coversExplicit === undefined ? {} : { claudeModelPolicyCoversExplicit: coversExplicit })
     }),
-    panes: () => panes,
+    panes: () => options.panes ?? panes,
     // Fable is over its line, so the policy wants Opus.
     usageFor: () => ({ rateLimits: limits(50, 95), updatedAt: NOW }),
     subscribe: () => () => {},
     apply: () => {},
+    uncover: (target) => options.uncover?.(target.ptyId),
     now: () => NOW
   })
   return ticker.evaluate()
@@ -92,6 +96,29 @@ describe('model policy covers explicit-model panes', () => {
     ])
     const sonnet = claudeModelPolicyEvaluations().find((row) => row.ptyId === 'explicit-sonnet')
     expect(sonnet?.skip).toBe('unrecognized-model')
+  })
+
+  it('off again uncovers a pane the policy took over; on keeps it under the lines', () => {
+    const covered = [
+      pane('covered', { model: 'opus', modelSource: 'policy', launchModel: 'fable' })
+    ]
+    const uncovered: string[] = []
+    const uncover = (ptyId: string) => uncovered.push(ptyId)
+    expect(run(true, { panes: covered, uncover })).toEqual([])
+    expect(uncovered).toEqual([])
+    expect(claudeModelPolicyEvaluations()[0]?.skip).toBe('same')
+    expect(run(false, { panes: covered, uncover })).toEqual([])
+    expect(run(undefined, { panes: covered, uncover })).toEqual([])
+    expect(uncovered).toEqual(['covered', 'covered'])
+    expect(claudeModelPolicyEvaluations()[0]).toMatchObject({
+      reason: 'uncovered',
+      skip: 'uncovered'
+    })
+    // A pane the policy chose for from launch has nothing to go back to.
+    expect(
+      run(false, { panes: [pane('policy', { model: 'opus', modelSource: 'policy' })], uncover })
+    ).toEqual([])
+    expect(uncovered).toHaveLength(2)
   })
 
   it('the settings patch writes the switch only when given, and keeps the lines', () => {

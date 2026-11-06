@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { inferClaudeAccountIdFromTranscript } from './claude-pane-account-registry'
-import { resolveClaudeAccountHome } from './claude-account-home-attribution'
+import {
+  inferClaudeAccountIdFromTranscript,
+  resolveClaudeAccountHome
+} from './claude-account-home-attribution'
 
 const accounts = [{ id: 'b' }]
 const home = () => 'C:\\Users\\Owner\\Claude\\'

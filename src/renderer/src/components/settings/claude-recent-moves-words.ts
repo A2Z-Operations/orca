@@ -56,7 +56,8 @@ const FLIP_WHY: Record<string, string> = {
   'weekly-guard': 'weekly window at its guard',
   hysteresis: 'still near a line',
   'window-reset': 'a window reset',
-  'fable-headroom': 'Fable has room'
+  'fable-headroom': 'Fable has room',
+  uncovered: 'fixed model restored'
 }
 
 /** Plain words for the Decision column. Unknown reasons from newer hosts show as themselves. */

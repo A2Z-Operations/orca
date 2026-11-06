@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { inferClaudeAccountIdFromTranscript } from './claude-account-home-attribution'
 import { bindClaudeAuthProxySlotToPty } from './claude-auth-proxy/claude-auth-proxy-slot-owners'
 import {
   _internals,
@@ -7,7 +8,6 @@ import {
   claudeBillingAccountForPaneKey,
   forgetClaudePaneAccount,
   getClaudePaneAccount,
-  inferClaudeAccountIdFromTranscript,
   listClaudePaneAccounts,
   listClaudePaneAccountsByAccount,
   onClaudePaneAssigned,

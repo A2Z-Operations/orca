@@ -20,7 +20,10 @@ import {
 } from './claude-accounts/claude-session-move-strategy'
 import { claudeModelFlips } from './claude-accounts/claude-model-flip-history'
 import { createClaudeModelPolicyTicker } from './claude-accounts/claude-model-policy-ticker'
-import { applyClaudeModelFlip } from './claude-accounts/claude-model-flip-apply'
+import {
+  applyClaudeModelFlip,
+  uncoverClaudePaneModel
+} from './claude-accounts/claude-model-flip-apply'
 import {
   claudeAccountUsageReading,
   claudeAccountUsageWindows
@@ -137,6 +140,7 @@ export function createProviderClaudeSessionMover(
         listener()
       }),
     apply: applyClaudeModelFlip,
+    uncover: uncoverClaudePaneModel,
     onWarning: (ptyId, warning) => {
       console.warn(`[claude-model-policy] ${ptyId}: ${warning}`)
     }
