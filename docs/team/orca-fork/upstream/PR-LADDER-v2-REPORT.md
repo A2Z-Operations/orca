@@ -361,3 +361,82 @@ Still **CONFLICTING on all six** (#37567, #37569–#37573): upstream/main moved 
 #37569's body sentence "Stacked on the headless-polling PR" → "Stacked on #37567" was changed with `gh pr edit --body-file` (pre-approved for this task; the old body is kept in the task scratchpad). No comments were posted on any upstream PR or issue.
 
 **Land order: 0, B, C, D, F, E.** Standing rule unchanged: no further rebases on my own.
+
+## Rebase #6 onto `26741256dcc` (2026-11-06)
+
+Asked for once rebase #5's branches were CONFLICTING against an upstream/main that had moved on. All six were rebased in stack order **0 → B** and **0 → C → D → F → E** onto upstream/main `26741256dcc`, which is 101 commits past `480842c82a7`. They were force-pushed with explicit leases against the rebase #5 heads, and GitHub reports **MERGEABLE on all six** (#37567, #37569–#37573).
+
+**Push before full gates (decision).** I pushed once the targeted gates were green, before the two full gates finished. During rebase #5, upstream moved 94 commits while those gates ran and every PR conflicted again. The plan was a fix commit pushed with a lease on the affected branch if a full gate found a real regression; none did. Five hours after the push upstream had moved 6 more commits, and GitHub still showed all six MERGEABLE. No seventh rebase.
+
+Author and committer on every commit is Nachumi Eliyahu <nachumi@a2zoperations.com>, with no trailers. The forbidden-word grep of messages and diffs is empty, `git merge-tree` against `26741256dcc` is clean, stack ancestry is verified, and `pnpm-lock.yaml` is untouched. #37569's body already read "Stacked on #37567" and was not edited. Nothing was posted upstream.
+
+### New HEADs
+
+| PR  | branch                               | old HEAD      | new HEAD      | own diff vs parent   | own commits |
+| --- | ------------------------------------ | ------------- | ------------- | -------------------- | ----------- |
+| 0   | `pr/claude-pane-account-registry-v2` | `67ca11eec50` | `bc09ca7485b` | 88 files, +3734/−164 | 8           |
+| B   | `pr/idle-token-refresh`              | `ef5d9d35c25` | `a062912fddb` | 41 files, +3110/−16  | 3           |
+| C   | `pr/claude-auth-proxy`               | `201c5c5ba43` | `ae0df5704cb` | 68 files, +3075/−45  | 6           |
+| D   | `pr/claude-session-mover-proxy`      | `0eaa8d69d29` | `2c734004a52` | 89 files, +6434/−82  | 6           |
+| F   | `pr/claude-account-pool`             | `2cc838e29c3` | `efe10dececb` | 61 files, +1600/−135 | 2           |
+| E   | `pr/native-chat-account-coverage`    | `c8874dcd517` | `d6ebc616765` | 23 files, +1012/−31  | 2           |
+
+D went from 7 commits to 6: "Expect the main agent state on saved-roster status rows" only touched `agent-session-saved-roster.test.ts`, which upstream deleted, so the commit was skipped.
+
+### Conflicts resolved
+
+- **PR 0**
+  - `src/cli/handlers/account-list-format.ts`: upstream now prints each account's id, a `system  System default` line, and a new Antigravity formatter. Our per-account `sessions:` count and the `auto-switch:` and `pane …` lines sit on top of upstream's id lines.
+  - `src/cli/handlers/account.ts`: `account rm` calls upstream's `removeAgentAccount`. `account auto-switch` stays.
+  - `root-help-text-{primary,secondary}.ts`: upstream's `select` and `rm` lines are kept, and our auto-switch lines are added.
+  - Upstream's test sweep (#38943) deleted `claude-profile-usage.test.ts`, and our test case in it went too.
+  - `claude-profile-router-launch-env-for.test.ts`: the adapter import follows its move to `agent-session-wire/providers/`.
+- **PR 0, line budget.** Upstream left `global-settings-types.ts` and `agent-session-failure-words.ts` at exactly 300 counted lines.
+  - `claudeAutoSwitchEnabled` moved into `ClaudeAccountSwitchSettings` in `src/shared/claude-account-switch-settings.ts`, where B, C, D and F already keep their Claude switch settings. `GlobalSettings` still includes it through `GlobalSettingsBase`.
+  - The four plain Claude-account failure sentences (`claudeAccountFolderMissing` and `claudeAccountSetupFailed` from upstream, plus our `claudeAccountUnknown` and `claudeAccountWslUnsupported`) moved into a new `src/shared/agent-session/failures/claude-account-failure-words.ts`. It is spread into `FAILURE_SENTENCES`, and the object's `satisfies Record<AgentSessionFailureKind, Sentence>` check still covers them.
+  - Both changes are folded into PR 0's first commit, so PR 0 stays at 8 commits.
+- **B**
+  - `claude-account-switch-settings.ts`: keeps both `claudeAutoSwitchEnabled` and `claudeAccountTokenRefresh`.
+  - B's edits to the deleted `claude-profile-usage.test.ts` went with it. Its own `claude-active-usage-refresh.test.ts` and `claude-oauth-refresh.test.ts` still cover the refresh path.
+- **C**
+  - The same three spots as PR 0: the list-format lines (auth-proxy and WSL auth-proxy lines on top of upstream's), `account.ts` imports and handlers, and the switch settings.
+  - Upstream deleted `orcad-account-services.test.ts` (#38905), and C's case in it went too.
+- **D**
+  - `orcad-account-services.test.ts` (deleted upstream): D's polling-switch case went with it. `claude-usage-polling-policy.test.ts` still covers the viewer switch.
+  - The saved-roster commit was skipped, as noted above.
+- **F**: rebased with no conflicts.
+- **E**
+  - `claude-structured-session-close.ts`: the logger import follows its move to `agent-session-wire/host/`. `forgetStructuredClaudeSession` stays.
+  - `claude-structured-launch-home.ts`: the pre-spawn error import follows its move to `agent-session-wire/providers/`. Our pool, proxy and registry imports are kept.
+
+### Gates
+
+On each branch:
+
+- typecheck node, web and cli
+- targeted vitest: every changed test file, plus `src/main/rate-limits/**/*.test.ts` and `runtime-composition-parity.test.ts`
+- oxlint on changed files
+- `check-changed-code-quality.mjs upstream/main`
+
+The vitest counts are lower than in rebase #5 because upstream removed several thousand test cases between the two bases.
+
+| branch | typecheck node/web/cli | targeted vitest     | oxlint | quality |
+| ------ | ---------------------- | ------------------- | ------ | ------- |
+| 0      | 0/0/0                  | 53 files, 285 pass  | pass   | pass    |
+| B      | 0/0/0                  | 58 files, 321 pass  | pass   | pass    |
+| C      | 0/0/0                  | 66 files, 372 pass  | pass   | pass    |
+| D      | 0/0/0                  | 85 files, 501 pass  | pass   | pass    |
+| F      | 0/0/0                  | 90 files, 538 pass  | pass   | pass    |
+| E      | 0/0/0                  | 92 files, 550 pass  | pass   | pass    |
+
+The first PR 0 runs caught a stale import and two budget overruns: `global-settings-types.ts` at 301 lines and `agent-session-failure-words.ts` at 303. The fixes above were folded into commit 1, and the table shows the re-run.
+
+Full `check-changed.mjs --base=upstream/main --maxWorkers=2 --timeout=120` ran in parallel on the pushed SHAs. PR 0 `bc09ca7485b` took 68 min and E `d6ebc616765` took 68 min. Both had 29/30 checks pass, with "unit tests" the only ✗. Every unit failure is from the env-only list in earlier sections:
+
+- `persisted-profile-state.unit` ×2
+- `wsl-host-agent-launch-paths` ×5
+- `pty-claude-agent-view-readiness` ×1, on E only
+
+This round found no regressions.
+
+**Land order: 0, B, C, D, F, E.** Standing rule unchanged: no rebase on my own while GitHub shows the six as mergeable.
