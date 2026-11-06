@@ -27,7 +27,10 @@ CLI:
 ```sh
 orca account auto-switch --agent claude --on
 orca account auto-switch --agent claude --off
+orca account auto-switch --agent claude --status
 ```
+
+`--status` changes nothing. It prints the setting, the selected account, and how many accounts have a usage reading and how many are at a line.
 
 When the selected account passes a line, the next Claude you start uses the account with the most room left. Sessions that are already running are not moved by this setting. They follow **When you switch accounts while Claude is running** (ask, always restart, or never restart), the same as a switch by hand.
 
@@ -49,9 +52,19 @@ CLI:
 orca account session-mover --agent claude --off
 orca account session-mover --agent claude --ask
 orca account session-mover --agent claude --move
+orca account session-mover --agent claude --status
 orca account moves
 orca account moves --json
+orca account moves --log --since 2026-11-05T06:00:00Z
 ```
+
+`--status` prints the setting, live sessions by strategy, the last decisions counted by reason, and model flips.
+
+A session that stays records why: `under-line`, `no-target` (no account has more room), `cooldown`, `failed-recently`, `prompt-cache` (a proxy session whose turn just ended), `no-usage`, `off`, or `pinned`. A wait is `wait:mid-turn`, `wait:no-status`, or `wait:background-work`.
+
+`--log` reads the durable account log, `account-moves.log` in the Orca logs folder (ndjson, rotated at 10 MB, three files kept). It holds every change of a pane's decision, every settled move, each model flip, and auth-proxy requests on an unknown slot and upstream errors (status, method, path, account). It never holds tokens, headers, or bodies. Repeated proxy rows fold for a minute and carry a count.
+
+Settings › Accounts › Claude › Recent moves shows the same history as a table: when, the session's tab and workspace, the account, the model on a flip, the decision in words, and whether it went through the proxy or a restart. Stays from one tick fold into one line. Filters: All, Moves, Flips, Stays, a search box, and the Accounts strip above the table (each account's 5-hour, weekly, and Fable usage). "Load older" reads the log.
 
 `orca account moves` reads `claude.sessionMoves` from the runtime that owns the sessions. Each line is the time, the pane (or the pty when the pane key is absent), from, to, the reason, and the strategy (`resume` or `proxy`). A host that predates strategies prints `-`.
 
@@ -73,7 +86,9 @@ orca account auth-proxy --agent claude --status
 
 On: each Claude pane talks to a loopback proxy. The proxy sets the bearer for the account assigned to that pane, so a later request can use another account without restarting the process. Off: launches use `CLAUDE_CONFIG_DIR` only.
 
-A user-set `ANTHROPIC_BASE_URL` is left unchanged. Orca does not replace that URL with the proxy, and it says so once. `--status` prints the live listener (port, slot, account, requests in the last hour, last error) and does not change the setting.
+A user-set `ANTHROPIC_BASE_URL` is left unchanged. Orca does not replace that URL with the proxy, and it says so once. `--status` prints the live listener (port, slot, account, requests in the last hour, last error) and does not change the setting. A `!` marks requests from an unknown slot and an upstream error within the last hour; the Settings row shows the same two facts and turns amber.
+
+Restart: pane rows and the listener's port are kept in `claude-pane-accounts.json` under the app data folder. When Orca restarts while a Claude pane keeps running, the listener asks for its previous port and re-registers the slot that pane still carries, so the pane keeps billing through the proxy and the next move needs no restart. If the port is taken, the pane resumes on its next move instead.
 
 ## Account pool
 
@@ -86,7 +101,20 @@ orca account pool --agent claude --on
 orca account pool --agent claude --off
 ```
 
-On: a new Claude session starts on the signed-in account with the most room left. Off: launches use the selected account. `orca account list` shows `pool: on|off` and a session count on each account. The selected account stays what non-pooled launches and the status bar show.
+On: a new Claude session starts on the signed-in account with the most room left. Off: launches use the selected account. `orca account list` shows `pool: on|off` and a session count on each account. The selected account stays what non-pooled launches and the status bar show. `orca account pool --agent claude --status` prints the live sessions billed to each account.
+
+## Usage readings
+
+```sh
+orca account usage --agent claude
+orca account usage --agent claude --json
+```
+
+Each managed account's last reading: 5-hour, weekly, and Fable-weekly percent, how old it is, and whether it is the selected account's reading or the inactive-account cache. It does not start a fetch.
+
+## Model policy and fixed-model sessions
+
+A session launched with `--model` or `ANTHROPIC_MODEL` keeps its model. `orca account model-policy --agent claude --set covers-explicit=on` (Settings: "Also switch sessions launched with a fixed model", setting `claudeModelPolicyCoversExplicit`, default off) lets the policy switch such a session too when it runs Fable or Opus, and take over one that recorded no model. Another model, such as Sonnet, is never switched.
 
 ## Durable background jobs
 

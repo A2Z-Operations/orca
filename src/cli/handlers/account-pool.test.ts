@@ -54,7 +54,7 @@ describe('account pool surface', () => {
 
   it('needs exactly one of --on or --off and only --agent claude', async () => {
     await expect(ACCOUNT_HANDLERS['account pool'](context([]))).rejects.toThrow(
-      'exactly one of --on or --off'
+      'exactly one of --on, --off, or --status'
     )
     await expect(
       ACCOUNT_HANDLERS['account pool'](
@@ -63,7 +63,7 @@ describe('account pool surface', () => {
           ['off', true]
         ])
       )
-    ).rejects.toThrow('exactly one of --on or --off')
+    ).rejects.toThrow('exactly one of --on, --off, or --status')
     await expect(
       ACCOUNT_HANDLERS['account pool'](
         context([

@@ -50,12 +50,13 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     path: ['account', 'auto-switch'],
     summary: 'Turn automatic Claude account switching before a usage limit on or off',
     usage:
-      'orca account auto-switch --agent claude (--on | --off) [--environment <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off'],
+      'orca account auto-switch --agent claude (--on | --off | --status) [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off', 'status'],
     notes: [
       'Writes the host setting behind Settings › Accounts › Claude › "Switch accounts before a usage limit" (accounts.setClaudeAutoSwitch). Default on.',
       'With --environment the setting is written on that paired Orca server, whose accounts the switch then rotates.',
-      'Lines: 5-hour window 95 %, weekly and Fable-weekly windows 90 %; the switch applies to the next Claude started.'
+      'Lines: 5-hour window 95 %, weekly and Fable-weekly windows 90 %; the switch applies to the next Claude started.',
+      '--status reads accounts.list and changes nothing: the setting, the selected account, and how many accounts have a usage reading and how many are at a line.'
     ],
     examples: [
       'orca account auto-switch --agent claude --on',
@@ -66,12 +67,13 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     path: ['account', 'session-mover'],
     summary: 'Choose whether running Claude sessions move to another account before a usage limit',
     usage:
-      'orca account session-mover --agent claude (--off | --ask | --move) [--environment <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'off', 'ask', 'move'],
+      'orca account session-mover --agent claude (--off | --ask | --move | --status) [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'off', 'ask', 'move', 'status'],
     notes: [
       'Writes the host setting behind Settings › Accounts › Claude › "Move running sessions before a usage limit" (accounts.setClaudeSessionMover). Default move.',
       'move: a running session whose own account passes a line (5-hour 95 %, weekly or Fable-weekly 90 %) resumes between turns, in the same pane, on the account with the most room. ask: the desktop shows a notice instead; a headless server treats ask as move. off: never.',
-      'With --environment the setting is written on that paired Orca server, whose sessions it then governs. `orca account list --json` shows the last decision per live session under claude.sessionMoves.'
+      'With --environment the setting is written on that paired Orca server, whose sessions it then governs. `orca account list --json` shows the last decision per live session under claude.sessionMoves.',
+      '--status reads accounts.list and changes nothing: the setting, live sessions by strategy (proxy or resume), the last decisions counted by reason, and model flips.'
     ],
     examples: [
       'orca account session-mover --agent claude --move',
@@ -81,12 +83,14 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['account', 'pool'],
     summary: 'Spread new Claude sessions across signed-in accounts',
-    usage: 'orca account pool --agent claude (--on | --off) [--environment <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off'],
+    usage:
+      'orca account pool --agent claude (--on | --off | --status) [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off', 'status'],
     notes: [
       'Writes the host setting behind Settings › Accounts › Claude › "Spread sessions across accounts" (accounts.setClaudeAccountPool). Default on.',
       'On: a new Claude session starts on the signed-in account with the most room left. Off: launches use the selected account.',
-      'With --environment the setting is written on that paired Orca server. `orca account list` shows pool: on|off and sessions: <count> on each account.'
+      'With --environment the setting is written on that paired Orca server. `orca account list` shows pool: on|off and sessions: <count> on each account.',
+      '--status reads accounts.list and changes nothing: the setting and the live sessions billed to each account.'
     ],
     examples: [
       'orca account pool --agent claude --on',
@@ -97,32 +101,51 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     path: ['account', 'model-policy'],
     summary: 'Spend Fable while both weekly windows have room, otherwise Opus 5.5',
     usage:
-      'orca account model-policy --agent claude (--on | --off | --status | --set fable-line=<n> | --set weekly-guard=<n>) [--environment <selector>] [--json]',
+      'orca account model-policy --agent claude (--on | --off | --status | --set fable-line=<n> | --set weekly-guard=<n> | --set covers-explicit=on|off) [--environment <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'agent', 'on', 'off', 'status', 'set'],
     repeatableFlags: ['set'],
     notes: [
       'Writes claudeModelPolicy (accounts.setClaudeModelPolicy). Default on: Fable while Fable is under 90% and the regular weekly window is under 91%. Otherwise that account runs Opus 5.5.',
       '--set accepts fable-line and weekly-guard, repeated or comma-separated (fable-line=80,weekly-guard=85). Lines clamp to 1–100.',
+      'covers-explicit=on (claudeModelPolicyCoversExplicit) lets the policy also switch a session launched with --model or ANTHROPIC_MODEL set to Fable or Opus, and take over one that recorded no model. Off, the default, leaves them on their model. Another model such as Sonnet is never switched.',
       '--status reads accounts.list and does not change the setting. It prints the lines and the last evaluation per live pane (pane, account, model, source, choice, reason, when). A running session switches models through the auth proxy, without a restart, at most once per 10 minutes. Changing the lines re-evaluates immediately.',
       'With --environment the setting is written on that paired Orca server. An explicit --model or ANTHROPIC_MODEL on a launch stays pinned.'
     ],
     examples: [
       'orca account model-policy --agent claude --status',
       'orca account model-policy --agent claude --set fable-line=80 --set weekly-guard=85',
+      'orca account model-policy --agent claude --set covers-explicit=on',
       'orca account model-policy --agent claude --off --environment macstudio'
     ]
   },
   {
-    path: ['account', 'moves'],
-    summary: "Show the Claude session mover's last decision for each live session",
-    usage: 'orca account moves [--agent claude] [--environment <selector>] [--json]',
+    path: ['account', 'usage'],
+    summary: "Print each managed Claude account's last usage reading",
+    usage: 'orca account usage --agent claude [--environment <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'agent'],
     notes: [
+      'Reads usageWindows from accounts.list without asking the runtime to fetch: 5-hour, weekly, and Fable-weekly percent, the age of the reading, and whether it is the selected reading or the inactive-account cache. * marks the selected account.',
+      'A blank window was not read yet; a named failure (401, 429, keychain denied, sign in again) says why.'
+    ],
+    examples: ['orca account usage --agent claude', 'orca account usage --agent claude --json']
+  },
+  {
+    path: ['account', 'moves'],
+    summary: "Show the Claude session mover's last decision for each live session",
+    usage:
+      'orca account moves [--agent claude] [--log [--since <iso>]] [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'log', 'since'],
+    notes: [
       'Reads claude.sessionMoves from accounts.list on the runtime that owns the sessions.',
+      '--log reads the durable account log (accounts.claudeAccountLog, account-moves.log in the Orca logs folder): every mover decision with its reason, model flip, unknown proxy slot, and proxy upstream error, across restarts. --since keeps rows at or after that time. No tokens, headers, or bodies are logged.',
       'Each line is the time, the pane (or pty when the pane key is absent), from → to, the reason, and the strategy (resume or proxy). A host that predates strategies prints -.',
       'With --environment the decisions are read from that paired Orca server. --json prints the sessionMoves array.'
     ],
-    examples: ['orca account moves', 'orca account moves --environment macstudio --json']
+    examples: [
+      'orca account moves',
+      'orca account moves --log --since 2026-11-05T06:00:00Z',
+      'orca account moves --environment my-server --json'
+    ]
   },
   {
     path: ['account', 'auth-proxy'],

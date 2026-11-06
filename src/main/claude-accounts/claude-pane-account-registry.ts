@@ -1,4 +1,3 @@
-import { claudeAccountHomeKey } from './claude-account-home-attribution'
 import {
   bindClaudeAuthProxySlotToPty,
   forgetClaudeAuthProxySlotOwner,
@@ -7,7 +6,7 @@ import {
   takeClaudeAuthProxySlotsForPty
 } from './claude-auth-proxy/claude-auth-proxy-slot-owners'
 import type { ClaudeModelSource } from './claude-model-policy'
-import { normalizeClaudeConfigDir } from '../rate-limits/service/service-types'
+import { claudePaneAccountPersistence } from './claude-pane-account-persistence'
 
 /**
  * Which managed Claude account each live PTY runs on.
@@ -60,6 +59,8 @@ export type ClaudePaneAccountRecord = {
   model?: string
   /** `policy` follows the lines. `pinned` is a `--model` or `ANTHROPIC_MODEL` the user set. */
   modelSource?: ClaudeModelSource
+  /** The pinned model the policy covers; the pane returns to it when covers-explicit turns off. */
+  launchModel?: string
 }
 
 const records = new Map<string, ClaudePaneAccountRecord>()
@@ -129,6 +130,7 @@ export function recordClaudePaneAccount(record: ClaudePaneAccountRecord): void {
   }
   syncSlotModel(record)
   records.set(record.ptyId, record)
+  claudePaneAccountPersistence()?.save(record)
   const nextAccountId = claudeBillingAccountId(record)
   if (
     !previous ||
@@ -150,6 +152,7 @@ export function forgetClaudePaneAccount(ptyId: string): void {
     forgetClaudeAuthProxySlotOwner(slot)
     releaseProxySlot?.(slot)
   }
+  claudePaneAccountPersistence()?.forget(ptyId)
   if (!record) {
     return
   }
@@ -172,6 +175,7 @@ export function assignClaudePaneAccount(
   if (providerSessionId) {
     record.providerSessionId = providerSessionId
   }
+  claudePaneAccountPersistence()?.save(record)
   if (previousAccountId !== accountId) {
     publishPaneAssigned(noticeFor(record, accountId))
   }
@@ -188,11 +192,25 @@ export function setClaudePaneModel(
   if (!record) {
     return false
   }
-  const changed = record.model !== model || record.modelSource !== modelSource
+  // Why: the first policy flip over a pin remembers the pin; a new pin replaces whatever was kept.
+  const launchModel =
+    modelSource === 'policy'
+      ? (record.launchModel ?? (record.modelSource === 'pinned' ? record.model : undefined))
+      : undefined
+  const changed =
+    record.model !== model ||
+    record.modelSource !== modelSource ||
+    record.launchModel !== launchModel
   record.model = model
   record.modelSource = modelSource
+  if (launchModel === undefined) {
+    delete record.launchModel
+  } else {
+    record.launchModel = launchModel
+  }
   syncSlotModel(record)
   if (changed) {
+    claudePaneAccountPersistence()?.save(record)
     publishPaneAssigned(noticeFor(record, claudeBillingAccountId(record)))
   }
   return true
@@ -250,37 +268,6 @@ export function listClaudePaneAccounts(): ClaudePaneAccountRecord[] {
 
 export function listClaudePaneAccountsByAccount(accountId: string): ClaudePaneAccountRecord[] {
   return listClaudePaneAccounts().filter((record) => claudeBillingAccountId(record) === accountId)
-}
-
-export type ClaudeAccountHomes = { id: string; homes: readonly (string | null | undefined)[] }
-
-/**
- * The account whose folder holds the transcript (`<CLAUDE_CONFIG_DIR>/projects/<project>/<file>`).
- * STRICTER than the renderer's resolveClaudeSessionAccountId on purpose: it requires `<project>/<file>`
- * after `/projects/`, so a path that merely contains a `projects` folder is not read as a transcript.
- * Do not "fix" either side to match the other. Null: a folder no managed account owns (System
- * default). Undefined: no transcript, so the caller cannot know.
- */
-export function inferClaudeAccountIdFromTranscript(
-  transcriptPath: string | undefined,
-  accounts: readonly ClaudeAccountHomes[]
-): { accountId: string; configDir: string } | null | undefined {
-  const transcript = normalizeClaudeConfigDir(transcriptPath) ?? ''
-  const projectsIndex = transcript.lastIndexOf('/projects/')
-  // Why: Claude writes `<CLAUDE_CONFIG_DIR>/projects/<project>/<session>.jsonl`; a path without the
-  // project folder is not a transcript, so its account cannot be read from it.
-  if (projectsIndex <= 0 || !transcript.slice(projectsIndex + '/projects/'.length).includes('/')) {
-    return undefined
-  }
-  // Why: report the folder as Claude wrote it; only the comparison ignores Windows case.
-  const configDir = transcript.slice(0, projectsIndex)
-  const comparableConfigDir = claudeAccountHomeKey(configDir)
-  for (const account of accounts) {
-    if (account.homes.some((home) => claudeAccountHomeKey(home) === comparableConfigDir)) {
-      return { accountId: account.id, configDir }
-    }
-  }
-  return null
 }
 
 export const _internals = {

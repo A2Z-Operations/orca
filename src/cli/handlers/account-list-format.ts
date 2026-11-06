@@ -66,9 +66,11 @@ export function formatClaudeModelPolicyLine(policy: {
   enabled: boolean
   fableLine: number
   weeklyGuard: number
+  coversExplicit?: boolean
 }): string {
+  const covers = policy.coversExplicit ? ', covers explicit --model' : ''
   return policy.enabled
-    ? `model-policy: on (fable<${policy.fableLine}, weekly<${policy.weeklyGuard})`
+    ? `model-policy: on (fable<${policy.fableLine}, weekly<${policy.weeklyGuard}${covers})`
     : 'model-policy: off'
 }
 

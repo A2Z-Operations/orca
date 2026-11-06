@@ -1,3 +1,4 @@
+import type { ClaudeAuthProxyStatus } from './claude-auth-proxy-status'
 import type { ClaudeSessionMoverSetting } from './claude-account-switch-settings'
 
 export type ManagedDataAccountProvider = 'opencode' | 'devin'
@@ -180,15 +181,35 @@ export type ClaudeRateLimitAccountsState = {
   /** Weekly and Fable percents. Absent from older hosts. Null means that window was not readable. `unavailable` names why. */
   usageWindows?: {
     accountId: string
+    /** 5-hour percent. Absent from older hosts. */
+    session?: number | null
     weekly: number | null
     fable: number | null
+    /** When the reading was taken. Absent from older hosts. */
+    readAt?: number | null
+    /** `selected`: the active reading. `cached`: the inactive-account cache. Absent from older hosts. */
+    source?: 'selected' | 'cached' | null
     unavailable?: string
   }[]
   /** Spend Fable first, then Opus. Absent from older hosts. */
-  modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
+  modelPolicy?: {
+    enabled: boolean
+    fableLine: number
+    weeklyGuard: number
+    /** Explicit-model sessions follow the policy too. Absent from older hosts means off. */
+    coversExplicit?: boolean
+  }
   /** Last model-policy pass per live pane. Absent from older hosts and when none has run. */
   modelPolicyEvaluations?: ClaudeModelPolicyEvaluation[]
+  /** Auth-proxy trouble since the listener started. Absent from older hosts and with no listener. */
+  authProxyHealth?: ClaudeAuthProxyHealth
 }
+
+/** Requests whose slot the listener did not know, and the last upstream status ≥ 400. */
+export type ClaudeAuthProxyHealth = Pick<
+  ClaudeAuthProxyStatus,
+  'listening' | 'unknownSlotRequests' | 'lastError'
+>
 
 /** One-shot refresh. The access token stays on the runtime. */
 export type ClaudeTokenRefreshNowResult = {

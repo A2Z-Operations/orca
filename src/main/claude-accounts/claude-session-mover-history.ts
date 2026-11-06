@@ -4,6 +4,7 @@ import type {
 } from '../../shared/managed-account-types'
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
 import { noteClaudeSessionMoveStat } from './claude-session-move-stats'
+import { appendClaudeAccountLog } from './claude-account-log'
 import { publishClaudeAccountSessionMoved } from './claude-account-plugin-publish'
 import {
   claudeSessionMoveNoticeDetail,
@@ -56,11 +57,26 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
       ...(view.record.surface === 'chat' ? { chat: true as const } : {})
     }
     // Why once per reason: the service publishes every 15 s; a repeated "stay" is not news.
-    if (lastDecision.get(view.record.ptyId)?.reason !== reason) {
+    // A settled move (detail present) is always news, even when it repeats the last reason.
+    if (lastDecision.get(view.record.ptyId)?.reason !== reason || detail !== undefined) {
       log(
         `${reason}${detail ? ` (${detail})` : ''} pty=${record.ptyId} from=${from.email} to=${to?.email ?? '-'}`,
         record
       )
+      appendClaudeAccountLog({
+        type: 'decision',
+        at: now,
+        ptyId: record.ptyId,
+        paneKey: record.paneKey,
+        fromAccountId: record.fromAccountId,
+        toAccountId: record.toAccountId,
+        reason,
+        window: record.window,
+        percent: record.percent,
+        ...(record.strategy ? { strategy: record.strategy } : {}),
+        ...(detail ? { detail } : {}),
+        ...(record.chat ? { chat: true as const } : {})
+      })
     }
     lastDecision.set(view.record.ptyId, record)
   }

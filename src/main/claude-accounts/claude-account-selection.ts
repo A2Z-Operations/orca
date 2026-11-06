@@ -15,8 +15,11 @@ import {
 } from './claude-account-summary'
 import { wslAuthProxyStatus } from './wsl-auth-proxy-status'
 import type { ClaudeRuntimeAuthService } from './runtime-auth-service'
-import { claudeModelPolicyEvaluations } from './claude-model-policy-evaluations'
-import { resolveClaudeModelPolicy, type ClaudeModelPolicyPatch } from './claude-model-policy'
+import {
+  claudeAccountListExtras,
+  claudeModelPolicySettingsUpdate
+} from './claude-account-list-extras'
+import type { ClaudeModelPolicyPatch } from './claude-model-policy'
 import { claudeListedPaneAccounts, listedPaneAssignments } from './claude-listed-pane-accounts'
 import { listClaudePaneAccounts } from './claude-pane-account-registry'
 import {
@@ -48,6 +51,7 @@ export type ClaudeAccountSettings = Pick<
   | 'claudeAccountTokenRefresh'
   | 'claudeAccountPool'
   | 'claudeModelPolicy'
+  | 'claudeModelPolicyCoversExplicit'
 >
 
 export type ClaudeAccountStore = {
@@ -105,15 +109,7 @@ export class ClaudeAccountSelection {
   }
 
   setModelPolicy(patch: ClaudeModelPolicyPatch): ClaudeRateLimitAccountsState {
-    const current = this.store.getSettings().claudeModelPolicy
-    const resolved = resolveClaudeModelPolicy({
-      claudeModelPolicy: {
-        enabled: patch.enabled ?? current?.enabled,
-        fableLine: patch.fableLine ?? current?.fableLine,
-        weeklyGuard: patch.weeklyGuard ?? current?.weeklyGuard
-      }
-    })
-    this.saveSettings({ claudeModelPolicy: resolved })
+    this.saveSettings(claudeModelPolicySettingsUpdate(this.store.getSettings(), patch))
     return this.list()
   }
 
@@ -160,7 +156,6 @@ export class ClaudeAccountSelection {
       accounts.length > 0 ? readClaudeFolderLogin(claudeStateFile(userConfigDir), 5_000) : null
     const wslAuthProxy =
       process.platform === 'win32' ? wslAuthProxyStatus(settings.claudeManagedAccounts) : undefined
-    const modelPolicyEvaluations = claudeModelPolicyEvaluations()
     return {
       accounts,
       activeAccountId: selection.host,
@@ -170,9 +165,8 @@ export class ClaudeAccountSelection {
       ...claudeTokenRefreshFields(settings, accounts),
       accountPool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
       pool: settings.claudeAccountPool === 'on' ? 'on' : 'off',
-      modelPolicy: resolveClaudeModelPolicy(settings),
+      ...claudeAccountListExtras(settings),
       ...(this.usageWindowsProvider ? { usageWindows: this.usageWindowsProvider(accounts) } : {}),
-      ...(modelPolicyEvaluations.length > 0 ? { modelPolicyEvaluations } : {}),
       assignedSessions,
       paneAccounts,
       sessionMoves: this.sessionMovesProvider?.() ?? [],

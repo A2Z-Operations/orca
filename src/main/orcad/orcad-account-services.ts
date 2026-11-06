@@ -22,9 +22,11 @@ import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source
 import { resolveHostAgentBaseEnvironment } from '../runtime/structured-agent-shell-environment'
 import { isWslHostOrcadProcess } from '../ipc/wsl-guest-windows-drive-path'
 import {
+  installClaudePaneAccountFileStore,
   startClaudeAuthProxy,
   stopClaudeAuthProxy
 } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
+import { closeClaudeAccountLog, openClaudeAccountLog } from '../claude-accounts/claude-account-log'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
 
 type StructuredLaunchInput = { launchEnv: NodeJS.ProcessEnv }
@@ -101,11 +103,14 @@ export function createOrcadAccountServices(args: {
   const unsubscribePolling = store.onSettingsChanged((updates) => {
     polling.apply(updates)
   })
+  installClaudePaneAccountFileStore()
+  openClaudeAccountLog()
   void startClaudeAuthProxy()
   args.registerCleanup(async () => {
     unsubscribePolling()
     services.sessionMover?.stop()
     await stopClaudeAuthProxy()
+    closeClaudeAccountLog()
     attachedRuntime = null
     services.rateLimits.stop()
     args.setClaudeStatusLineListener(null)

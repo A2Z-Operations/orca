@@ -9,9 +9,9 @@ import type {
 import { claudeAccountsShareRuntime, isClaudeUsageReadingOf } from './claude-account-auto-switch'
 import {
   inferClaudeAccountIdFromTranscript,
-  type ClaudeAccountHomes,
-  type ClaudePaneAccountRecord
-} from './claude-pane-account-registry'
+  type ClaudeAccountHomes
+} from './claude-account-home-attribution'
+import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
 
 export type ClaudeMoverSessionView = {
   record: ClaudePaneAccountRecord

@@ -11,6 +11,7 @@ export const ACCOUNT_HANDLER_GROUP: HandlerGroup = {
     'account auto-switch',
     'account model-policy',
     'account moves',
+    'account usage',
     'account pool',
     'account session-mover',
     'account token-refresh'

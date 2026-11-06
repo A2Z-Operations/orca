@@ -12,7 +12,7 @@ import {
   claudeUsageForAccount,
   type ClaudeMoverSessionView
 } from './claude-session-mover-sessions'
-import type { ClaudeSessionMoverDeps } from './claude-session-mover-types'
+import type { ClaudeSessionMoveReason, ClaudeSessionMoverDeps } from './claude-session-mover-types'
 import type { ClaudeMoverHistory } from './claude-session-mover-history'
 
 export function evaluateClaudeMoverSessions(
@@ -92,14 +92,13 @@ export function evaluateClaudeMoverSessions(
       continue
     }
     if (decision.kind === 'stay' || decision.kind === 'wait') {
-      const reason =
+      // The decision's own reason, so a review can tell "nothing has room" from "under the line".
+      const reason: ClaudeSessionMoveReason =
         decision.kind === 'wait'
-          ? (`wait:${decision.reason}` as const)
-          : decision.reason === 'off'
-            ? 'off'
-            : view.record.pinned && decision.reason === 'under-line'
-              ? 'pinned'
-              : 'stay'
+          ? `wait:${decision.reason}`
+          : view.record.pinned && decision.reason === 'under-line'
+            ? 'pinned'
+            : decision.reason
       remember(view, from, null, reason, own?.rateLimits ?? null, now)
       continue
     }

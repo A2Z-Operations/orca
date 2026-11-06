@@ -9,10 +9,12 @@ export type ClaudeModelFlipRecord = {
   ptyId: string
   paneKey: string | null
   accountId: string
-  from: ClaudePolicyModel
+  from: ClaudePolicyModel | 'unset'
   to: ClaudePolicyModel
   reason: string
   at: number
+  /** The proxy rewrites the request body, so a pane with a slot flips without a restart. */
+  strategy?: 'proxy'
 }
 
 export function rememberClaudeModelFlip(flip: ClaudeModelFlipRecord): void {
@@ -28,7 +30,8 @@ export function rememberClaudeModelFlip(flip: ClaudeModelFlipRecord): void {
     at: flip.at,
     kind: 'model',
     modelFrom: flip.from,
-    modelTo: flip.to
+    modelTo: flip.to,
+    ...(flip.strategy ? { strategy: flip.strategy } : {})
   })
   if (flips.length > MAX_FLIPS) {
     flips.length = MAX_FLIPS

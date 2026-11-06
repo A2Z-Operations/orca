@@ -109,8 +109,9 @@ describe('formatAccountsBlock', () => {
         at: Date.parse('2026-10-30T00:00:00.000Z'),
         kind: 'model',
         modelFrom: 'fable',
-        modelTo: 'opus'
+        modelTo: 'opus',
+        strategy: 'proxy'
       })
-    ).toBe('2026-10-30T00:00:00.000Z  reports  fable → opus  weekly-guard  model')
+    ).toBe('2026-10-30T00:00:00.000Z  reports  fable → opus  weekly-guard  proxy  model')
   })
 })

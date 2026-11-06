@@ -31,9 +31,11 @@ import {
   type ClaudePaneAssignedNotice
 } from '../claude-accounts/claude-pane-account-registry'
 import {
+  installClaudePaneAccountFileStore,
   startClaudeAuthProxy,
   stopClaudeAuthProxy
 } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
+import { closeClaudeAccountLog, openClaudeAccountLog } from '../claude-accounts/claude-account-log'
 import { mainProcessState as state } from './main-process-state'
 
 // Settings that change which account or binary a new chat's agent runs under.
@@ -146,6 +148,8 @@ export function initializeMainProcessAccountServices(): void {
       })
     }
   })
+  installClaudePaneAccountFileStore()
+  openClaudeAccountLog()
   void startClaudeAuthProxy()
   const paneAssignedEvent = (notice: ClaudePaneAssignedNotice): ClaudePaneAssignedEvent => {
     const accounts = store.getSettings().claudeManagedAccounts
@@ -176,6 +180,7 @@ export function initializeMainProcessAccountServices(): void {
     services.sessionMover?.stop()
     stopClaudeModelPolicyTicker()
     void stopClaudeAuthProxy()
+    closeClaudeAccountLog()
   }
   state.rateLimits = services.rateLimits
   state.codexRuntimeHome = services.codexRuntimeHome

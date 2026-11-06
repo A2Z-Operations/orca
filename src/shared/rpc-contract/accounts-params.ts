@@ -44,20 +44,31 @@ export const RefreshClaudeAccountTokenNowParams = z.object({
 
 export const ClaudeAuthProxyStatusParams = z.object({}).strict()
 
+/** Epoch ms. The newest `limit` rows at or after `since` and before `before`, oldest first. */
+export const ClaudeAccountLogParams = z
+  .object({
+    since: z.number().int().min(0).optional(),
+    before: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).max(5_000).optional()
+  })
+  .strict()
+
 export const SetClaudeAccountPoolParams = z.object({ enabled: z.boolean() })
 
 export const SetClaudeModelPolicyParams = z
   .object({
     enabled: z.boolean().optional(),
     fableLine: z.number().min(1).max(100).optional(),
-    weeklyGuard: z.number().min(1).max(100).optional()
+    weeklyGuard: z.number().min(1).max(100).optional(),
+    coversExplicit: z.boolean().optional()
   })
   .refine(
     (value) =>
       value.enabled !== undefined ||
       value.fableLine !== undefined ||
-      value.weeklyGuard !== undefined,
-    { message: 'Set enabled, fableLine, or weeklyGuard.' }
+      value.weeklyGuard !== undefined ||
+      value.coversExplicit !== undefined,
+    { message: 'Set enabled, fableLine, weeklyGuard, or coversExplicit.' }
   )
 
 /** Tell the execution host which account a live pane's proxy slot bills. configDir is required on a WSL guest. */

@@ -41,6 +41,8 @@ const fsAllowances: Record<string, readonly string[]> = {
   // Stores Claude config folder paths only.
   'claude-accounts/claude-observed-config-dirs.ts': ['writeFileAtomically'],
   'claude-accounts/claude-profile-paths.ts': ['mkdirSync', 'writeFileAtomically'],
+  // Pane → account rows and the proxy port, for a reattach after a restart. No credentials.
+  'claude-accounts/claude-pane-account-persistence.ts': ['mkdirSync', 'writeFileAtomically'],
   'claude-accounts/claude-profile-router.ts': ['mkdirSync', 'rmSync', 'writeFileAtomically'],
   'claude-accounts/claude-account-folder.ts': ['rmSync', 'rmdirSync', 'unlinkSync'],
   // PTY write of the hand-off note into the resumed session; nothing touches the filesystem.

@@ -27,7 +27,7 @@ export type ClaudeModelPolicySettings = {
 }
 
 /** A partial write. Unset fields keep the saved value. */
-export type ClaudeModelPolicyPatch = ClaudeModelPolicySettings
+export type ClaudeModelPolicyPatch = ClaudeModelPolicySettings & { coversExplicit?: boolean }
 
 export type ClaudeModelPolicyResolved = {
   enabled: boolean

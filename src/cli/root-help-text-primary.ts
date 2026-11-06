@@ -35,6 +35,7 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   '  account pool              Spread new Claude sessions across signed-in accounts',
   '  account model-policy      Spend Fable first, then Opus 5.5, without restarting',
   "  account moves             Show the Claude session mover's last decisions",
+  "  account usage             Print each managed Claude account's last usage reading",
   '',
   'Skills:',
   '  skills installed          List installed skill selectors',

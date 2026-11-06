@@ -549,8 +549,8 @@ describe('RateLimitService', () => {
           inactiveAccounts: state.inactiveClaudeAccounts
         })
       ).toEqual([
-        { accountId: 'active', weekly: 11, fable: 3 },
-        { accountId: 'idle', weekly: 22, fable: 4 }
+        expect.objectContaining({ accountId: 'active', weekly: 11, fable: 3, source: 'selected' }),
+        expect.objectContaining({ accountId: 'idle', weekly: 22, fable: 4, source: 'cached' })
       ])
 
       info.mockClear()

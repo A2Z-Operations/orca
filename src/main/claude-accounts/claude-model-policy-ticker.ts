@@ -16,9 +16,18 @@ export type ClaudeModelPolicyFlip = {
   ptyId: string
   paneKey: string | null
   accountId: string
-  from: ClaudePolicyModel
+  /** `unset`: a covered explicit-model pane that recorded no model is taken over by the policy. */
+  from: ClaudePolicyModel | 'unset'
   to: ClaudePolicyModel
   reason: string
+  at: number
+}
+
+/** A pane the policy covered whose setting turned off: it goes back to the model its launch fixed. */
+export type ClaudeModelPolicyUncover = {
+  ptyId: string
+  paneKey: string | null
+  accountId: string
   at: number
 }
 
@@ -34,7 +43,10 @@ export type ClaudeModelPolicyTicker = {
  * At most one flip per pane per {@link CLAUDE_MODEL_POLICY_FLIP_COOLDOWN_MS}.
  */
 export function createClaudeModelPolicyTicker(deps: {
-  getSettings: () => { claudeModelPolicy?: ClaudeModelPolicySettings }
+  getSettings: () => {
+    claudeModelPolicy?: ClaudeModelPolicySettings
+    claudeModelPolicyCoversExplicit?: boolean
+  }
   panes: () => readonly ClaudePaneAccountRecord[]
   usageFor: (
     accountId: string
@@ -43,6 +55,7 @@ export function createClaudeModelPolicyTicker(deps: {
   /** Fires when `claudeModelPolicy` changes so a line edit does not wait for the next poll. */
   subscribeSettings?: (listener: () => void) => () => void
   apply: (flip: ClaudeModelPolicyFlip) => void
+  uncover: (pane: ClaudeModelPolicyUncover) => void
   onWarning?: (ptyId: string, warning: string) => void
   now?: () => number
 }): ClaudeModelPolicyTicker {
@@ -97,17 +110,27 @@ export function createClaudeModelPolicyTicker(deps: {
           `pty=${record.ptyId} pane=${record.paneKey ?? '-'} account=${accountId} model=${record.model ?? '-'} source=${record.modelSource ?? '-'} weekly=${windows.weekly} fable=${windows.fable} lines=${policy.fableLine}/${policy.weeklyGuard} choice=${choice ?? '-'} reason=${reason}${skip ? ` skip=${skip}` : ''}`
         )
       }
+      // Covered: a launch with its own --model or ANTHROPIC_MODEL follows the lines too.
+      const covered = policy.enabled && settings.claudeModelPolicyCoversExplicit === true
+      // Why: a covered pane keeps rewriting toward the policy's last choice until it is let go.
+      if (!covered && record.modelSource === 'policy' && record.launchModel) {
+        deps.uncover({ ptyId: record.ptyId, paneKey: record.paneKey, accountId, at: now })
+        note(null, 'uncovered', 'uncovered', { weekly: '-', fable: '-' })
+        continue
+      }
       if (!policy.enabled) {
         note(null, 'policy-off', 'policy-off', { weekly: '-', fable: '-' })
         continue
       }
-      if (record.modelSource !== 'policy') {
+      if (record.modelSource !== 'policy' && !covered) {
         const skip = record.modelSource === 'pinned' ? 'pinned' : 'not-policy'
         note(null, skip, skip, { weekly: '-', fable: '-' })
         continue
       }
       const current = record.model ? claudePolicyModelLabel(record.model) : null
-      if (!current) {
+      // A covered pane with no recorded model is chosen for as a fresh launch.
+      const takeover = covered && record.modelSource !== 'policy' && !record.model
+      if (!current && !takeover) {
         note(null, 'unrecognized-model', 'unrecognized-model', { weekly: '-', fable: '-' })
         continue
       }
@@ -125,7 +148,7 @@ export function createClaudeModelPolicyTicker(deps: {
         limits: usage?.rateLimits ?? null,
         settings,
         now,
-        current
+        ...(current ? { current } : {})
       })
       if (choice.warning) {
         if (!warned.has(record.ptyId)) {
@@ -149,14 +172,14 @@ export function createClaudeModelPolicyTicker(deps: {
         ptyId: record.ptyId,
         paneKey: record.paneKey,
         accountId,
-        from: current,
+        from: current ?? 'unset',
         to: choice.model,
         reason: choice.reason,
         at: now
       }
       flips.push(flip)
       console.info(
-        `[claude-model-policy] flip pty=${record.ptyId} pane=${record.paneKey ?? '-'} account=${accountId} ${current} → ${choice.model} reason=${choice.reason}`
+        `[claude-model-policy] flip pty=${record.ptyId} pane=${record.paneKey ?? '-'} account=${accountId} ${current ?? 'unset'} → ${choice.model} reason=${choice.reason}${covered && record.modelSource !== 'policy' ? ' covered' : ''}`
       )
       deps.apply(flip)
       note(choice.model, choice.reason, null, windows)

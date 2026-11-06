@@ -53,7 +53,7 @@ describe('account session-mover surface', () => {
 
     it('needs exactly one of --off, --ask, --move and only --agent claude', async () => {
       await expect(ACCOUNT_HANDLERS['account session-mover'](moverContext([]))).rejects.toThrow(
-        'exactly one of --off, --ask or --move'
+        'exactly one of --off, --ask, --move, or --status'
       )
       await expect(
         ACCOUNT_HANDLERS['account session-mover'](
@@ -62,7 +62,7 @@ describe('account session-mover surface', () => {
             ['move', true]
           ])
         )
-      ).rejects.toThrow('exactly one of --off, --ask or --move')
+      ).rejects.toThrow('exactly one of --off, --ask, --move, or --status')
       await expect(
         ACCOUNT_HANDLERS['account session-mover'](
           moverContext([

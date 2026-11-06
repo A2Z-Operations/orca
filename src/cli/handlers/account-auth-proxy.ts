@@ -1,6 +1,8 @@
 import type { HandlerContext } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import type { ClaudeAuthProxyStatus } from '../../shared/claude-auth-proxy-status'
+import { claudeAuthProxyHealthView } from '../../shared/claude-auth-proxy-health'
+import { formatClaudeShortAge } from '../../shared/claude-relative-age'
 import type { ClaudeRateLimitAccountsState } from '../../shared/managed-account-types'
 
 /**
@@ -50,7 +52,11 @@ export async function setClaudeAuthProxy(ctx: HandlerContext): Promise<void> {
   console.log(`Claude auth-proxy: ${enabled}`)
 }
 
-function printClaudeAuthProxyStatus(status: ClaudeAuthProxyStatus, json: boolean): void {
+function printClaudeAuthProxyStatus(
+  status: ClaudeAuthProxyStatus,
+  json: boolean,
+  now: number = Date.now()
+): void {
   if (json) {
     console.log(JSON.stringify(status, null, 2))
     return
@@ -74,12 +80,19 @@ function printClaudeAuthProxyStatus(status: ClaudeAuthProxyStatus, json: boolean
       lines.push(`  requests last hour: ${row.accountId} ${row.count}`)
     }
   }
-  lines.push(`  unknown slots: ${status.unknownSlotRequests}`)
+  const health = claudeAuthProxyHealthView(status, now)
+  // `!` marks what needs a look: a pane on a slot this listener lost, or an error within the hour.
+  const unknownMark = health.unknownSlotRequests > 0 ? '!' : ' '
+  lines.push(`${unknownMark} unknown slots: ${status.unknownSlotRequests}`)
+  const error = status.lastError
   lines.push(
-    status.lastError
-      ? `  last error: ${status.lastError.status} ${status.lastError.method} ${status.lastError.path} ${status.lastError.accountId ?? '-'}`
+    error
+      ? `${health.recentError ? '!' : ' '} last error: ${error.status} ${error.method} ${error.path} ${error.accountId ?? '-'} (${formatClaudeShortAge(error.at, now)} ago)`
       : '  last error: none'
   )
+  if (health.warn) {
+    lines.push('  health: needs attention')
+  }
   console.log(lines.join('\n'))
 }
 

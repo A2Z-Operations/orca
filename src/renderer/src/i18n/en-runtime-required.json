@@ -1,6 +1,36 @@
 {
   "accounts": {
     "claude": {
+      "recentMoves": {
+        "decision": {
+          "ask": "Asked to move",
+          "cooldown": "Stayed: moved recently",
+          "failed": "Move failed",
+          "failedRecently": "Stayed: a move failed recently",
+          "flip": "Switched model: {{from}} → {{to}} ({{why}})",
+          "movedProxy": "Moved (no restart)",
+          "movedResume": "Moved (restarted)",
+          "moving": "Moving",
+          "noTarget": "Stayed: no account under the line",
+          "noUsage": "Stayed: no usage reading",
+          "off": "Mover is off",
+          "other": "{{reason}}",
+          "pinned": "Pinned",
+          "promptCache": "Stayed: turn just ended",
+          "readUsage": "Reading usage",
+          "rebalance": "Moved to balance accounts",
+          "skipped": "Move skipped",
+          "stay": "Stayed",
+          "underLine": "Stayed: under the line",
+          "waitBackgroundWork": "Waiting: background work",
+          "waitMidTurn": "Waiting: mid-turn",
+          "waitNoStatus": "Waiting: no status yet"
+        },
+        "filterAll": "All",
+        "filterFlips": "Flips",
+        "filterMoves": "Moves",
+        "filterStays": "Stays"
+      },
       "sessionMover": {
         "handoff": {
           "backgroundTask": "a background task was still running",
@@ -13,6 +43,16 @@
           "none": "none reported",
           "subagent": "{{agentType}} {{id}} ({{state}})",
           "subagentUntyped": "{{id}} ({{state}})"
+        }
+      },
+      "usageStrip": {
+        "state": {
+          "atLine": "at line",
+          "nearLine": "near line",
+          "ok": "ok",
+          "refreshing": "refreshing",
+          "signIn": "sign-in needed",
+          "unreadable": "unreadable"
         }
       }
     }

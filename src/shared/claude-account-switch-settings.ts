@@ -42,4 +42,9 @@ export type ClaudeAccountSwitchSettings = {
     fableLine?: number
     weeklyGuard?: number
   }
+  /**
+   * Absent means off: a session launched with `--model` or `ANTHROPIC_MODEL` keeps that model.
+   * On: such a session on Fable or Opus, and one that recorded no model, follows the policy too.
+   */
+  claudeModelPolicyCoversExplicit?: boolean
 }

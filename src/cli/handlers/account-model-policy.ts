@@ -15,7 +15,10 @@ type ModelPolicyPatch = {
   enabled?: boolean
   fableLine?: number
   weeklyGuard?: number
+  coversExplicit?: boolean
 }
+
+const SWITCH_VALUES: Readonly<Record<string, boolean>> = { on: true, off: false }
 
 /**
  * `orca account model-policy --agent claude --on|--off|--status|--set fable-line=.. weekly-guard=..`
@@ -99,11 +102,22 @@ function parseSet(entries: string[]): ModelPolicyPatch {
       if (eq <= 0) {
         throw new RuntimeClientError(
           'invalid_argument',
-          'Each --set value is key=value. Keys: fable-line, weekly-guard.'
+          'Each --set value is key=value. Keys: fable-line, weekly-guard, covers-explicit.'
         )
       }
       const key = part.slice(0, eq)
       const raw = part.slice(eq + 1)
+      if (key === 'covers-explicit') {
+        const covers = SWITCH_VALUES[raw]
+        if (covers === undefined) {
+          throw new RuntimeClientError(
+            'invalid_argument',
+            '--set covers-explicit must be on or off.'
+          )
+        }
+        patch.coversExplicit = covers
+        continue
+      }
       const value = Number(raw)
       if (!Number.isFinite(value)) {
         throw new RuntimeClientError('invalid_argument', `--set ${key} must be a number.`)
@@ -115,7 +129,7 @@ function parseSet(entries: string[]): ModelPolicyPatch {
       } else {
         throw new RuntimeClientError(
           'invalid_argument',
-          `Unknown --set key ${key}. Use fable-line or weekly-guard.`
+          `Unknown --set key ${key}. Use fable-line, weekly-guard, or covers-explicit.`
         )
       }
     }

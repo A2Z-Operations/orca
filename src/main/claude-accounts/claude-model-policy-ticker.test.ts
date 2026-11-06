@@ -54,6 +54,7 @@ describe('createClaudeModelPolicyTicker', () => {
       panes: () => [pane(current)],
       usageFor: () => ({ rateLimits: usage, updatedAt: now }),
       subscribe: () => () => {},
+      uncover: () => {},
       apply: (flip) => {
         applied.push(`${flip.from}->${flip.to}:${flip.reason}`)
         current = flip.to
@@ -83,6 +84,7 @@ describe('createClaudeModelPolicyTicker', () => {
       panes: () => [{ ...pane('fable'), modelSource: 'pinned' }],
       usageFor: () => ({ rateLimits: limits(99, 99), updatedAt: NOW }),
       subscribe: () => () => {},
+      uncover: () => {},
       apply: () => {
         throw new Error('pinned')
       },
@@ -101,6 +103,7 @@ describe('createClaudeModelPolicyTicker', () => {
       panes: () => [pane(current)],
       usageFor: () => ({ rateLimits: limits(64, 63), updatedAt: NOW }),
       subscribe: () => () => {},
+      uncover: () => {},
       subscribeSettings: (listener) => {
         onSettings.current = listener
         return () => {

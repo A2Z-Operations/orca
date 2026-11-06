@@ -1,3 +1,4 @@
+import { CLAUDE_USAGE_LINES } from '../../shared/claude-usage-lines'
 import type {
   InactiveAccountUsage,
   ProviderRateLimits,
@@ -5,7 +6,7 @@ import type {
 } from '../../shared/rate-limit-types'
 
 // Lines: the 5-hour window at 95 %, the weekly and the Fable-weekly windows at 90 %.
-export const CLAUDE_AUTO_SWITCH_LINES = { session: 95, weekly: 90, fableWeekly: 90 } as const
+export const CLAUDE_AUTO_SWITCH_LINES = CLAUDE_USAGE_LINES
 // Why: a switch only reaches the next Claude started, so a fresh pick needs time to be used.
 export const CLAUDE_AUTO_SWITCH_COOLDOWN_MS = 5 * 60_000
 // Why: an account only a few points under a line would cross it again within minutes.

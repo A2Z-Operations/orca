@@ -7,8 +7,7 @@ import {
   getClaudePaneAccount,
   listClaudePaneAccounts,
   recordClaudePaneAccount,
-  rememberClaudeSessionAssignment,
-  setClaudePaneModel
+  rememberClaudeSessionAssignment
 } from './claude-accounts/claude-pane-account-registry'
 import {
   createClaudeSessionMover,
@@ -19,12 +18,12 @@ import {
   createProxyMoveStrategy,
   createResumeMoveStrategy
 } from './claude-accounts/claude-session-move-strategy'
-import { publishClaudeAccountModelChanged } from './claude-accounts/claude-account-plugin-publish'
-import {
-  claudeModelFlips,
-  rememberClaudeModelFlip
-} from './claude-accounts/claude-model-flip-history'
+import { claudeModelFlips } from './claude-accounts/claude-model-flip-history'
 import { createClaudeModelPolicyTicker } from './claude-accounts/claude-model-policy-ticker'
+import {
+  applyClaudeModelFlip,
+  uncoverClaudePaneModel
+} from './claude-accounts/claude-model-flip-apply'
 import {
   claudeAccountUsageReading,
   claudeAccountUsageWindows
@@ -131,22 +130,17 @@ export function createProviderClaudeSessionMover(
     subscribe: (listener) => rateLimits.onStateChange(() => listener()),
     subscribeSettings: (listener) =>
       store.onSettingsChanged((updates) => {
-        if (updates && !('claudeModelPolicy' in updates)) {
+        if (
+          updates &&
+          !('claudeModelPolicy' in updates) &&
+          !('claudeModelPolicyCoversExplicit' in updates)
+        ) {
           return
         }
         listener()
       }),
-    apply: (flip) => {
-      setClaudePaneModel(flip.ptyId, flip.to, 'policy')
-      rememberClaudeModelFlip(flip)
-      publishClaudeAccountModelChanged({
-        ptyId: flip.ptyId,
-        accountId: flip.accountId,
-        from: flip.from,
-        to: flip.to,
-        reason: flip.reason
-      })
-    },
+    apply: applyClaudeModelFlip,
+    uncover: uncoverClaudePaneModel,
     onWarning: (ptyId, warning) => {
       console.warn(`[claude-model-policy] ${ptyId}: ${warning}`)
     }

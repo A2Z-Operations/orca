@@ -801,7 +801,7 @@ describe('account CLI handlers', () => {
       async (flags) => {
         await expect(
           ACCOUNT_HANDLERS['account auto-switch'](autoSwitchContext(flags))
-        ).rejects.toThrow(/--on or --off/)
+        ).rejects.toThrow(/--on, --off, or --status/)
         expect(callMock).not.toHaveBeenCalled()
       }
     )

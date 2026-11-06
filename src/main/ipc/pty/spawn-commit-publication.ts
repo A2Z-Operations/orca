@@ -93,7 +93,8 @@ export function publishCommittedPtySpawn(input: PtySpawnCommitInput): PtySpawnOu
     claudeAuth: state.claudeAuth,
     claudeAccountId: args.claudeAccountId,
     settings: deps.getSettings?.(),
-    target: state.codexSelectionTarget
+    target: state.codexSelectionTarget,
+    pid: result.pid ?? null
   })
   retainAppliedClaudeAuthProxySlot({
     ptyId: result.id,

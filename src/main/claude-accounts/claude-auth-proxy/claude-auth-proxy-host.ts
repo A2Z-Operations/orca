@@ -1,4 +1,6 @@
+import { join } from 'node:path'
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
+import { getOrcaUserDataPath } from '../../codex/codex-home-paths'
 import { listRegisteredPtys } from '../../memory/pty-registry'
 import {
   readClaudeOAuthCredentials,
@@ -10,8 +12,15 @@ import {
   listClaudePaneAccounts,
   setClaudePaneProxySlotReleaser
 } from '../claude-pane-account-registry'
+import {
+  claudePaneAccountPersistence,
+  createClaudePaneAccountFileStore,
+  installClaudePaneAccountPersistence
+} from '../claude-pane-account-persistence'
 import { noteUserAnthropicBaseUrl } from './claude-auth-proxy-note'
 import { createClaudeAuthProxy, type ClaudeAuthProxy } from './claude-auth-proxy'
+import { createClaudeAuthProxyAccountLogObserver } from '../claude-account-log'
+import { setClaudeAuthProxyStatusReader } from '../claude-account-list-extras'
 import {
   bindClaudeAuthProxySlotToPty,
   claudeAuthProxySlotModel,
@@ -62,19 +71,39 @@ export function startClaudeAuthProxy(): Promise<void> {
     readToken: readClaudeAuthProxyAccessToken,
     refreshAccessToken: refreshClaudeAuthProxyAccessToken,
     log: (line) => console.info(`[claude-auth-proxy] ${line}`),
-    modelForSlot: claudeAuthProxySlotModel
+    modelForSlot: claudeAuthProxySlotModel,
+    onRequest: createClaudeAuthProxyAccountLogObserver(),
+    preferredPort: claudePaneAccountPersistence()?.proxyPort() ?? null
   })
   pending = created
     .start()
     .then(() => {
       proxy = created
       setClaudePaneProxySlotReleaser((slot) => releaseOwnClaudeAuthProxySlot(slot))
+      setClaudeAuthProxyStatusReader(() => created.status())
+      const port = created.port()
+      if (port !== null) {
+        claudePaneAccountPersistence()?.setProxyPort(port)
+      }
     })
     .catch((error: unknown) => {
       pending = null
       console.warn('[claude-auth-proxy] failed to start', error)
     })
   return pending
+}
+
+/**
+ * Pane rows and the listener port, under userData, so a PTY reattached after a restart keeps its
+ * account and its slot. Called before {@link startClaudeAuthProxy} so the listener asks for its old port.
+ */
+export function installClaudePaneAccountFileStore(): void {
+  installClaudePaneAccountPersistence(
+    createClaudePaneAccountFileStore({
+      filePath: join(getOrcaUserDataPath(), 'claude-pane-accounts.json'),
+      listeningPort: claudeAuthProxyListeningPort
+    })
+  )
 }
 
 export async function stopClaudeAuthProxy(): Promise<void> {
@@ -85,9 +114,12 @@ export async function stopClaudeAuthProxy(): Promise<void> {
   }
   const current = proxy
   proxy = null
+  // Teardown after this point must not erase the rows the next start reattaches from.
+  installClaudePaneAccountPersistence(null)
   accountConfigDirs.clear()
   resetClaudeAuthProxySlotOwners()
   setClaudePaneProxySlotReleaser(null)
+  setClaudeAuthProxyStatusReader(null)
   if (current) {
     await current.stop()
   }

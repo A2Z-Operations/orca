@@ -7,10 +7,14 @@ import type { AgentHookServer } from '../agent-hooks/server'
 import type { RateLimitService } from '../rate-limits/service'
 import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
 import type { ClaudeSessionMoveStrategy } from './claude-session-move-strategy'
+import type { ClaudeSessionMoveDecision } from './claude-session-mover-policy'
 import type { ClaudeAccountService } from './service'
 
+/** Why a session stayed: the policy decision's reason. `pinned` is under the line on a pinned folder. */
+export type ClaudeSessionStayReason = Extract<ClaudeSessionMoveDecision, { kind: 'stay' }>['reason']
+
 export type ClaudeSessionMoveReason =
-  | 'stay'
+  | ClaudeSessionStayReason
   | 'read-usage'
   | 'wait:mid-turn'
   | 'wait:no-status'

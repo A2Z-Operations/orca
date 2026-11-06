@@ -156,7 +156,7 @@ describe('createClaudeSessionMover', () => {
     // a has 5 points of room, under the ten-point minimum gain; c is claimed by the first session.
     expect(move).toHaveBeenCalledTimes(1)
     expect(mover.lastDecisions().find((decision) => decision.ptyId === 'pty-2')?.reason).toBe(
-      'stay'
+      'no-target'
     )
     vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS)
     publish(state(90, { b: limits(96), c: limits(20) }))
@@ -280,7 +280,7 @@ describe('createClaudeSessionMover', () => {
     resume.publish(state(50, { b: limits(60), c: limits(5) }))
     await vi.runAllTimersAsync()
     expect(resume.move).not.toHaveBeenCalled()
-    expect(resume.mover.lastDecisions()[0]?.reason).toBe('stay')
+    expect(resume.mover.lastDecisions()[0]?.reason).toBe('under-line')
 
     const proxyMove = vi.fn(async (request: { ptyId: string }) => ({
       kind: 'moved' as const,
@@ -293,7 +293,7 @@ describe('createClaudeSessionMover', () => {
     off.publish(state(50, { b: limits(60), c: limits(5) }))
     await vi.runAllTimersAsync()
     expect(proxyMove).not.toHaveBeenCalled()
-    expect(off.mover.lastDecisions()[0]?.reason).toBe('stay')
+    expect(off.mover.lastDecisions()[0]?.reason).toBe('under-line')
   })
 
   it('rebalances a proxy session onto the freer account and names that in the notice', async () => {
@@ -365,7 +365,7 @@ describe('createClaudeSessionMover', () => {
     f.publish(state(50, { b: limits(60), c: limits(5) }))
     await vi.runAllTimersAsync()
     expect(proxyMove).not.toHaveBeenCalled()
-    expect(f.mover.lastDecisions()[0]?.reason).toBe('stay')
+    expect(f.mover.lastDecisions()[0]?.reason).toBe('prompt-cache')
 
     vi.setSystemTime(Date.now() + CLAUDE_POOL_REBALANCE_QUIET_MS)
     f.publish(state(50, { b: limits(60), c: limits(5) }))

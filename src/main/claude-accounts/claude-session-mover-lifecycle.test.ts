@@ -83,7 +83,7 @@ describe('session mover lifecycle and metadata', () => {
     f.publish(state(30, { b: limits(20), c: limits(96) }))
     await vi.runAllTimersAsync()
     expect(f.move).toHaveBeenCalledTimes(1)
-    expect(f.mover.lastDecisions()[0]).toMatchObject({ ptyId: 'pty-new', reason: 'stay' })
+    expect(f.mover.lastDecisions()[0]).toMatchObject({ ptyId: 'pty-new', reason: 'cooldown' })
     vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_COOLDOWN_MS)
     f.publish(state(30, { b: limits(20), c: limits(96) }))
     await vi.runAllTimersAsync()
@@ -179,7 +179,7 @@ describe('session mover lifecycle and metadata', () => {
 
     vi.setSystemTime(Date.now() + 2 * 60_000)
     f.publish(state(30, { b: limits(20), c: limits(20) }))
-    expect(f.mover.lastDecisions()[0]?.reason).toBe('stay')
+    expect(f.mover.lastDecisions()[0]?.reason).toBe('under-line')
     expect(f.move).not.toHaveBeenCalled()
 
     vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS)
@@ -195,7 +195,7 @@ describe('session mover lifecycle and metadata', () => {
     vi.setSystemTime(Date.now() + 2 * 60_000)
     restarted.setBackgroundWork(PANE_1, false, false)
     restarted.publish(state(30, { b: limits(20), c: limits(20) }))
-    expect(restarted.mover.lastDecisions()[0]?.reason).toBe('stay')
+    expect(restarted.mover.lastDecisions()[0]?.reason).toBe('under-line')
 
     vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS)
     restarted.setBackgroundWork(PANE_1, true, false)
@@ -210,7 +210,7 @@ describe('session mover lifecycle and metadata', () => {
     f.session('pty-1', PANE_1, 'b')
     f.mover.start()
     f.publish(state(30, { b: limits(20), c: limits(20) }))
-    expect(f.mover.lastDecisions()[0]?.reason).toBe('stay')
+    expect(f.mover.lastDecisions()[0]?.reason).toBe('under-line')
     f.publish(state(30, { b: limits(96, Date.now() - 16 * 60_000), c: limits(20) }))
     expect(f.mover.lastDecisions()[0]?.reason).toBe('read-usage')
     f.settings.claudeSessionMover = 'off'
@@ -348,7 +348,11 @@ describe('pool rebalance lifecycle', () => {
     f.publish(reading())
     await vi.runAllTimersAsync()
     expect(moved).toEqual(['pty-1', 'pty-2', 'pty-3'])
-    expect(f.mover.lastDecisions().every((decision) => decision.reason === 'stay')).toBe(true)
+    expect(f.mover.lastDecisions().map((decision) => decision.reason)).toEqual([
+      'under-line',
+      'under-line',
+      'under-line'
+    ])
     expect(f.move).not.toHaveBeenCalled()
   })
 })
