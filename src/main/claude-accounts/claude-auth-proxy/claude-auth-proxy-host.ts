@@ -20,6 +20,7 @@ import {
 import { noteUserAnthropicBaseUrl } from './claude-auth-proxy-note'
 import { createClaudeAuthProxy, type ClaudeAuthProxy } from './claude-auth-proxy'
 import { createClaudeAuthProxyAccountLogObserver } from '../claude-account-log'
+import { setClaudeAuthProxyStatusReader } from '../claude-account-list-extras'
 import {
   bindClaudeAuthProxySlotToPty,
   claudeAuthProxySlotModel,
@@ -79,6 +80,7 @@ export function startClaudeAuthProxy(): Promise<void> {
     .then(() => {
       proxy = created
       setClaudePaneProxySlotReleaser((slot) => releaseOwnClaudeAuthProxySlot(slot))
+      setClaudeAuthProxyStatusReader(() => created.status())
       const port = created.port()
       if (port !== null) {
         claudePaneAccountPersistence()?.setProxyPort(port)
@@ -117,6 +119,7 @@ export async function stopClaudeAuthProxy(): Promise<void> {
   accountConfigDirs.clear()
   resetClaudeAuthProxySlotOwners()
   setClaudePaneProxySlotReleaser(null)
+  setClaudeAuthProxyStatusReader(null)
   if (current) {
     await current.stop()
   }

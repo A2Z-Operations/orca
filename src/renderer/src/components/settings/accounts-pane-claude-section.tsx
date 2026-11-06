@@ -9,12 +9,7 @@ import { ClaudeIcon } from '../status-bar/icons'
 import { claudeAccountNeedsSignIn } from '../status-bar/usage-error-copy'
 import { SearchableSetting } from './SearchableSetting'
 import { renderClaudeAutoSwitchSetting } from './accounts-pane-claude-auto-switch'
-import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
-import { ClaudeAccountPoolSetting } from './claude-account-pool-setting'
-import { ClaudeModelPolicySetting } from './claude-model-policy-setting'
-import { ClaudeAuthProxySetting } from './claude-auth-proxy-setting'
-import { ClaudeSessionMoverSetting } from './claude-session-mover-setting'
-import { ClaudeRecentMoves } from './claude-recent-moves'
+import { ClaudeAccountBehaviorSettings } from './claude-account-behavior-settings'
 import {
   getProviderAccountRuntime,
   providerAccountIsActiveInView
@@ -393,16 +388,12 @@ export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): Re
       </SearchableSetting>
 
       {renderClaudeAutoSwitchSetting(model)}
-      {isRemoteAccountScope ? null : (
-        <>
-          <ClaudeRunningSessionSwitchSetting settings={settings} updateSettings={updateSettings} />
-          <ClaudeSessionMoverSetting settings={settings} updateSettings={updateSettings} />
-          <ClaudeAccountPoolSetting settings={settings} updateSettings={updateSettings} />
-          <ClaudeModelPolicySetting settings={settings} updateSettings={updateSettings} />
-          <ClaudeAuthProxySetting settings={settings} updateSettings={updateSettings} />
-        </>
-      )}
-      <ClaudeRecentMoves moves={claudeAccounts.sessionMoves} />
+      <ClaudeAccountBehaviorSettings
+        settings={settings}
+        updateSettings={updateSettings}
+        accounts={claudeAccounts}
+        showHostSettings={!isRemoteAccountScope}
+      />
     </section>
   )
 }

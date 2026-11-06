@@ -129,7 +129,46 @@ describe('account auth-proxy surface', () => {
     expect(text).toContain('Claude auth-proxy: 127.0.0.1:43121')
     expect(text).toContain('  slot-a → account-a')
     expect(text).toContain('  requests last hour: account-a 4')
-    expect(text).toContain('  unknown slots: 2')
+    expect(text).toContain('! unknown slots: 2')
     expect(text).toContain('  last error: 429 POST /v1/messages account-a')
+    expect(text).toContain('  health: needs attention')
+  })
+
+  it('marks an upstream error within the hour, and stays quiet when healthy', async () => {
+    const status = {
+      listening: true,
+      host: '127.0.0.1',
+      port: 43121,
+      slots: [],
+      requestsLastHour: [],
+      unknownSlotRequests: 0,
+      lastError: {
+        at: Date.now() - 12 * 60_000,
+        method: 'POST',
+        path: '/v1/messages',
+        status: 429,
+        accountId: null
+      }
+    }
+    const flags: [string, string | boolean][] = [
+      ['agent', 'claude'],
+      ['status', true]
+    ]
+    callMock.mockResolvedValue({ id: 'test', ok: true, result: status, _meta: { runtimeId: 'r' } })
+    await ACCOUNT_HANDLERS['account auth-proxy'](context(flags))
+    const recent = String(logSpy.mock.calls[0]?.[0])
+    expect(recent).toContain('  unknown slots: 0')
+    expect(recent).toContain('! last error: 429 POST /v1/messages - (12m ago)')
+    expect(recent).toContain('  health: needs attention')
+    callMock.mockResolvedValue({
+      id: 'test',
+      ok: true,
+      result: { ...status, lastError: null },
+      _meta: { runtimeId: 'r' }
+    })
+    await ACCOUNT_HANDLERS['account auth-proxy'](context(flags))
+    const healthy = String(logSpy.mock.calls[1]?.[0])
+    expect(healthy).toContain('  last error: none')
+    expect(healthy).not.toContain('needs attention')
   })
 })

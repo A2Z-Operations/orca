@@ -1,3 +1,4 @@
+import type { ClaudeAuthProxyStatus } from './claude-auth-proxy-status'
 import type { ClaudeSessionMoverSetting } from './claude-account-switch-settings'
 
 export type ManagedDataAccountProvider = 'opencode' | 'devin'
@@ -188,7 +189,15 @@ export type ClaudeRateLimitAccountsState = {
   modelPolicy?: { enabled: boolean; fableLine: number; weeklyGuard: number }
   /** Last model-policy pass per live pane. Absent from older hosts and when none has run. */
   modelPolicyEvaluations?: ClaudeModelPolicyEvaluation[]
+  /** Auth-proxy trouble since the listener started. Absent from older hosts and with no listener. */
+  authProxyHealth?: ClaudeAuthProxyHealth
 }
+
+/** Requests whose slot the listener did not know, and the last upstream status ≥ 400. */
+export type ClaudeAuthProxyHealth = Pick<
+  ClaudeAuthProxyStatus,
+  'listening' | 'unknownSlotRequests' | 'lastError'
+>
 
 /** One-shot refresh. The access token stays on the runtime. */
 export type ClaudeTokenRefreshNowResult = {
