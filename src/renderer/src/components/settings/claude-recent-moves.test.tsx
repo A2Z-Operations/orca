@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ClaudeRecentMoves } from './claude-recent-moves'
 import { RECENT_MOVES_NOW, recentMovesFixture } from './claude-recent-moves-test-fixture'
@@ -77,5 +77,37 @@ describe('ClaudeRecentMoves table', () => {
     const [, method, params] = rpc.call.mock.calls[0] ?? []
     expect(method).toBe('accounts.claudeAccountLog')
     expect(params).toMatchObject({ limit: 200 })
+  })
+
+  it('Load older reaches rows that share the oldest millisecond, without repeating it', async () => {
+    const oldestAt = RECENT_MOVES_NOW - 14 * 60_000
+    const sameTick = (ptyId: string) => ({
+      type: 'decision' as const,
+      at: oldestAt,
+      ptyId,
+      paneKey: null,
+      fromAccountId: 'acct-a',
+      toAccountId: 'acct-b',
+      reason: 'moved',
+      strategy: 'resume' as const
+    })
+    // The page the host serves ends on the same tick the table already shows: the move it has, plus
+    // two more panes moved in that same millisecond that the first page's limit cut off.
+    rpc.call.mockResolvedValue({
+      entries: [sameTick('pty-moved'), sameTick('pty-same-ms-1'), sameTick('pty-same-ms-2')]
+    })
+    renderTable()
+    expect(screen.getAllByTestId('claude-move-row')).toHaveLength(3)
+    const loadOlder = screen.getByRole('button', { name: 'Load older' })
+    fireEvent.click(loadOlder)
+    expect(await screen.findByText('25 rows')).toBeTruthy()
+    expect(rpc.call.mock.calls[0]?.[2]).toMatchObject({ before: oldestAt + 1 })
+    // The oldest row still sits on that tick; the next page asks for it again and repeats nothing.
+    fireEvent.click(loadOlder)
+    await waitFor(() => expect(loadOlder.hasAttribute('disabled')).toBe(false))
+    expect(rpc.call).toHaveBeenCalledTimes(2)
+    expect(rpc.call.mock.calls[1]?.[2]).toMatchObject({ before: oldestAt + 1 })
+    expect(screen.getByText('25 rows')).toBeTruthy()
+    expect(screen.getAllByTestId('claude-move-row')).toHaveLength(5)
   })
 })

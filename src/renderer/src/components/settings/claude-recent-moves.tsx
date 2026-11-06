@@ -75,7 +75,10 @@ export function ClaudeRecentMoves({
     setLoading(true)
     setLoadFailed(false)
     try {
-      const before = rows.at(-1)?.at ?? Date.now()
+      // Why +1: the host reads strictly before this stamp. Rows that share the oldest row's
+      // millisecond past the page limit would never come back; the merge drops the repeats.
+      const oldest = rows.at(-1)?.at
+      const before = oldest === undefined ? Date.now() : oldest + 1
       const result = await callRuntimeRpc<{ entries: ClaudeAccountLogEntry[] }>(
         owner,
         'accounts.claudeAccountLog',
