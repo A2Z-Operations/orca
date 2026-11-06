@@ -1,4 +1,5 @@
 import type { ClaudeSessionMoveSummary } from '../../../../shared/managed-account-types'
+import { translate } from '@/i18n/i18n'
 
 /** A translatable phrase: the component passes it to `translate`; tests read the fallback. */
 export type ClaudeMovePhrase = {
@@ -49,26 +50,38 @@ const STAY_WORDS: Record<string, [string, string]> = {
   rebalance: [`${PREFIX}.rebalance`, 'Moved to balance accounts']
 }
 
-const MODEL_NAMES: Record<string, string> = { fable: 'Fable', opus: 'Opus', unset: 'unset' }
+const MODEL_NAMES: Record<string, [string, string]> = {
+  fable: [`${PREFIX}.model.fable`, 'Fable'],
+  opus: [`${PREFIX}.model.opus`, 'Opus'],
+  unset: [`${PREFIX}.model.unset`, 'unset']
+}
 
-const FLIP_WHY: Record<string, string> = {
-  'fable-line': 'Fable window at its line',
-  'weekly-guard': 'weekly window at its guard',
-  hysteresis: 'still near a line',
-  'window-reset': 'a window reset',
-  'fable-headroom': 'Fable has room',
-  uncovered: 'fixed model restored'
+const FLIP_WHY: Record<string, [string, string]> = {
+  'fable-line': [`${PREFIX}.flipWhy.fableLine`, 'Fable window at its line'],
+  'weekly-guard': [`${PREFIX}.flipWhy.weeklyGuard`, 'weekly window at its guard'],
+  hysteresis: [`${PREFIX}.flipWhy.hysteresis`, 'still near a line'],
+  'window-reset': [`${PREFIX}.flipWhy.windowReset`, 'a window reset'],
+  'fable-headroom': [`${PREFIX}.flipWhy.fableHeadroom`, 'Fable has room'],
+  uncovered: [`${PREFIX}.flipWhy.uncovered`, 'fixed model restored']
+}
+
+/** A catalog word for a known token; a token newer hosts add shows as itself. */
+function word(words: Record<string, [string, string]>, token: string | undefined): string {
+  const entry = words[token ?? '']
+  return entry ? translate(entry[0], entry[1]) : (token ?? '-')
 }
 
 /** Plain words for the Decision column. Unknown reasons from newer hosts show as themselves. */
 export function claudeMoveDecision(row: ClaudeSessionMoveSummary): ClaudeMovePhrase {
   if (row.kind === 'model') {
-    const from = MODEL_NAMES[row.modelFrom ?? ''] ?? row.modelFrom ?? '-'
-    const to = MODEL_NAMES[row.modelTo ?? ''] ?? row.modelTo ?? '-'
     return {
       key: `${PREFIX}.flip`,
       fallback: 'Switched model: {{from}} → {{to}} ({{why}})',
-      values: { from, to, why: FLIP_WHY[row.reason] ?? row.reason }
+      values: {
+        from: word(MODEL_NAMES, row.modelFrom),
+        to: word(MODEL_NAMES, row.modelTo),
+        why: word(FLIP_WHY, row.reason)
+      }
     }
   }
   if (row.reason === 'moved') {

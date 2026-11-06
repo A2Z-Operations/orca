@@ -21424,8 +21424,24 @@
           "flip": "Switched model: {{from}} → {{to}} ({{why}})",
           "movedProxy": "Moved (no restart)",
           "movedResume": "Moved (restarted)",
-          "other": "{{reason}}"
+          "other": "{{reason}}",
+          "model": {
+            "fable": "Fable",
+            "opus": "Opus",
+            "unset": "unset"
+          },
+          "flipWhy": {
+            "fableLine": "Fable window at its line",
+            "weeklyGuard": "weekly window at its guard",
+            "hysteresis": "still near a line",
+            "windowReset": "a window reset",
+            "fableHeadroom": "Fable has room",
+            "uncovered": "fixed model restored"
+          }
         },
+        "sessionIds": "pane {{pane}} · pty {{pty}}",
+        "chatSession": "Chat {{short}}",
+        "terminalSession": "Session {{short}}",
         "viaProxy": "proxy",
         "viaRestart": "restart",
         "when": "When",

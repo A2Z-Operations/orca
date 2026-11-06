@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { ClaudeSessionMoveSummary } from '../../../../shared/managed-account-types'
+import { translate } from '@/i18n/i18n'
 import { useAppStore, type AppState } from '../../store'
 import { selectWorktreesByRepo } from '../../store/workspace-record-selectors'
 
@@ -44,14 +45,20 @@ export function claudeMoveSessionName(
   row: Pick<ClaudeSessionMoveSummary, 'ptyId' | 'paneKey' | 'chat'>,
   tabs: ReadonlyMap<string, ClaudeMoveTabName>
 ): ClaudeMoveSessionName {
-  const ids = `pane ${row.paneKey ?? '-'} · pty ${row.ptyId}`
+  const ids = translate('accounts.claude.recentMoves.sessionIds', 'pane {{pane}} · pty {{pty}}', {
+    pane: row.paneKey ?? '-',
+    pty: row.ptyId
+  })
   const tabId = row.paneKey?.split(':')[0]
   const tab = tabId ? tabs.get(tabId) : undefined
   if (tab?.title) {
     return { name: tab.worktree ? `${tab.title} · ${tab.worktree}` : tab.title, ids }
   }
   const short = row.ptyId.replace(/[^a-zA-Z0-9]/g, '').slice(-6) || row.ptyId
-  return { name: row.chat ? `Chat ${short}` : `Session ${short}`, ids }
+  const name = row.chat
+    ? translate('accounts.claude.recentMoves.chatSession', 'Chat {{short}}', { short })
+    : translate('accounts.claude.recentMoves.terminalSession', 'Session {{short}}', { short })
+  return { name, ids }
 }
 
 const NONE = {}
