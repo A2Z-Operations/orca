@@ -1,7 +1,7 @@
 import type { ClaudeSessionMoveSummary } from '../../../../shared/managed-account-types'
 import { translate } from '@/i18n/i18n'
 
-/** A translatable phrase: the component passes it to `translate`; tests read the fallback. */
+/** A translatable phrase: the component passes it to `translate`. */
 export type ClaudeMovePhrase = {
   key: string
   fallback: string
@@ -93,11 +93,4 @@ export function claudeMoveDecision(row: ClaudeSessionMoveSummary): ClaudeMovePhr
   return words
     ? { key: words[0], fallback: words[1] }
     : { key: `${PREFIX}.other`, fallback: '{{reason}}', values: { reason: row.reason } }
-}
-
-/** Fallback text with `{{name}}` filled in, as `translate` does with no catalog entry. */
-export function claudeMovePhraseText(phrase: ClaudeMovePhrase): string {
-  return phrase.fallback.replace(/\{\{(\w+)\}\}/g, (match, name: string) =>
-    phrase.values && name in phrase.values ? (phrase.values[name] ?? match) : match
-  )
 }

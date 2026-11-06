@@ -39,10 +39,6 @@ export function appendClaudeAccountLog(entry: ClaudeAccountLogEntry): void {
   sink?.push(entry)
 }
 
-export function flushClaudeAccountLog(): void {
-  sink?.flush()
-}
-
 export function closeClaudeAccountLog(): void {
   sink?.close()
   sink = null

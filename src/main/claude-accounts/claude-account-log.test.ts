@@ -8,7 +8,6 @@ import {
   CLAUDE_ACCOUNT_LOG_FILE,
   closeClaudeAccountLog,
   createClaudeAuthProxyAccountLogObserver,
-  flushClaudeAccountLog,
   openClaudeAccountLog
 } from './claude-account-log'
 import { readClaudeAccountLog } from './claude-account-log-read'
@@ -48,7 +47,7 @@ describe('claude account log', () => {
     appendClaudeAccountLog(decision(3_000, 'under-line'))
     appendClaudeAccountLog(decision(1_000, 'wait:mid-turn'))
     appendClaudeAccountLog(decision(2_000, 'cooldown'))
-    flushClaudeAccountLog()
+    closeClaudeAccountLog()
     expect(readFileSync(path, 'utf8').trim().split('\n')).toHaveLength(3)
     expect(readClaudeAccountLog({ filePath: path }).entries.map((row) => row.at)).toEqual([
       1_000, 2_000, 3_000

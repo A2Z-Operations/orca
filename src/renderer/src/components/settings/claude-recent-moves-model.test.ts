@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { translate } from '@/i18n/i18n'
 import type { ClaudeSessionMoveSummary } from '../../../../shared/managed-account-types'
 import { claudeAccountUsageState } from './claude-account-usage-state'
 import { recentMovesFixture } from './claude-recent-moves-test-fixture'
@@ -9,12 +10,7 @@ import {
   mergeClaudeMoveRows
 } from './claude-recent-moves-rows'
 import { claudeMoveSessionName } from './claude-recent-moves-session-name'
-import {
-  claudeMoveCategory,
-  claudeMoveDecision,
-  claudeMovePhraseText,
-  claudeMoveVia
-} from './claude-recent-moves-words'
+import { claudeMoveCategory, claudeMoveDecision, claudeMoveVia } from './claude-recent-moves-words'
 
 const row = (extra: Partial<ClaudeSessionMoveSummary>): ClaudeSessionMoveSummary => ({
   ptyId: 'pty-1',
@@ -29,8 +25,10 @@ const row = (extra: Partial<ClaudeSessionMoveSummary>): ClaudeSessionMoveSummary
   ...extra
 })
 
-const words = (extra: Partial<ClaudeSessionMoveSummary>) =>
-  claudeMovePhraseText(claudeMoveDecision(row(extra)))
+const words = (extra: Partial<ClaudeSessionMoveSummary>) => {
+  const phrase = claudeMoveDecision(row(extra))
+  return translate(phrase.key, phrase.fallback, phrase.values)
+}
 
 describe('recent moves rows', () => {
   it('turns reasons into plain words', () => {

@@ -47,5 +47,3 @@ export type ClaudeAccountLogEntry =
       /** Identical errors folded into this row since the previous one. */
       count: number
     }
-
-export type ClaudeAccountLogType = ClaudeAccountLogEntry['type']

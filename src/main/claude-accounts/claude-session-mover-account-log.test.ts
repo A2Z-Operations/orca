@@ -2,11 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  closeClaudeAccountLog,
-  flushClaudeAccountLog,
-  openClaudeAccountLog
-} from './claude-account-log'
+import { closeClaudeAccountLog, openClaudeAccountLog } from './claude-account-log'
 import { readClaudeAccountLog } from './claude-account-log-read'
 import { limits, PANE_1, setup, state } from './claude-session-mover-test-fixture'
 
@@ -36,7 +32,7 @@ describe('session mover writes the durable account log', () => {
     f.publish(state(31, { b: limits(96), c: limits(20) }))
     f.publish(state(96, { b: limits(20), c: limits(50) }))
     await vi.runAllTimersAsync()
-    flushClaudeAccountLog()
+    closeClaudeAccountLog()
     const rows = readClaudeAccountLog({ filePath: path }).entries
     const reasons = rows.map((row) => (row.type === 'decision' ? row.reason : row.type))
     expect(reasons.filter((reason) => reason === reasons[0])).toHaveLength(1)
@@ -73,7 +69,7 @@ describe('session mover writes the durable account log', () => {
     )
     expect(reasons['pty-1']).toBe('no-target')
     expect(reasons['pty-3']).toBe('wait:mid-turn')
-    flushClaudeAccountLog()
+    closeClaudeAccountLog()
     const logged = readClaudeAccountLog({ filePath: path }).entries
     expect(logged.some((row) => row.type === 'decision' && row.reason === 'stay')).toBe(false)
     expect(logged.filter((row) => row.type === 'decision').map((row) => row.reason)).toEqual(

@@ -2,11 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import {
-  closeClaudeAccountLog,
-  flushClaudeAccountLog,
-  openClaudeAccountLog
-} from './claude-account-log'
+import { closeClaudeAccountLog, openClaudeAccountLog } from './claude-account-log'
 import { readClaudeAccountLog } from './claude-account-log-read'
 import { applyClaudeModelFlip, uncoverClaudePaneModel } from './claude-model-flip-apply'
 import { claudeModelFlips, resetClaudeModelFlips } from './claude-model-flip-history'
@@ -81,7 +77,7 @@ describe('applyClaudeModelFlip', () => {
       modelTo: 'opus'
     })
     expect(rows.find((row) => row.ptyId === 'pty-plain')?.strategy).toBeUndefined()
-    flushClaudeAccountLog()
+    closeClaudeAccountLog()
     const logged = readClaudeAccountLog({ filePath: path }).entries
     expect(logged.find((row) => row.type === 'flip' && row.ptyId === 'pty-proxy')).toMatchObject({
       kind: 'model',
