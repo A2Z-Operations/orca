@@ -292,3 +292,72 @@ Conflicts and import moves (all mechanical, folded into the commits that introdu
 - D: `orcad-account-services.ts` and `provider-claude-session-mover.ts` import the moved provider file; the provider file's `./provider-claude-session-mover` import became `../../provider-claude-session-mover` (caught by E's typecheck). F: `claude-account-pool-launch` import re-pointed.
 
 Gate (coordinator-reduced): typecheck node/web/cli `EXIT 0` on PR 0 and E; PR 0 targeted suites 240/240 pass; `oxlint src/main/startup/main-process-quit.ts` clean on C. The `run-vitest.mjs related` selection from the brief was dropped on the coordinator's instruction (it pulled in unrelated runtime/persistence specs that fail for environment reasons here).
+
+## Rebase #5 onto `480842c82a72` (A dropped after #37633) (2026-11-05, task_354bd99fb16a)
+
+A maintainer closed PR A #37568 (`pr/serve-usage-polling`) and merged #37633 instead: every host now runs the poll timer from `createProviderAccountServices` (`rateLimits.start({ fetchImmediately: false })`), and a tick fetches only while someone watches — the focused desktop window, or a viewer taken with `RateLimitService.addUsageViewer()` (held by a paired device's `accounts.subscribe` stream). The ladder now has six PRs: **0 → B** and **0 → C → D → F → E**. All six rebased onto upstream/main `480842c82a72` (527 commits past `af6cb2cf8c3`), force-pushed with lease on 2026-11-06 12:50Z, after both full gates had passed on the pushed SHAs. Author and committer Nachumi only, no trailers (the `(cherry picked from …)` line on PR 0's `--on/--off` commit was removed), forbidden-word grep of messages and diffs empty, merge-tree clean on all six, stack ancestry verified.
+
+### New HEADs
+
+| PR  | branch                               | old HEAD      | new HEAD                                   | own diff vs parent        | own commits |
+| --- | ------------------------------------ | ------------- | ------------------------------------------ | ------------------------- | ----------- |
+| 0   | `pr/claude-pane-account-registry-v2` | `7e4c2859da3` | `67ca11eec50f0ebd22d3897bf7a9b4ca91a6c4c0` | 88 files, +3726/−161      | 8           |
+| B   | `pr/idle-token-refresh`              | `46fdb2215f3` | `ef5d9d35c253b4e7a932853ba76713127a4c9f09` | 42 files, +3113/−17       | 3           |
+| C   | `pr/claude-auth-proxy`               | `9d0edf9c67c` | `201c5c5ba43e6c6f0842680b894a1aa1b61a035d` | 69 files, +3089/−45       | 6           |
+| D   | `pr/claude-session-mover-proxy`      | `d71e1c88c45` | `0eaa8d69d298bb7435ddece842a388ab5ada3471` | 91 files, +6474/−82       | 7           |
+| F   | `pr/claude-account-pool`             | `d7df158ab79` | `2cc838e29c3bda3abdf0d814465db8b807060372` | 61 files, +1600/−135      | 2           |
+| E   | `pr/native-chat-account-coverage`    | `9621971791e` | `c8874dcd51786bb794ef987a6ca81d87c5548929` | 23 files, +1012/−31       | 2           |
+
+### A dropped
+
+B was rebased with `--onto` PR 0 and these five commits removed from the todo: `9388eb948f7` (poll inactive accounts under Electron serve, failure logging), `f378f85466f` (arm polling from Electron serve launch, `serve-claude-usage-polling.ts`, selected-account usage), `069eb76978b`, `bb7931f98ac`, `00e0c396fb1` (their test/line-budget follow-ups). B's three own commits stayed.
+
+What of A survived inside B (folded into B's first commit, `Refresh idle Claude account tokens…`): only the `httpStatus?: number` field on `UsageRateLimitMetadata`, because B's lapsed result reports `httpStatus: 401`. B's ordering hook now calls `orderInactiveClaudeRefreshAccounts(accounts, null)` inside upstream's `fetchInactiveClaudeAccountsOnOpen` (A's selected-host-account fetch is gone), and B no longer adds `setActiveClaudeUsageAccountResolver` in `provider-account-services.ts`. The token-refresh retry therefore runs on #37633's path: the inactive-account fetch that `accounts.list`/`accounts.subscribe` and window focus trigger, on a host someone watches.
+
+### PR 0 polling re-wired onto #37633
+
+PR 0 had its own headless opt-in (`start({ pollWithoutWindow: true })`). That flag is removed from `service-configuration.ts`, `service-polling.ts` and `service-state.ts`, and `service-headless-polling.test.ts` is deleted. `createClaudeUsagePollingSwitch` now holds one usage viewer (`addUsageViewer()`, plus one `refreshIfStale()`) while auto-switch is on and releases it when off; orcad still applies it from settings. D and F extend the same switch with the session mover and the pool, as before. D's `orcad-account-services.test.ts` case now spies on `addUsageViewer`/`refreshIfStale`. `docs/reference/claude-accounts.md` states the headless behaviour in viewer terms. No window-only start was added, so `runtime-composition-parity.test.ts` passes unchanged.
+
+### Conflicts resolved
+
+- **PR 0** — upstream moves: `codex/configuration/homes/`, `agent-hook-listener/configuration/agent-status-hooks-setting` (also in the new `claude-profile-setup-queue.ts`), `settings/accounts/claude/` (our `accounts-pane-claude-auto-switch.tsx` moved there), `runtime/agent-session/environment/` (our `runtime-account-data-snapshot.ts` moved beside the controller). Upstream deleted `ClaudeAccountSwitchDialog.test.tsx`, `AccountsPane.test.tsx`, `runtime-provider-accounts-client.test.ts` (low-value test sweeps); our additions to them went with them. `AccountsPane.owner-scope.test.tsx` moved to `settings/accounts/`; our auto-switch case re-added there.
+- **B** — `claude-credential-persistence-ratchet.test.ts` was deleted upstream (#38763); our allowance for `claude-oauth-refresh.ts` went with it. Import moves in `runtime-service-command-surface.ts` and the Claude settings section.
+- **C** — `main-process-quit.ts`: upstream path kept, `stopClaudeAuthProxy` import and call kept. `runtime-auth-service.ts` (wsl moves), `spawn-commit-assembly.ts`, `orcad-account-services.test.ts`. `runtime-account-claude-policy.ts` and `claude-auth-proxy-setting.tsx` moved beside their upstream neighbours. `index-local-command-routing-flags.test.ts` deleted upstream (#38733), our `auth-proxy --environment` case went with it.
+- **D** — `provider-account-services.ts`: upstream `rateLimits.start` kept above our `sessionMover` return. ~20 shared-module moves fixed (`workspace-layout/stable-pane-id`, `agent-status/contracts/*`, `agent-launch/startup/*`, `push/notifications/…`). Mover settings UI moved into `settings/accounts/claude/`. Our new cases in `server-status-listener-fanout.test.ts` kept, the ones upstream deleted dropped.
+- **F** — `ClaudeSwitcherForOwner.tsx`: upstream's `AccountSwitchSection`/signed-out grouping kept; our Pool badge goes through a new optional `badge` prop on `AccountSwitchSection`, and the per-account session count joins the row's `detail` line. `use-tab-agent.ts`: upstream's memoised resolver kept with our `focusedTerminalPtyId`. `account.ts` imports merged with upstream's `account-command-guards`. `claude-account-pool-setting.tsx` moved to `settings/accounts/claude/`.
+- **E** — `claude-structured-launch-resolution.ts` (moved composition import), `runtime-mobile-structured-tab-status.ts` (moved). Upstream deleted the old `runtime-mobile-structured-tab-status.test.ts`; our billed-account case is recreated beside the moved source.
+
+### Found by the full gate and fixed: saved-roster rows (D)
+
+Upstream's newer `src/main/runtime/agent-session-saved-roster.test.ts` asserts the exact status-change row (`paneKey`, `state`, `receivedAt`, `observedInCurrentRuntime`). D adds `mainAgentState` (and `backgroundWork`/`turnEndedAt` when present) to those rows for the session mover, so the four seeding cases failed from D onward (passes on upstream/main, PR 0, B and C; fails on D, F, E). Fixed by one test-only commit on D, "Expect the main agent state on saved-roster status rows." (`0eaa8d69d29`, 11/11 pass); F and E restacked with `--onto` onto it, each keeping only its own two commits.
+
+### Found by the full gate and fixed: launch on a deleted account home (PR 0)
+
+The first full gate of PR 0 failed two cases of upstream's `claude-profile-router.test.ts` ("makes a launch redo a first setup that was cut off after its ownership gate", "requires concurrent launches to finish rebuilding a home whose marker survived"): `prepareLaunch()` resolved where upstream rejects with `claudeAccountSetupFailed`. Cause: upstream #38389 moved the profile marker out of the home folder (`claude-profiles/<id>/profile.json`), and its `prepareClaudeProfileForLaunch` now treats a missing **folder or** marker as a first construction that must succeed. PR 0's `ClaudeProfileSetupQueue.runForLaunch` (the setup logic PR 0 extracts from the router) had carried the older marker-only check, so a deleted home with a surviving marker took the capped-refresh path and launched. Fix (14 lines removed, 10 added, one file): `runForLaunch` now delegates to upstream's `prepareClaudeProfileForLaunch` with the queue's `run` as the setup, so the launch policy stays upstream's. Squashed into PR 0's "Follow upstream module moves and router helpers" commit (PR 0 stays at 8 commits); B, C, D, F, E restacked with `--onto`, each unchanged apart from inheriting the fix. 11/11 pass on PR 0; both full gates re-run on the new SHAs (below).
+
+### Gates
+
+Per branch: typecheck node/web/cli, targeted vitest on every changed test file plus `src/main/rate-limits/**/*.test.ts` and `runtime-composition-parity.test.ts`, oxlint on changed files, `check-changed-code-quality.mjs upstream/main`.
+
+| branch | typecheck node/web/cli | targeted vitest       | oxlint | quality |
+| ------ | ---------------------- | --------------------- | ------ | ------- |
+| 0      | 0/0/0                  | 69 files, 840 pass    | pass   | pass    |
+| B      | 0/0/0                  | 74 files, 876 pass    | pass   | pass    |
+| C      | 0/0/0                  | 83 files, 931 pass    | pass   | pass    |
+| D      | 0/0/0                  | 102 files, 1061 pass  | pass   | pass    |
+| F      | 0/0/0                  | 107 files, 1098 pass  | pass   | pass    |
+| E      | 0/0/0                  | 109 files, 1110 pass  | pass   | pass    |
+
+Full `check-changed.mjs --base=upstream/main --maxWorkers=2 --timeout=150` on PR 0 and E, run one at a time (another worker's build kept the load average at 90–235 during round one; two parallel runs had both hit the 120-min timeout before that). Round one: PR 0 `3a9b828fcbf` 102 min, E `3c66a34af74` 79 min — found the profile-router regression above. Round two, on the pushed SHAs: PR 0 `67ca11eec50` 67 min, E `c8874dcd517` 64 min (load ~40). Both rounds: 29/30 checks pass, "unit tests" the only ✗.
+
+Unit failures on the pushed SHAs, all env-only on this Mac: `pty-attach-view-joins-main-start` ×3, `pty-claude-agent-view-readiness`, `pty-hidden-at-spawn-mark`, `pty-launch-race-parity`, `pty-pane-materialization-race`, `pty-runtime-hidden-at-spawn-mark`, `wsl-host-agent-launch-paths` ×4 (PR 0) / ×5 (E), `persisted-profile-state.unit` ×2. One flake on PR 0: `runtime-rpc-websocket-bind-host` ("widens the listener" re-bound on port 59803 instead of 59802 — another process took the freed port; 19/19 on three reruns; PR 0 does not touch `rpc/server`).
+
+Two more env-only groups showed in round one only, both failing identically on upstream/main `480842c82a7`: `runtime-failed-local-worktree-removal.test.ts` ×15 (the global `commit-msg` identity hook refuses the fixture author `Worktree Removal <removal@example.invalid>`) and `tests/e2e/cross-version-wire/*` ×9 (`released-chat-upgrade`, `agent-session-outcome-chat-downgrade`, `agent-session-kill-delivered-downgrade`: the harness needs the two latest release tags, which `git fetch upstream` does not bring in; `git fetch upstream --tags` clears it). Two more things learnt about the gate on this terminal: `pty-spawn-env-terminal-basics` fails only because the Orca terminal exports `GIT_CONFIG_{KEY,VALUE}_0/1`, `GIT_CONFIG_COUNT`, `GIT_EDITOR`, `GIT_TERMINAL_PROMPT`, `GIT_ASKPASS` (42/42 with them unset — the gate script now unsets them); `pty-connection-hidden-replay` is a load flake (90/90 rerun unloaded). The renderer tests need `corepack pnpm exec vitest run --config config/vitest.config.ts`; the direct runner cannot resolve the `@/lib/...` alias.
+
+### GitHub state after the push
+
+Still **CONFLICTING on all six** (#37567, #37569–#37573): upstream/main moved 94 commits (`480842c82a7` → `f3cba2e772c`) during the ~26 h the four full-gate runs took, and `git merge-tree` against the new tip reports 5/5/6/7/7/7 conflicting files (PR 0: `src/cli/handlers/account.ts`, `account-list-format.ts`, `root-help-text-primary.ts`, `root-help-text-secondary.ts`, and `src/main/rate-limits/claude-profile-usage.test.ts` deleted upstream). The branches are clean against the base this task was given. Rebase #6 onto `f3cba2e772c` was asked for and not answered within 30 min, so under the standing rule it was not started; it needs its own dispatch (expect ~4–5 h: resolve + two sequential full gates).
+
+#37569's body sentence "Stacked on the headless-polling PR" → "Stacked on #37567" was changed with `gh pr edit --body-file` (pre-approved for this task; the old body is kept in the task scratchpad). No comments were posted on any upstream PR or issue.
+
+**Land order: 0, B, C, D, F, E.** Standing rule unchanged: no further rebases on my own.
