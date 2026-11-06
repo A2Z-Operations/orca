@@ -6,7 +6,15 @@ type LoggedRequest = { accountId: string; at: number }
 
 export function createClaudeAuthProxyRequestLog(
   now: () => number,
-  log: (line: string) => void
+  log: (line: string) => void,
+  /** Every observed request, for the durable account log. */
+  onRequest?: (request: {
+    method: string
+    path: string
+    status: number
+    accountId: string | null
+    unknownSlot: boolean
+  }) => void
 ): {
   observe: (
     method: string,
@@ -39,6 +47,7 @@ export function createClaudeAuthProxyRequestLog(
     observe(method, upstreamPath, status, accountId, unknownSlot) {
       const at = now()
       log(`${method} ${upstreamPath} ${status} ${accountId ?? '-'}`)
+      onRequest?.({ method, path: upstreamPath, status, accountId, unknownSlot })
       if (accountId) {
         requests.push({ accountId, at })
         prune(at)

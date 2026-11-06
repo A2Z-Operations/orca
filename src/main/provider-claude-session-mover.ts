@@ -25,6 +25,7 @@ import {
   rememberClaudeModelFlip
 } from './claude-accounts/claude-model-flip-history'
 import { createClaudeModelPolicyTicker } from './claude-accounts/claude-model-policy-ticker'
+import { appendClaudeAccountLog } from './claude-accounts/claude-account-log'
 import {
   claudeAccountUsageReading,
   claudeAccountUsageWindows
@@ -139,6 +140,16 @@ export function createProviderClaudeSessionMover(
     apply: (flip) => {
       setClaudePaneModel(flip.ptyId, flip.to, 'policy')
       rememberClaudeModelFlip(flip)
+      appendClaudeAccountLog({
+        type: 'flip',
+        at: flip.at,
+        ptyId: flip.ptyId,
+        paneKey: flip.paneKey,
+        accountId: flip.accountId,
+        modelFrom: flip.from,
+        modelTo: flip.to,
+        reason: flip.reason
+      })
       publishClaudeAccountModelChanged({
         ptyId: flip.ptyId,
         accountId: flip.accountId,

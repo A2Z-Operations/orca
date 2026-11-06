@@ -115,14 +115,20 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['account', 'moves'],
     summary: "Show the Claude session mover's last decision for each live session",
-    usage: 'orca account moves [--agent claude] [--environment <selector>] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'agent'],
+    usage:
+      'orca account moves [--agent claude] [--log [--since <iso>]] [--environment <selector>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'agent', 'log', 'since'],
     notes: [
       'Reads claude.sessionMoves from accounts.list on the runtime that owns the sessions.',
+      '--log reads the durable account log (accounts.claudeAccountLog, account-moves.log in the Orca logs folder): every mover decision with its reason, model flip, unknown proxy slot, and proxy upstream error, across restarts. --since keeps rows at or after that time. No tokens, headers, or bodies are logged.',
       'Each line is the time, the pane (or pty when the pane key is absent), from → to, the reason, and the strategy (resume or proxy). A host that predates strategies prints -.',
       'With --environment the decisions are read from that paired Orca server. --json prints the sessionMoves array.'
     ],
-    examples: ['orca account moves', 'orca account moves --environment macstudio --json']
+    examples: [
+      'orca account moves',
+      'orca account moves --log --since 2026-11-05T06:00:00Z',
+      'orca account moves --environment my-server --json'
+    ]
   },
   {
     path: ['account', 'auth-proxy'],

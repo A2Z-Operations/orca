@@ -19,6 +19,7 @@ import {
 } from '../claude-pane-account-persistence'
 import { noteUserAnthropicBaseUrl } from './claude-auth-proxy-note'
 import { createClaudeAuthProxy, type ClaudeAuthProxy } from './claude-auth-proxy'
+import { createClaudeAuthProxyAccountLogObserver } from '../claude-account-log'
 import {
   bindClaudeAuthProxySlotToPty,
   claudeAuthProxySlotModel,
@@ -70,6 +71,7 @@ export function startClaudeAuthProxy(): Promise<void> {
     refreshAccessToken: refreshClaudeAuthProxyAccessToken,
     log: (line) => console.info(`[claude-auth-proxy] ${line}`),
     modelForSlot: claudeAuthProxySlotModel,
+    onRequest: createClaudeAuthProxyAccountLogObserver(),
     preferredPort: claudePaneAccountPersistence()?.proxyPort() ?? null
   })
   pending = created

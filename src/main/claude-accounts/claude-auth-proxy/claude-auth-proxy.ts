@@ -85,6 +85,8 @@ export type ClaudeAuthProxyOptions = {
   refreshAccessToken?: (accountId: string) => Promise<string | null>
   /** Port of the previous listener. Taken or absent means an ephemeral port. */
   preferredPort?: number | null
+  /** Each request's method, upstream path, status, account, and whether its slot was unknown. */
+  onRequest?: Parameters<typeof createClaudeAuthProxyRequestLog>[2]
 }
 
 export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAuthProxy {
@@ -101,7 +103,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     now,
     readToken: options.readToken
   })
-  const requests = createClaudeAuthProxyRequestLog(now, log)
+  const requests = createClaudeAuthProxyRequestLog(now, log, options.onRequest)
   const idleTimeoutMs = options.idleTimeoutMs ?? CLAUDE_AUTH_PROXY_IDLE_TIMEOUT_MS
   const httpAgent = new HttpAgent({ keepAlive: true })
   const httpsAgent = new HttpsAgent({ keepAlive: true })

@@ -44,6 +44,14 @@ export const RefreshClaudeAccountTokenNowParams = z.object({
 
 export const ClaudeAuthProxyStatusParams = z.object({}).strict()
 
+/** `since` is epoch ms. The newest `limit` rows at or after it, oldest first. */
+export const ClaudeAccountLogParams = z
+  .object({
+    since: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).max(5_000).optional()
+  })
+  .strict()
+
 export const SetClaudeAccountPoolParams = z.object({ enabled: z.boolean() })
 
 export const SetClaudeModelPolicyParams = z

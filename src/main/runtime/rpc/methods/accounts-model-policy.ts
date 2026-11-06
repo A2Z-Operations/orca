@@ -1,5 +1,7 @@
 import { defineMethod } from '../core'
+import { readClaudeAccountLog } from '../../../claude-accounts/claude-account-log-read'
 import {
+  ClaudeAccountLogParams,
   RefreshClaudeAccountTokenNowParams,
   SetClaudeAccountTokenRefreshParams,
   SetClaudeModelPolicyParams
@@ -27,8 +29,17 @@ export const refreshClaudeAccountTokenNowMethod = defineMethod({
     runtime.refreshClaudeAccountTokenNow({ account: params.account, force: params.force })
 })
 
+/** The durable account log on the runtime that owns the sessions. Read-only. */
+export const claudeAccountLogMethod = defineMethod({
+  name: 'accounts.claudeAccountLog',
+  permission: 'accounts-admin',
+  params: ClaudeAccountLogParams,
+  handler: async (params) => readClaudeAccountLog({ since: params.since, limit: params.limit })
+})
+
 export const claudeAccountSettingMethods = [
   setClaudeModelPolicyMethod,
+  claudeAccountLogMethod,
   setClaudeAccountTokenRefreshMethod,
   refreshClaudeAccountTokenNowMethod
 ]
