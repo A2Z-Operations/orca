@@ -4,7 +4,7 @@ import type { ClaudeSessionMoveSummary } from './managed-account-types'
 export function formatClaudeSessionMoveLine(move: ClaudeSessionMoveSummary): string {
   const pane = move.paneKey ?? move.ptyId
   if (move.kind === 'model') {
-    return `${new Date(move.at).toISOString()}  ${pane}  ${move.modelFrom ?? '-'} → ${move.modelTo ?? '-'}  ${move.reason}  model`
+    return `${new Date(move.at).toISOString()}  ${pane}  ${move.modelFrom ?? '-'} → ${move.modelTo ?? '-'}  ${move.reason}  ${move.strategy ?? '-'}  model`
   }
   const to = move.toAccountId ?? '-'
   const strategy = move.strategy ?? '-'
