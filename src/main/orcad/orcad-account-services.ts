@@ -22,6 +22,7 @@ import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source
 import { resolveHostAgentBaseEnvironment } from '../runtime/structured-agent-shell-environment'
 import { isWslHostOrcadProcess } from '../ipc/wsl-guest-windows-drive-path'
 import {
+  installClaudePaneAccountFileStore,
   startClaudeAuthProxy,
   stopClaudeAuthProxy
 } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
@@ -101,6 +102,7 @@ export function createOrcadAccountServices(args: {
   const unsubscribePolling = store.onSettingsChanged((updates) => {
     polling.apply(updates)
   })
+  installClaudePaneAccountFileStore()
   void startClaudeAuthProxy()
   args.registerCleanup(async () => {
     unsubscribePolling()

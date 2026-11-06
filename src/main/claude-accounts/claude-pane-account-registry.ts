@@ -7,6 +7,7 @@ import {
   takeClaudeAuthProxySlotsForPty
 } from './claude-auth-proxy/claude-auth-proxy-slot-owners'
 import type { ClaudeModelSource } from './claude-model-policy'
+import { claudePaneAccountPersistence } from './claude-pane-account-persistence'
 import { normalizeClaudeConfigDir } from '../rate-limits/service/service-types'
 
 /**
@@ -129,6 +130,7 @@ export function recordClaudePaneAccount(record: ClaudePaneAccountRecord): void {
   }
   syncSlotModel(record)
   records.set(record.ptyId, record)
+  claudePaneAccountPersistence()?.save(record)
   const nextAccountId = claudeBillingAccountId(record)
   if (
     !previous ||
@@ -150,6 +152,7 @@ export function forgetClaudePaneAccount(ptyId: string): void {
     forgetClaudeAuthProxySlotOwner(slot)
     releaseProxySlot?.(slot)
   }
+  claudePaneAccountPersistence()?.forget(ptyId)
   if (!record) {
     return
   }
@@ -172,6 +175,7 @@ export function assignClaudePaneAccount(
   if (providerSessionId) {
     record.providerSessionId = providerSessionId
   }
+  claudePaneAccountPersistence()?.save(record)
   if (previousAccountId !== accountId) {
     publishPaneAssigned(noticeFor(record, accountId))
   }
@@ -193,6 +197,7 @@ export function setClaudePaneModel(
   record.modelSource = modelSource
   syncSlotModel(record)
   if (changed) {
+    claudePaneAccountPersistence()?.save(record)
     publishPaneAssigned(noticeFor(record, claudeBillingAccountId(record)))
   }
   return true

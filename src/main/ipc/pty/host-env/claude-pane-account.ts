@@ -4,12 +4,20 @@ import {
   getClaudePaneAccount,
   recordClaudePaneAccount
 } from '../../../claude-accounts/claude-pane-account-registry'
+import { claudePaneAccountPersistence } from '../../../claude-accounts/claude-pane-account-persistence'
+import { getClaudeAuthProxy } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import type { ClaudeEnvPatch } from '../../../claude-accounts/environment'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import {
   getSelectedClaudeAccountIdForTarget,
   type ClaudeAccountSelectionTarget
 } from '../../../claude-accounts/runtime-selection'
+import {
+  proxySlotFromUrl,
+  readProcessAnthropicBaseUrl,
+  recoverReattachedProxySlot,
+  type ReattachSlotProxy
+} from './claude-pane-proxy-slot-recovery'
 
 const REJECTED_PROFILE_IDS = new Set(['unavailable', 'undefined', 'null'])
 
@@ -59,27 +67,81 @@ function proxySlotFromBaseUrl(envPatch: ClaudeEnvPatch): string | undefined {
   }
 }
 
+type ReattachSources = {
+  pid?: number | null
+  /** Defaults to the live listener. Tests pass a fake. */
+  proxy?: ReattachSlotProxy | null
+  /** Defaults to reading the process environment. Tests pass a fake. */
+  readBaseUrl?: (pid: number | null | undefined) => string | null
+}
+
+function reattachProxy(sources: ReattachSources): ReattachSlotProxy | null {
+  return sources.proxy === undefined ? getClaudeAuthProxy() : sources.proxy
+}
+
+/** The slot a reattached process still carries, read from its environment. */
+function slotFromProcessEnv(sources: ReattachSources, accountId: string): string | undefined {
+  const read = sources.readBaseUrl ?? readProcessAnthropicBaseUrl
+  return recoverReattachedProxySlot({
+    recovered: proxySlotFromUrl(read(sources.pid)),
+    accountId,
+    proxy: reattachProxy(sources)
+  })
+}
+
+/**
+ * A reattach after a restart: the persisted row names the account the launch recorded and the
+ * slot its process carries. Returns false when nothing was persisted for this PTY.
+ */
+function recordReattachedFromPersisted(
+  args: { ptyId: string; paneKey: string | null } & ReattachSources
+): boolean {
+  const persisted = claudePaneAccountPersistence()?.read(args.ptyId)
+  if (!persisted) {
+    return false
+  }
+  const { proxyPort, proxySlot, ...row } = persisted
+  const billed = row.assignedAccountId ?? row.accountId
+  const slot = proxySlot
+    ? recoverReattachedProxySlot({
+        recovered: { slot: proxySlot, port: proxyPort ?? null },
+        accountId: billed,
+        proxy: reattachProxy(args)
+      })
+    : slotFromProcessEnv(args, billed)
+  recordClaudePaneAccount({
+    ...row,
+    paneKey: args.paneKey ?? row.paneKey,
+    ...(slot ? { proxySlot: slot } : {})
+  })
+  return true
+}
+
 /**
  * Records the account a Claude launch runs on; both spawn choke points (renderer pty:spawn and the
  * runtime controller) call this after the spawn committed and its pane key was remembered, so the
  * stored paneKey equals ptyPaneKey's.
  */
-export function recordClaudePaneAccountForSpawn(args: {
-  ptyId: string
-  paneKey: string | null
-  isClaudeLaunch: boolean
-  isReattach: boolean
-  claudeAuth: ClaudeRuntimeAuthPreparation | null
-  claudeAccountId?: string
-  settings: ClaudePaneAccountSettings | undefined
-  target: ClaudeAccountSelectionTarget
-  now?: number
-}): void {
+export function recordClaudePaneAccountForSpawn(
+  args: {
+    ptyId: string
+    paneKey: string | null
+    isClaudeLaunch: boolean
+    isReattach: boolean
+    claudeAuth: ClaudeRuntimeAuthPreparation | null
+    claudeAccountId?: string
+    settings: ClaudePaneAccountSettings | undefined
+    target: ClaudeAccountSelectionTarget
+    now?: number
+  } & ReattachSources
+): void {
   // Why: a reattach inherits the baked environment; re-recording it under today's selection would
-  // erase the account the launch recorded. An empty registry (orcad restarted) still needs a row
-  // so `account list` counts the live pane. The new proxy slot is not stored: the process kept
-  // the env it was born with.
+  // erase the account the launch recorded. An empty registry (the process restarted) reads the
+  // persisted row, so the pane keeps its account and the slot its process still carries.
   if (args.isReattach && getClaudePaneAccount(args.ptyId)) {
+    return
+  }
+  if (args.isReattach && recordReattachedFromPersisted(args)) {
     return
   }
   if (!args.isClaudeLaunch || !args.claudeAuth) {
@@ -100,7 +162,10 @@ export function recordClaudePaneAccountForSpawn(args: {
     }
     return
   }
-  const proxySlot = args.isReattach ? undefined : proxySlotFromBaseUrl(args.claudeAuth.envPatch)
+  // The slot minted for this reattach never reached the process; only the one it was born with counts.
+  const proxySlot = args.isReattach
+    ? slotFromProcessEnv(args, accountId)
+    : proxySlotFromBaseUrl(args.claudeAuth.envPatch)
   const pooled = args.claudeAuth.pooled === true
   recordClaudePaneAccount({
     ptyId: args.ptyId,

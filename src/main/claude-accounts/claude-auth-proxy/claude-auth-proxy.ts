@@ -17,6 +17,7 @@ import {
 } from './claude-auth-proxy-model-body'
 import { createClaudeAuthProxyRequestLog } from './claude-auth-proxy-request-log'
 import { createClaudeAuthProxyTokenCache } from './claude-auth-proxy-token-cache'
+import { CLAUDE_AUTH_PROXY_SLOT_ID, listenClaudeAuthProxy } from './claude-auth-proxy-listen'
 import { CLAUDE_MODEL_REWRITE_BUFFER_CAP } from '../claude-model-body-rewrite'
 import {
   finishBufferedClaudeAuthProxy,
@@ -50,6 +51,8 @@ export type ClaudeAuthProxy = {
   port: () => number | null
   allocateSlot: (accountId: string) => string
   assignSlot: (slot: string, accountId: string) => boolean
+  /** Re-registers a slot a reattached PTY still carries. False for a malformed id. */
+  adoptSlot: (slot: string, accountId: string) => boolean
   accountIdForSlot: (slot: string) => string | null
   /** Trailing slash so Claude's `/v1/...` join keeps the `/p/<slot>/` prefix. */
   slotBaseUrl: (slot: string) => string | null
@@ -80,6 +83,8 @@ export type ClaudeAuthProxyOptions = {
    * A body over the rewrite cap is not replayed; the refresh still runs for the next request.
    */
   refreshAccessToken?: (accountId: string) => Promise<string | null>
+  /** Port of the previous listener. Taken or absent means an ephemeral port. */
+  preferredPort?: number | null
 }
 
 export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAuthProxy {
@@ -128,19 +133,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     if (listening) {
       return listening
     }
-    listening = new Promise<void>((resolve, reject) => {
-      const fail = (error: Error): void => {
-        server.off('listening', ready)
-        reject(error)
-      }
-      const ready = (): void => {
-        server.off('error', fail)
-        resolve()
-      }
-      server.once('error', fail)
-      server.once('listening', ready)
-      server.listen(0, bindHost)
-    })
+    listening = listenClaudeAuthProxy(server, bindHost, options.preferredPort)
     return listening
   }
 
@@ -297,6 +290,13 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     },
     assignSlot(slot, accountId) {
       if (!slots.has(slot)) {
+        return false
+      }
+      slots.set(slot, accountId)
+      return true
+    },
+    adoptSlot(slot, accountId) {
+      if (!CLAUDE_AUTH_PROXY_SLOT_ID.test(slot)) {
         return false
       }
       slots.set(slot, accountId)

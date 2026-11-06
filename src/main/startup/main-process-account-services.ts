@@ -31,6 +31,7 @@ import {
   type ClaudePaneAssignedNotice
 } from '../claude-accounts/claude-pane-account-registry'
 import {
+  installClaudePaneAccountFileStore,
   startClaudeAuthProxy,
   stopClaudeAuthProxy
 } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
@@ -146,6 +147,7 @@ export function initializeMainProcessAccountServices(): void {
       })
     }
   })
+  installClaudePaneAccountFileStore()
   void startClaudeAuthProxy()
   const paneAssignedEvent = (notice: ClaudePaneAssignedNotice): ClaudePaneAssignedEvent => {
     const accounts = store.getSettings().claudeManagedAccounts
