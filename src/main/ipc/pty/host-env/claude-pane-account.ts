@@ -82,22 +82,25 @@ function reattachProxy(sources: ReattachSources): ReattachSlotProxy | null {
 /**
  * The slot a reattached process still carries, read from its environment once the read lands. The
  * row is already recorded without a slot; a pane evaluated in between resumes, as before this fix.
- * A row that gained a slot or vanished meanwhile is left alone.
+ * A row that gained a slot or vanished meanwhile is left alone, and the listener never adopts a
+ * slot for it: an adopted slot with no row would bill the account until the pane's next prune.
  */
 function adoptSlotFromProcessEnv(sources: ReattachSources, ptyId: string, accountId: string): void {
   const read = sources.readBaseUrl ?? readProcessAnthropicBaseUrl
   void read(sources.pid).then(
     (url) => {
+      const current = getClaudePaneAccount(ptyId)
+      if (!current || current.proxySlot) {
+        return
+      }
       const slot = recoverReattachedProxySlot({
         recovered: proxySlotFromUrl(url),
         accountId,
         proxy: reattachProxy(sources)
       })
-      const current = getClaudePaneAccount(ptyId)
-      if (!slot || !current || current.proxySlot) {
-        return
+      if (slot) {
+        recordClaudePaneAccount({ ...current, proxySlot: slot, assignedAccountId: accountId })
       }
-      recordClaudePaneAccount({ ...current, proxySlot: slot, assignedAccountId: accountId })
     },
     () => {}
   )

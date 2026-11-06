@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   _internals,
+  forgetClaudePaneAccount,
   getClaudePaneAccount,
   recordClaudePaneAccount
 } from '../../../claude-accounts/claude-pane-account-registry'
@@ -199,6 +200,21 @@ describe('reattach keeps the proxy slot', () => {
     release(`http://127.0.0.1:4100/p/${SLOT}/`)
     await pending
     expect(getClaudePaneAccount('pty-1')?.proxySlot).toBe('other')
+  })
+
+  it('a pane that left during the environment read neither adopts the slot nor comes back', async () => {
+    const proxy = fakeProxy(4100)
+    let release: (url: string | null) => void = () => {}
+    const pending = new Promise<string | null>((resolve) => {
+      release = resolve
+    })
+    reattach(proxy, () => pending)
+    expect(getClaudePaneAccount('pty-1')).not.toBeNull()
+    forgetClaudePaneAccount('pty-1')
+    release(`http://127.0.0.1:4100/p/${SLOT}/`)
+    await pending
+    expect(proxy.adoptSlot).not.toHaveBeenCalled()
+    expect(getClaudePaneAccount('pty-1')).toBeNull()
   })
 
   it('ignores the slot minted for the reattach itself', async () => {
