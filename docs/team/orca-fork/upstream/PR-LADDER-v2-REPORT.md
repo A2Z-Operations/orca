@@ -52,6 +52,7 @@ Env-only failures seen on this Mac (ignored, listed per branch below):
 - `plugin-service-reconciliation.test.ts` worker `SIGTRAP` (vitest pool crash, not an assertion).
 - `tests/e2e/helpers/persisted-profile-state.unit.test.ts` — `unable to open database file` under `/tmp/ovols/...` (sandbox temp path), not in any diff.
 - `profile-project-domain-transfer` timeouts did not occur on these runs.
+- `claude-auth-proxy.test.ts` "cuts an idle stream at the configured budget and keeps an active stream" — `Error: aborted` only inside a full `check-changed` run, never alone (re-run alone: pass, 1.1 s; PR #10 reproduced it with the base's proxy files swapped in, so the proxy code is not the cause). Load artifact: the active half streams a tick every 40 ms against a 200 ms idle budget, and a loaded event loop delays one tick past the budget, so the proxy cuts a stream that is still writing. The tolerances from the C ladder (`580bb07cc3a` 10 s request timeout / 8 s elapsed bound on the idle half, `c1ef1cbb2a9` 2 s idle budget on the active half) had not reached `blowzer/fork-only`; `fix/stale-default-tests` (issue #13) carries them there, so this entry leaves the env-only list for gates run on or after that branch.
 
 ## A and upstream #28044 (coordinator question 1)
 
@@ -299,14 +300,14 @@ A maintainer closed PR A #37568 (`pr/serve-usage-polling`) and merged #37633 ins
 
 ### New HEADs
 
-| PR  | branch                               | old HEAD      | new HEAD                                   | own diff vs parent        | own commits |
-| --- | ------------------------------------ | ------------- | ------------------------------------------ | ------------------------- | ----------- |
-| 0   | `pr/claude-pane-account-registry-v2` | `7e4c2859da3` | `67ca11eec50f0ebd22d3897bf7a9b4ca91a6c4c0` | 88 files, +3726/−161      | 8           |
-| B   | `pr/idle-token-refresh`              | `46fdb2215f3` | `ef5d9d35c253b4e7a932853ba76713127a4c9f09` | 42 files, +3113/−17       | 3           |
-| C   | `pr/claude-auth-proxy`               | `9d0edf9c67c` | `201c5c5ba43e6c6f0842680b894a1aa1b61a035d` | 69 files, +3089/−45       | 6           |
-| D   | `pr/claude-session-mover-proxy`      | `d71e1c88c45` | `0eaa8d69d298bb7435ddece842a388ab5ada3471` | 91 files, +6474/−82       | 7           |
-| F   | `pr/claude-account-pool`             | `d7df158ab79` | `2cc838e29c3bda3abdf0d814465db8b807060372` | 61 files, +1600/−135      | 2           |
-| E   | `pr/native-chat-account-coverage`    | `9621971791e` | `c8874dcd51786bb794ef987a6ca81d87c5548929` | 23 files, +1012/−31       | 2           |
+| PR  | branch                               | old HEAD      | new HEAD                                   | own diff vs parent   | own commits |
+| --- | ------------------------------------ | ------------- | ------------------------------------------ | -------------------- | ----------- |
+| 0   | `pr/claude-pane-account-registry-v2` | `7e4c2859da3` | `67ca11eec50f0ebd22d3897bf7a9b4ca91a6c4c0` | 88 files, +3726/−161 | 8           |
+| B   | `pr/idle-token-refresh`              | `46fdb2215f3` | `ef5d9d35c253b4e7a932853ba76713127a4c9f09` | 42 files, +3113/−17  | 3           |
+| C   | `pr/claude-auth-proxy`               | `9d0edf9c67c` | `201c5c5ba43e6c6f0842680b894a1aa1b61a035d` | 69 files, +3089/−45  | 6           |
+| D   | `pr/claude-session-mover-proxy`      | `d71e1c88c45` | `0eaa8d69d298bb7435ddece842a388ab5ada3471` | 91 files, +6474/−82  | 7           |
+| F   | `pr/claude-account-pool`             | `d7df158ab79` | `2cc838e29c3bda3abdf0d814465db8b807060372` | 61 files, +1600/−135 | 2           |
+| E   | `pr/native-chat-account-coverage`    | `9621971791e` | `c8874dcd51786bb794ef987a6ca81d87c5548929` | 23 files, +1012/−31  | 2           |
 
 ### A dropped
 
@@ -339,14 +340,14 @@ The first full gate of PR 0 failed two cases of upstream's `claude-profile-route
 
 Per branch: typecheck node/web/cli, targeted vitest on every changed test file plus `src/main/rate-limits/**/*.test.ts` and `runtime-composition-parity.test.ts`, oxlint on changed files, `check-changed-code-quality.mjs upstream/main`.
 
-| branch | typecheck node/web/cli | targeted vitest       | oxlint | quality |
-| ------ | ---------------------- | --------------------- | ------ | ------- |
-| 0      | 0/0/0                  | 69 files, 840 pass    | pass   | pass    |
-| B      | 0/0/0                  | 74 files, 876 pass    | pass   | pass    |
-| C      | 0/0/0                  | 83 files, 931 pass    | pass   | pass    |
-| D      | 0/0/0                  | 102 files, 1061 pass  | pass   | pass    |
-| F      | 0/0/0                  | 107 files, 1098 pass  | pass   | pass    |
-| E      | 0/0/0                  | 109 files, 1110 pass  | pass   | pass    |
+| branch | typecheck node/web/cli | targeted vitest      | oxlint | quality |
+| ------ | ---------------------- | -------------------- | ------ | ------- |
+| 0      | 0/0/0                  | 69 files, 840 pass   | pass   | pass    |
+| B      | 0/0/0                  | 74 files, 876 pass   | pass   | pass    |
+| C      | 0/0/0                  | 83 files, 931 pass   | pass   | pass    |
+| D      | 0/0/0                  | 102 files, 1061 pass | pass   | pass    |
+| F      | 0/0/0                  | 107 files, 1098 pass | pass   | pass    |
+| E      | 0/0/0                  | 109 files, 1110 pass | pass   | pass    |
 
 Full `check-changed.mjs --base=upstream/main --maxWorkers=2 --timeout=150` on PR 0 and E, run one at a time (another worker's build kept the load average at 90–235 during round one; two parallel runs had both hit the 120-min timeout before that). Round one: PR 0 `3a9b828fcbf` 102 min, E `3c66a34af74` 79 min — found the profile-router regression above. Round two, on the pushed SHAs: PR 0 `67ca11eec50` 67 min, E `c8874dcd517` 64 min (load ~40). Both rounds: 29/30 checks pass, "unit tests" the only ✗.
 
@@ -420,14 +421,14 @@ On each branch:
 
 The vitest counts are lower than in rebase #5 because upstream removed several thousand test cases between the two bases.
 
-| branch | typecheck node/web/cli | targeted vitest     | oxlint | quality |
-| ------ | ---------------------- | ------------------- | ------ | ------- |
-| 0      | 0/0/0                  | 53 files, 285 pass  | pass   | pass    |
-| B      | 0/0/0                  | 58 files, 321 pass  | pass   | pass    |
-| C      | 0/0/0                  | 66 files, 372 pass  | pass   | pass    |
-| D      | 0/0/0                  | 85 files, 501 pass  | pass   | pass    |
-| F      | 0/0/0                  | 90 files, 538 pass  | pass   | pass    |
-| E      | 0/0/0                  | 92 files, 550 pass  | pass   | pass    |
+| branch | typecheck node/web/cli | targeted vitest    | oxlint | quality |
+| ------ | ---------------------- | ------------------ | ------ | ------- |
+| 0      | 0/0/0                  | 53 files, 285 pass | pass   | pass    |
+| B      | 0/0/0                  | 58 files, 321 pass | pass   | pass    |
+| C      | 0/0/0                  | 66 files, 372 pass | pass   | pass    |
+| D      | 0/0/0                  | 85 files, 501 pass | pass   | pass    |
+| F      | 0/0/0                  | 90 files, 538 pass | pass   | pass    |
+| E      | 0/0/0                  | 92 files, 550 pass | pass   | pass    |
 
 The first PR 0 runs caught a stale import and two budget overruns: `global-settings-types.ts` at 301 lines and `agent-session-failure-words.ts` at 303. The fixes above were folded into commit 1, and the table shows the re-run.
 
