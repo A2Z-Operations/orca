@@ -7,6 +7,7 @@ import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetche
 import { fetchCodexRateLimits } from './codex-fetcher'
 import {
   deferred,
+  errorProvider,
   okProvider,
   resetRateLimitProviderMocks
 } from './rate-limit-service-test-harness'

@@ -2,12 +2,12 @@ import type { GlobalSettings } from '../../../../../../shared/global-settings-ty
 import type { ClaudeRateLimitAccountsState } from '../../../../../../shared/managed-account-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
-import { ClaudeAccountPoolSetting } from '../../claude-account-pool-setting'
-import { ClaudeModelPolicySetting } from '../../claude-model-policy-setting'
-import { ClaudeModelPolicyCoversExplicitSetting } from '../../claude-model-policy-covers-explicit-setting'
-import { ClaudeAuthProxySetting } from '../../claude-auth-proxy-setting'
-import { ClaudeSessionMoverSetting } from '../../claude-session-mover-setting'
-import { ClaudeRecentMoves } from '../../claude-recent-moves'
+import { ClaudeAccountPoolSetting } from './claude-account-pool-setting'
+import { ClaudeModelPolicySetting } from './claude-model-policy-setting'
+import { ClaudeModelPolicyCoversExplicitSetting } from './claude-model-policy-covers-explicit-setting'
+import { ClaudeAuthProxySetting } from './claude-auth-proxy-setting'
+import { ClaudeSessionMoverSetting } from './claude-session-mover-setting'
+import { ClaudeRecentMoves } from './claude-recent-moves'
 
 /**
  * The rows that govern running sessions, then what the mover did. Host settings are hidden while a

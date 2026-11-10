@@ -7,7 +7,7 @@ import type {
 import {
   claudeAccountIdForPaneKey,
   claudeModelForPaneKey
-} from '../claude-accounts/claude-pane-account-registry'
+} from '../../../claude-accounts/claude-pane-account-registry'
 import {
   structuredAgentSessionPaneKey,
   structuredAgentSessionTabId

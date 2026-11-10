@@ -35,6 +35,21 @@ function eventTitle(event: PluginEventName, t: Translate = translate): string {
         'auto.components.settings.PluginContributionActionEvents.workspaceChanged',
         'When you switch workspace or its terminals change'
       )
+    case 'accounts.usage.changed':
+      return t(
+        'auto.components.settings.PluginContributionActionEvents.accountsUsageChanged',
+        'When a Claude account’s usage changes'
+      )
+    case 'accounts.session.moved':
+      return t(
+        'auto.components.settings.PluginContributionActionEvents.accountsSessionMoved',
+        'When a Claude session moves to another account'
+      )
+    case 'accounts.model.changed':
+      return t(
+        'auto.components.settings.PluginContributionActionEvents.accountsModelChanged',
+        'When the model policy changes a Claude session’s model'
+      )
   }
 }
 

@@ -16,7 +16,7 @@ import { agentHookServer } from '../agent-hooks/server/agent-hook-server'
 import { resolveHostCodexSessionSourceHome } from '../codex/history/rollouts/codex-session-source-home'
 import { browserManager } from '../browser/guest-lifecycle/manager/browser-manager'
 import { prewarmStructuredAgentModelCatalogs } from '../runtime/agent-session/model-catalog/structured-agent-model-catalog-wiring'
-import { getRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
+import { getRuntimeDesktopSurface } from '../runtime/construction/runtime-desktop-surface'
 import { translateMain } from '../i18n/main-i18n'
 import { dispatchClaudeRecentMoves } from '../claude-accounts/claude-session-move-mobile-notice'
 import type {

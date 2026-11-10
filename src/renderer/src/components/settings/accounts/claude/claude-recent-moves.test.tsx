@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ClaudeRecentMoves } from '../../claude-recent-moves'
+import { ClaudeRecentMoves } from './claude-recent-moves'
 import { RECENT_MOVES_NOW, recentMovesFixture } from './claude-recent-moves-test-fixture'
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }))
-vi.mock('@/runtime/runtime-rpc-client', () => ({ callRuntimeRpc: rpc.call }))
+vi.mock('@/runtime/rpc/calls/runtime-rpc-call', () => ({ callRuntimeRpc: rpc.call }))
 
 describe('ClaudeRecentMoves table', () => {
   beforeEach(() => {

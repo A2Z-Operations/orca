@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../shared/constants'
-import { makePaneKey } from '../../shared/stable-pane-id'
-import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
+import { makePaneKey } from '../../shared/workspace-layout/stable-pane-id'
+import type { RuntimePtyController } from '../runtime/terminal/lifecycle/runtime-pty-controller-contract'
 import { TEST_LEAF_1 } from '../persistence/persistence-session-fixtures'
 import {
   _internals,

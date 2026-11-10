@@ -1,6 +1,6 @@
 import type { ClaudeAccountLogEntry } from '../../../../../../shared/claude-account-log-types'
 import type { ClaudeSessionMoveSummary } from '../../../../../../shared/managed-account-types'
-import { claudeMoveCategory, type ClaudeMoveCategory } from '../../claude-recent-moves-words'
+import { claudeMoveCategory, type ClaudeMoveCategory } from './claude-recent-moves-words'
 
 /** Rows kept from the live list; older history comes from the durable log on request. */
 export const CLAUDE_RECENT_MOVES_CAP = 200

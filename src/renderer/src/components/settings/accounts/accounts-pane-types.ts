@@ -37,6 +37,8 @@ export type ProviderAccountAction =
   | `reauth:${string}`
   | `remove:${string}`
   | `select:${string}`
+  /** Fork: the auto-switch toggle, which the busy flag covers like a select. */
+  | 'auto-switch'
 
 export type RemoveAccountTarget = {
   id: string

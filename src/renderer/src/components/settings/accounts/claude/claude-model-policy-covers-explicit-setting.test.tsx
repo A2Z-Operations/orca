@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../../../shared/constants'
 import type { ClaudeModelPolicyEvaluation } from '../../../../../../shared/managed-account-types'
-import { ClaudeModelPolicyCoversExplicitSetting } from '../../claude-model-policy-covers-explicit-setting'
+import { ClaudeModelPolicyCoversExplicitSetting } from './claude-model-policy-covers-explicit-setting'
 
 const row = (ptyId: string, skip: string | null): ClaudeModelPolicyEvaluation => ({
   ptyId,

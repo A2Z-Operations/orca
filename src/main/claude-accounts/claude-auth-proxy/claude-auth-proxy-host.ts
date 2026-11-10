@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
-import { getOrcaUserDataPath } from '../../codex/codex-home-paths'
+import { getOrcaUserDataPath } from '../../codex/configuration/homes/codex-home-paths'
 import { listRegisteredPtys } from '../../memory/pty-registry'
 import {
   readClaudeOAuthCredentials,

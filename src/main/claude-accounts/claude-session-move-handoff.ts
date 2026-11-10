@@ -1,8 +1,8 @@
 import {
   AGENT_PROMPT_SUBMIT,
   buildAgentPromptPasteBytes
-} from '../../shared/agent-prompt-injection'
-import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
+} from '../../shared/agent-launch/startup/agent-prompt-injection'
+import type { RuntimePtyController } from '../runtime/terminal/lifecycle/runtime-pty-controller-contract'
 import { listJobs } from '../../../resources/durable-jobs/durable-background-job.mjs'
 import {
   buildClaudeSessionMoveHandoffNote,

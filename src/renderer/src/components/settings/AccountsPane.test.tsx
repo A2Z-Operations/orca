@@ -22,6 +22,7 @@ function renderPane(
     React.createElement(AccountsPane, {
       settings,
       updateSettings: vi.fn(),
+      updateSettingsOrThrow: vi.fn(),
       hostScope: resolveSettingsHostScope({
         choice: null,
         defaultEnvironmentId: settings.activeRuntimeEnvironmentId,
@@ -220,6 +221,7 @@ function render(
   const accountRuntime = { runtime: 'host' as const, wslDistro: null, label: 'This device' }
   const model: AccountsPaneSectionModel = {
     updateSettings: vi.fn(),
+    updateSettingsOrThrow: vi.fn(),
     accountOwner: { kind: 'local' },
     searchQuery: '',
     recordFeatureInteraction: vi.fn(),

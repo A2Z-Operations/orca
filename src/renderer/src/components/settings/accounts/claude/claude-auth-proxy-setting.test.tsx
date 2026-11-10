@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { getDefaultSettings } from '../../../../../../shared/constants'
-import { ClaudeAuthProxySetting } from '../../claude-auth-proxy-setting'
+import { ClaudeAuthProxySetting } from './claude-auth-proxy-setting'
 
 const NOW = Date.parse('2026-11-05T07:00:00Z')
 const settings = getDefaultSettings('/home/test')

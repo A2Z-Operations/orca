@@ -1,6 +1,6 @@
 import { getConnectionExecutionHostId } from '../../../../shared/execution-host'
 import { getProvider } from '../provider/registry'
-import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
 import { isClaudeLaunchCommand } from '../host-env/fresh-spawn-routing'
 import { resolveRuntimeClaudeAuth } from './spawn-claude-auth'
 import { beginRuntimePaneReplacement } from './spawn-replacement'

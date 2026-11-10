@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeAccountSwitchRunningSessions } from '../../../shared/claude-account-switch-settings'
-import type * as AccountMove from './claude-session-account-move'
-import { findClaudeSwitchSessions } from './claude-session-account-move'
+import type * as AccountMove from './agent-session/accounts/claude/claude-session-account-move'
+import { findClaudeSwitchSessions } from './agent-session/accounts/claude/claude-session-account-move'
 import {
   getClaudeAccountSwitchPrompt,
   resetClaudeAccountSwitchSessionsForTests
-} from './claude-account-switch-sessions'
+} from './provider-accounts/claude-account-switch-sessions'
 import { followClaudeAutoSwitch } from './claude-auto-switch-follow'
 
 type StoreStub = {
@@ -26,7 +26,7 @@ const store = vi.hoisted((): StoreStub => ({
 
 vi.mock('@/store', () => ({ useAppStore: { getState: () => store } }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
-vi.mock('./claude-session-account-move', async (importOriginal) => ({
+vi.mock('./agent-session/accounts/claude/claude-session-account-move', async (importOriginal) => ({
   ...(await importOriginal<typeof AccountMove>()),
   findClaudeSwitchSessions: vi.fn(async () => ({
     onAccount: [{ ptyId: 'pty-1', worktreeId: 'wt-1', tabId: 'tab-1', leafId: 'leaf-1' }],

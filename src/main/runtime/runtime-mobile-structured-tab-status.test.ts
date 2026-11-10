@@ -10,7 +10,7 @@ import {
 import { makeStructuredAgentStatusSubject } from '../../shared/agent-status/contracts/agent-status-subject'
 import type { AgentSessionStatusSummary } from '../../shared/agent-session/agent-session-wire'
 import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
-import { AgentHookServer } from '../agent-hooks/server'
+import { AgentHookServer } from '../agent-hooks/server/agent-hook-server'
 import { projectRuntimeMobileSessionTabs } from './session-lifecycle/projection/runtime-mobile-session-projection'
 import type { RuntimeMobileSessionProjectionHost } from './session-lifecycle/projection/runtime-mobile-session-projection-contract'
 

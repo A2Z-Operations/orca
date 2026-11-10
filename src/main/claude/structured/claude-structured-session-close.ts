@@ -23,7 +23,7 @@ import { settleClaudeTurnEndWaiters } from '../claude-request-end-wait'
 import type { StructuredAgentSessionLogger } from '../../native-chat/agent-session-wire/host/structured-agent-session-logger'
 import type { ProviderProcessCloseOptions } from '../../provider-process/provider-process-close'
 import { forgetClaudePaneAccount } from '../../claude-accounts/claude-pane-account-registry'
-import { structuredClaudeSessionKey } from './claude-structured-session-key'
+import { structuredClaudeSessionKey } from '../claude-structured-session-key'
 
 /** Root exit releases the lease even with unverified descendants; a failed spawn proves no exit. */
 export function claudeRootExitObserved(

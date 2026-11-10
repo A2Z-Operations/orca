@@ -1,8 +1,8 @@
-import type { AgentSubagentSnapshot } from '../../shared/agent-status-subagent-snapshot'
-import type { AgentWorkingMode } from '../../shared/agent-status-types'
+import type { AgentSubagentSnapshot } from '../../shared/agent-status/contracts/agent-status-subagent-snapshot'
+import type { AgentWorkingMode } from '../../shared/agent-status/contracts/agent-status-types'
 import { formatSurvivingJobNote } from '../../../resources/durable-jobs/durable-background-job.mjs'
 import { createDraftPasteReadyScanner } from '../../shared/draft-paste-ready-scanner'
-import { stripTerminalControl } from '../../shared/terminal-control-stripping'
+import { stripTerminalControl } from '../../shared/terminal/protocol/escape/terminal-control-stripping'
 
 export type ClaudeSessionDetachedJob = {
   state: string

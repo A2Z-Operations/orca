@@ -10,7 +10,7 @@ import { useFocusedTerminalPtyId } from '@/lib/use-tab-agent'
 import {
   structuredAgentSessionPaneKey,
   structuredAgentSessionTabId
-} from '../../../../shared/structured-agent-session-projection'
+} from '../../../../shared/agent-session/view/structured-agent-session-projection'
 import type { NativeChatTabSession } from './tab-session-history-switch'
 
 export function claudeSessionCountLabel(count: number): string {

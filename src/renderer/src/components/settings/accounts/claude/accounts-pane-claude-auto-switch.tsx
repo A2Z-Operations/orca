@@ -1,5 +1,5 @@
 import { translate } from '@/i18n/i18n'
-import { setClaudeAutoSwitch } from '@/runtime/runtime-provider-accounts-client'
+import { setClaudeAutoSwitch } from '@/runtime/provider-accounts/observations/runtime-provider-accounts-client'
 import { Label } from '../../../ui/label'
 import { Switch } from '../../../ui/switch'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'

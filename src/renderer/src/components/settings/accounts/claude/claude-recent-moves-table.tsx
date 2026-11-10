@@ -9,7 +9,7 @@ import {
   claudeMoveDecision,
   claudeMoveVia,
   type ClaudeMovePhrase
-} from '../../claude-recent-moves-words'
+} from './claude-recent-moves-words'
 
 export type ClaudeMoveTableContext = {
   now: number

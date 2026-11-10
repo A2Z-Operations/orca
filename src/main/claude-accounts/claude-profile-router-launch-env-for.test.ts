@@ -20,7 +20,7 @@ import {
   CLAUDE_PROFILE_SETUP_FAILED_MESSAGE
 } from '../../shared/claude-profile-routing'
 import { getPosixClaudeShellFunction } from '../../shared/claude-shell-function'
-import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
+import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/providers/structured-agent-session-adapter-errors'
 import type { ClaudeProfileSetupReport } from './claude-profile-setup'
 import { claudeProfileMarkerPath, describeClaudeProfile } from './claude-profile-paths'
 import { ClaudeProfileRouter, type ClaudeProfileRouterSettings } from './claude-profile-router'

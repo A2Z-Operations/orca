@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Store } from '../../../persistence'
+import type { Store } from '../../../persistence/loading-store/store'
 import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import { ptySizes } from '../delivery/visibility-state'
 import { ptyIncarnationById, ptyOwnership } from '../provider/ownership-state'

@@ -6,7 +6,7 @@ import type {
 } from '../../../../../../shared/managed-account-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { translate } from '@/i18n/i18n'
-import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import { cn } from '@/lib/utils'
 import { translateSearchKeyword } from '../../search/settings-search-keywords'
 import { Button } from '../../../ui/button'

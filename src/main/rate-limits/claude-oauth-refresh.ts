@@ -1,5 +1,5 @@
 import { listClaudePaneAccounts } from '../claude-accounts/claude-pane-account-registry'
-import { writeCredentialFileAtomic } from '../integration-credential-file'
+import { writeCredentialFileAtomic } from '../credentials/integration-credential-file'
 import { execSecurityCommand } from '../macos-keychain/generic-password'
 import { CLAUDE_OAUTH_TOKEN_HEADERS, claudeOAuthTokenFetch } from './claude-oauth-node-fetch'
 import {

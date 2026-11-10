@@ -2,19 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { translate } from '@/i18n/i18n'
 import type { ClaudeSessionMoveSummary } from '../../../../../../shared/managed-account-types'
 import { claudeAccountUsageState } from './claude-account-usage-state'
-import { recentMovesFixture } from '../../claude-recent-moves-test-fixture'
+import { recentMovesFixture } from './claude-recent-moves-test-fixture'
 import {
   claudeMoveRowsFromLog,
   filterClaudeMoveRows,
   groupClaudeMoveRows,
   mergeClaudeMoveRows
-} from '../../claude-recent-moves-rows'
-import { claudeMoveSessionName } from '../../claude-recent-moves-session-name'
-import {
-  claudeMoveCategory,
-  claudeMoveDecision,
-  claudeMoveVia
-} from '../../claude-recent-moves-words'
+} from './claude-recent-moves-rows'
+import { claudeMoveSessionName } from './claude-recent-moves-session-name'
+import { claudeMoveCategory, claudeMoveDecision, claudeMoveVia } from './claude-recent-moves-words'
 
 const row = (extra: Partial<ClaudeSessionMoveSummary>): ClaudeSessionMoveSummary => ({
   ptyId: 'pty-1',

@@ -44,6 +44,9 @@ import { emitPluginWorktreeLifecycle } from './main-process-pty-startup'
 import { mainProcessState as state } from './main-process-state'
 import { bindDesktopPluginClaudeAccountEvents } from './main-process-plugin-claude-accounts'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { PluginStatusBarState } from '../plugins/status-bar/plugin-status-bar-state'
+import { createDesktopPluginAppearance } from '../plugins/appearance/desktop-plugin-appearance'
+import { ALL_RPC_METHODS } from '../runtime/rpc/methods/rpc-method-registry'
 
 const PLUGIN_AUTO_UPDATE_STARTUP_DELAY_MS = 60_000
 // Why: the official catalog fetch must not compete with first paint; opening the marketplace seeds sooner.

@@ -13,7 +13,7 @@ import {
   createCompatibleRuntimeStatusResponseIfNeeded,
   type RuntimeEnvironmentCallRequest
 } from './rpc/testing/runtime-compatibility-test-fixture'
-import { clearRuntimeCompatibilityCacheForTests } from './runtime-rpc-client'
+import { clearRuntimeCompatibilityCache as clearRuntimeCompatibilityCacheForTests } from './rpc/compatibility/runtime-compatibility-cache'
 
 const LOCAL = { kind: 'local' } as const
 const REMOTE = { kind: 'environment', environmentId: 'env-1' } as const

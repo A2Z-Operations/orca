@@ -1,6 +1,6 @@
 import { translateMain } from '../../i18n/main-i18n'
-import type { RuntimePtyController } from '../../runtime/runtime-pty-controller-contract'
-import { agentHookServer } from '../../agent-hooks/server'
+import type { RuntimePtyController } from '../../runtime/terminal/lifecycle/runtime-pty-controller-contract'
+import { agentHookServer } from '../../agent-hooks/server/agent-hook-server'
 import { getClaudeAuthProxy } from '../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import {
   assignClaudePaneAccount,

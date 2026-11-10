@@ -3,7 +3,7 @@ import {
   pluginClaudeSessionMovedPayloadSchema,
   pluginClaudeUsageChangedPayloadSchema,
   type PluginClaudeAccountView
-} from '../../shared/plugins/plugin-claude-account-contract'
+} from '../../shared/plugins/workers/plugin-claude-account-contract'
 import {
   setClaudeAccountModelPluginPublishListener,
   setClaudeAccountPluginPublishListener

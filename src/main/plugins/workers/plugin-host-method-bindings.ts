@@ -104,8 +104,8 @@ export type PluginHostServices = {
       value: PluginJsonValue
     ): { ok: true } | { ok: false; error: string }
   }
-  /** Fork: the managed Claude accounts' public view, for `accounts.listClaudeAccounts`. */
-  listClaudeAccounts():
+  /** Fork: the managed Claude accounts' public view, for `accounts.listClaudeAccounts`; absent where none are managed. */
+  listClaudeAccounts?: () =>
     | { accounts: PluginClaudeAccountView[] }
     | Promise<{ accounts: PluginClaudeAccountView[] }>
 }
@@ -237,7 +237,7 @@ const HANDLERS: Record<PluginHostMethodName, BoundPluginHostMethod> = {
   ...PLUGIN_WORKSPACE_ACTION_HANDLERS,
   'accounts.listClaudeAccounts': bind(
     api['accounts.listClaudeAccounts'],
-    async (_params, { services }) => services.listClaudeAccounts()
+    async (_params, { services }) => services.listClaudeAccounts?.() ?? { accounts: [] }
   )
 }
 

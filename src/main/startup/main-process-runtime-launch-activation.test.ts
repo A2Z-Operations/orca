@@ -139,6 +139,7 @@ vi.mock('./main-process-i18n-menu', () => ({
 const { initializeMainProcessReady } = await import('./main-process-ready')
 const { mainProcessState: state } = await import('./main-process-state')
 const { createServeDesktopActivationGate } = await import('./serve-desktop-activation')
+const { getServeOptions } = await import('./main-process-serve')
 const { focusExistingMainWindow } = await import('../window/focus-existing-window')
 
 type FakeWindow = {
@@ -295,7 +296,9 @@ describe('desktop startup activation', () => {
       mobilePairing: false,
       grantDesktopControl: false,
       recipeJson: false,
-      projectRoot: null
+      projectRoot: null,
+      allowPublic: false,
+      refusePublic: false
     })
     Object.assign(state.runtime!, {
       refreshRestoredOrchestrationAuthority: vi.fn(async () => {}),

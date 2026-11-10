@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
-import { parsePluginManifest } from '../../shared/plugins/plugin-manifest'
-import type { PluginClaudeAccountView } from '../../shared/plugins/plugin-claude-account-contract'
+import { parsePluginManifest } from '../../shared/plugins/manifest/plugin-manifest'
+import type { PluginClaudeAccountView } from '../../shared/plugins/workers/plugin-claude-account-contract'
 import type { ProviderRateLimits, RateLimitWindow } from '../../shared/rate-limit-types'
 import {
   publishClaudeAccountSessionMoved,
   setClaudeAccountPluginPublishListener
 } from '../claude-accounts/claude-account-plugin-publish'
 import type { ClaudePaneAccountRecord } from '../claude-accounts/claude-pane-account-registry'
-import { PluginEventBus } from './plugin-event-bus'
-import { deliverPluginEvent } from './plugin-event-delivery'
+import { deliverPluginEvent, type PluginEventDeliveryContext } from './plugin-event-delivery'
+import type { PluginCapabilityKind } from '../../shared/plugins/capabilities/plugin-capabilities'
 import {
   bindPluginClaudeAccountEvents,
   readPluginClaudeAccounts
@@ -19,9 +19,8 @@ import {
   fingerprintPluginClaudeAccounts,
   projectPluginClaudeAccounts
 } from './plugin-claude-account-projection'
-import { executePluginHostCall, type PluginHostServices } from './plugin-host-methods'
+import { executePluginHostCall, type PluginHostServices } from './workers/plugin-host-methods'
 import type { ValidDiscoveredPlugin } from './plugin-discovery'
-import type { PluginWorkerController } from './plugin-worker-controller'
 
 const SECRET = 'sk-ant-plugin-sentinel'
 
@@ -96,6 +95,7 @@ function services(): PluginHostServices {
   return {
     resolveActiveWorktreeContext: vi.fn().mockResolvedValue(null),
     listWorktreeTerminals: vi.fn().mockResolvedValue([]),
+    listAgentStatuses: vi.fn().mockReturnValue([]),
     sendTerminalText: vi.fn().mockResolvedValue({ accepted: true }),
     dispatchPluginNotification: vi.fn().mockResolvedValue({ delivered: true }),
     storage: {
@@ -107,13 +107,13 @@ function services(): PluginHostServices {
     secrets: {
       get: vi.fn().mockReturnValue({ ok: true, value: null }),
       set: vi.fn().mockReturnValue({ ok: true }),
-      delete: vi.fn()
+      delete: vi.fn(),
+      protection: vi.fn().mockReturnValue('unavailable')
     },
     settings: {
       getAll: vi.fn().mockReturnValue({}),
       set: vi.fn().mockReturnValue({ ok: true })
     },
-    subscribeEvents: vi.fn().mockReturnValue([]),
     listClaudeAccounts: vi.fn().mockReturnValue({ accounts: [] })
   }
 }
@@ -403,13 +403,13 @@ describe('publishClaudeAccountSessionMoved', () => {
 })
 
 describe('accounts.listClaudeAccounts', () => {
-  it('denies a worker without accounts.read and a sandboxed panel', async () => {
+  it('denies a worker without accounts.read and any panel', async () => {
     const host = services()
     const denied = await executePluginHostCall({
       pluginId: 'orca-samples.demo',
       method: 'accounts.listClaudeAccounts',
       params: {},
-      viaPanel: false,
+      surface: 'worker',
       grantedCapabilities: [],
       services: host
     })
@@ -417,7 +417,7 @@ describe('accounts.listClaudeAccounts', () => {
       pluginId: 'orca-samples.demo',
       method: 'accounts.listClaudeAccounts',
       params: {},
-      viaPanel: true,
+      surface: 'panel',
       grantedCapabilities: ['accounts.read'],
       services: host
     })
@@ -426,7 +426,7 @@ describe('accounts.listClaudeAccounts', () => {
       code: 'capability_denied',
       error: 'plugin does not have the "accounts.read" capability'
     })
-    expect(panel).toMatchObject({ ok: false, code: 'panel_forbidden' })
+    expect(panel).toMatchObject({ ok: false, code: 'not_permitted' })
     expect(host.listClaudeAccounts).not.toHaveBeenCalled()
   })
 
@@ -443,7 +443,7 @@ describe('accounts.listClaudeAccounts', () => {
       pluginId: 'orca-samples.demo',
       method: 'accounts.listClaudeAccounts',
       params: undefined,
-      viaPanel: false,
+      surface: 'worker',
       grantedCapabilities: ['accounts.read'],
       services: host
     })
@@ -457,7 +457,7 @@ describe('accounts.listClaudeAccounts', () => {
       pluginId: 'orca-samples.demo',
       method: 'accounts.listClaudeAccounts',
       params: {},
-      viaPanel: false,
+      surface: 'worker',
       grantedCapabilities: ['accounts.read'],
       services: host
     })
@@ -470,39 +470,6 @@ describe('accounts.listClaudeAccounts', () => {
   })
 })
 
-describe('events.subscribe account events', () => {
-  it('requires accounts.read in addition to events:subscribe', async () => {
-    const host = services()
-    const denied = await executePluginHostCall({
-      pluginId: 'orca-samples.demo',
-      method: 'events.subscribe',
-      params: { events: ['worktree.created', 'accounts.usage.changed'] },
-      viaPanel: false,
-      grantedCapabilities: ['events:subscribe'],
-      services: host
-    })
-    expect(denied).toEqual({
-      ok: false,
-      code: 'capability_denied',
-      error: 'plugin does not have the "accounts.read" capability'
-    })
-    expect(host.subscribeEvents).not.toHaveBeenCalled()
-
-    const allowed = await executePluginHostCall({
-      pluginId: 'orca-samples.demo',
-      method: 'events.subscribe',
-      params: { events: ['accounts.session.moved'] },
-      viaPanel: false,
-      grantedCapabilities: ['events:subscribe', 'accounts.read'],
-      services: host
-    })
-    expect(allowed.ok).toBe(true)
-    expect(host.subscribeEvents).toHaveBeenCalledWith('orca-samples.demo', [
-      'accounts.session.moved'
-    ])
-  })
-})
-
 function manifest(events: string[], capabilities: string[]): Record<string, unknown> {
   return {
     manifestVersion: 1,
@@ -510,7 +477,7 @@ function manifest(events: string[], capabilities: string[]): Record<string, unkn
     publisher: 'orca-samples',
     name: 'Demo',
     version: '1.0.0',
-    engines: { orca: '>=1.0.0' },
+    engines: { orca: '>=1.4.244' },
     pluginApi: 1,
     main: 'main.mjs',
     contributes: { events: events.map((on) => ({ on })) },
@@ -519,27 +486,27 @@ function manifest(events: string[], capabilities: string[]): Record<string, unkn
 }
 
 describe('account event manifest validation', () => {
-  it('requires accounts.read for account events and events:subscribe for the others', () => {
+  it('requires accounts.read for account events and the domain capability for the others', () => {
     expect(parsePluginManifest(manifest(['accounts.usage.changed'], ['accounts.read'])).ok).toBe(
       true
     )
-    expect(parsePluginManifest(manifest(['accounts.session.moved'], ['events:subscribe'])).ok).toBe(
+    expect(parsePluginManifest(manifest(['accounts.session.moved'], ['workspace:read'])).ok).toBe(
       false
     )
-    expect(parsePluginManifest(manifest(['worktree.created'], ['events:subscribe'])).ok).toBe(true)
-    expect(parsePluginManifest(manifest(['worktree.created'], ['accounts.read'])).ok).toBe(false)
+    expect(parsePluginManifest(manifest(['workspace.created'], ['workspace:read'])).ok).toBe(true)
+    expect(parsePluginManifest(manifest(['workspace.created'], ['accounts.read'])).ok).toBe(false)
     const mixed = parsePluginManifest(
-      manifest(['worktree.created', 'accounts.session.moved'], ['accounts.read'])
+      manifest(['workspace.created', 'accounts.session.moved'], ['accounts.read'])
     )
     expect(mixed.ok).toBe(false)
     if (!mixed.ok) {
-      expect(mixed.error).toContain('events:subscribe')
+      expect(mixed.error).toContain('workspace:read')
     }
     expect(
       parsePluginManifest(
         manifest(
-          ['worktree.created', 'accounts.usage.changed', 'accounts.session.moved'],
-          ['events:subscribe', 'accounts.read']
+          ['workspace.created', 'accounts.usage.changed', 'accounts.session.moved'],
+          ['workspace:read', 'accounts.read']
         )
       ).ok
     ).toBe(true)
@@ -562,65 +529,37 @@ function discovered(events: string[], capabilities: string[]): ValidDiscoveredPl
 }
 
 describe('deliverPluginEvent account capability', () => {
-  it('skips account events unless the manifest grants accounts.read', async () => {
+  it('skips account events unless the grant covers accounts.read', async () => {
     const delivered: string[] = []
-    // SAFETY: delivery only calls ensure and deliverEventIfRunning.
-    const workerController = {
-      ensure: vi.fn(async () => ({
-        deliverEvent: (event: string) => delivered.push(`manifest:${event}`)
-      })),
-      deliverEventIfRunning: (_key: string, event: string) => delivered.push(`dynamic:${event}`)
-    } as unknown as PluginWorkerController
+    // SAFETY: delivery only calls deliverEvent on the handle.
+    const ensureWorker = vi.fn(async () => ({
+      deliverEvent: (event: string) => {
+        delivered.push(event)
+      }
+    })) as unknown as PluginEventDeliveryContext['ensureWorker']
     const usage = {
       accountId: 'a',
       label: 'a@example.com',
       usage: { session: null, weekly: null, fableWeekly: null, updatedAt: null }
     }
-    const eventBus = new PluginEventBus()
-    const granted = discovered(['accounts.usage.changed'], ['accounts.read'])
-    const denied: ValidDiscoveredPlugin = {
-      ...granted,
-      manifest: { ...granted.manifest, capabilities: [{ kind: 'events:subscribe' }] }
-    }
-    eventBus.subscribe(denied.pluginKey, ['accounts.usage.changed'])
-    deliverPluginEvent({
-      event: 'accounts.usage.changed',
-      payload: usage,
-      plugins: [denied],
-      eventBus,
-      workerController,
+    const subscribed = discovered(['accounts.usage.changed'], ['accounts.read'])
+    const context = (granted: PluginCapabilityKind[]): PluginEventDeliveryContext => ({
+      plugins: () => [subscribed],
+      ensureWorker,
       isRuntimeApproved: () => true,
+      grantedCapabilities: () => granted,
       logWarning: () => () => undefined
     })
+    deliverPluginEvent({ event: 'accounts.usage.changed', payload: usage, ...context([]) })
     await Promise.resolve()
     expect(delivered).toEqual([])
-    expect(workerController.ensure).not.toHaveBeenCalled()
+    expect(ensureWorker).not.toHaveBeenCalled()
 
-    delivered.length = 0
-    const allowed = discovered(['accounts.usage.changed'], ['accounts.read'])
     deliverPluginEvent({
       event: 'accounts.usage.changed',
       payload: usage,
-      plugins: [allowed],
-      eventBus,
-      workerController,
-      isRuntimeApproved: () => true,
-      logWarning: () => () => undefined
+      ...context(['accounts.read'])
     })
-    await vi.waitFor(() => expect(delivered).toEqual(['manifest:accounts.usage.changed']))
-
-    delivered.length = 0
-    const dynamic = discovered([], ['accounts.read'])
-    eventBus.subscribe(dynamic.pluginKey, ['accounts.session.moved'])
-    deliverPluginEvent({
-      event: 'accounts.session.moved',
-      payload: { ptyId: 'pty-1', fromAccountId: 'a', toAccountId: 'b' },
-      plugins: [dynamic],
-      eventBus,
-      workerController,
-      isRuntimeApproved: () => true,
-      logWarning: () => () => undefined
-    })
-    expect(delivered).toEqual(['dynamic:accounts.session.moved'])
+    await vi.waitFor(() => expect(delivered).toEqual(['accounts.usage.changed']))
   })
 })

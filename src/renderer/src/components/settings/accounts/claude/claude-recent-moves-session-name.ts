@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { ClaudeSessionMoveSummary } from '../../../../../../shared/managed-account-types'
 import { translate } from '@/i18n/i18n'
-import { useAppStore, type AppState } from '../../../../store'
+import { useAppStore } from '../../../../store'
+import type { AppState } from '@/store/types'
 import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 
 export type ClaudeMoveTabName = { title: string; worktree: string | null }

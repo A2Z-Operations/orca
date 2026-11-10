@@ -1,8 +1,8 @@
-import { getClaudeAgentViewService } from '../claude/agent-view-service'
+import { getClaudeAgentViewService } from '../claude/agent-view/agent-view-service'
 // Runs a host Claude account folder's setup in the worker: one at a time per account, and the
 // capped wait a launch puts on it. The router decides which folder; this decides how it is set up.
 import { existsSync } from 'node:fs'
-import { isAgentStatusHooksEnabledForAgent } from '../../shared/agent-status-hooks-setting'
+import { isAgentStatusHooksEnabledForAgent } from '../../shared/agent-hook-listener/configuration/agent-status-hooks-setting'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { probeRecentClaudeCliVersion } from '../claude/claude-hook-event-versions'
 import { resolveClaudeCommand } from '../codex-cli/command'

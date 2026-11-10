@@ -17,7 +17,7 @@ import {
   type PluginClaudeAccountView,
   type PluginClaudeUsageChangedPayload,
   type PluginClaudeUsageWindow
-} from '../../shared/plugins/plugin-claude-account-contract'
+} from '../../shared/plugins/workers/plugin-claude-account-contract'
 
 export type PluginClaudeAccountSource = {
   id: string
