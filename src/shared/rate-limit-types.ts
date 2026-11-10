@@ -87,6 +87,8 @@ export type UsageRateLimitMetadata = {
   unverifiableOwner?: boolean
   /** Renderer-only: set up on this device but not on the remote host that owns usage. Hosts never set it. */
   ownerNotSetUp?: OwnerNotSetUpPlaceholder
+  /** Antigravity: the native login verified before and after the read; id is null for an unsaved login. */
+  account?: { id: string | null; email: string | null }
 }
 
 export type ProviderRateLimits = {
@@ -101,6 +103,7 @@ export type ProviderRateLimits = {
     | 'antigravity'
     | 'cursor'
     | 'zcode'
+    | 'muse'
   /** 5-hour session window, null if not available. */
   session: RateLimitWindow | null
   /** 7-day weekly window, null if not available. */
@@ -155,6 +158,16 @@ export type InactiveAccountUsage = {
   isFetching: boolean
 }
 
+/** One saved Antigravity account's last verified reading on the runtime the meter reads. */
+export type AntigravityAccountUsage = {
+  accountId: string
+  email: string | null
+  /** True when this account is the native agy login right now. */
+  active: boolean
+  /** Null until a reading verified as this account succeeded; `updatedAt` is when it was read. */
+  rateLimits: ProviderRateLimits | null
+}
+
 export type GrokAccountStatus = {
   signedIn: boolean
   email: string | null
@@ -185,6 +198,7 @@ export type RateLimitState = {
   grok: ProviderRateLimits | null
   cursor: ProviderRateLimits | null
   zcode: ProviderRateLimits | null
+  muse: ProviderRateLimits | null
   /** Cookie is stored outside GlobalSettings; this durable flag keeps MiniMax visible across reloads/snapshot refreshes. */
   minimaxCookieConfigured: boolean
   /** Expose API-key presence only; main retains the secret. Combined with cookie presence, keeps MiniMax visible across reloads. */
@@ -201,4 +215,6 @@ export type RateLimitState = {
   codexTarget: RateLimitRuntimeTarget
   inactiveClaudeAccounts: InactiveAccountUsage[]
   inactiveCodexAccounts: InactiveAccountUsage[]
+  /** Saved Antigravity accounts; agy has one shared login, so only the active one is ever read. */
+  antigravityAccounts: AntigravityAccountUsage[]
 }

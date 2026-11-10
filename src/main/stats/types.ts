@@ -14,7 +14,6 @@ export type StatsEventType =
 export type StatsEvent = {
   type: StatsEventType
   at: number // Unix epoch milliseconds.
-  // Keep repo/workspace context for future breakdowns even when current aggregates omit it.
   repoId?: string
   worktreeId?: string
   meta?: Record<string, string | number>
@@ -26,7 +25,7 @@ export type StatsAggregates = {
   totalAgentTimeMs: number
   // PR URLs deduplicate across restarts; collector caps this at 2000.
   countedPRs: string[]
-  // Persist first event time independently: trimming the 10K event log must not move tracking-since forward.
+  // Persisted because raw events are not retained.
   firstEventAt: number | null
   // Completed moves by how they landed. A rebalance is also counted under its strategy.
   claudeSessionMoves: ClaudeSessionMoveStats
@@ -34,6 +33,7 @@ export type StatsAggregates = {
 
 export type StatsFile = {
   schemaVersion: number
+  // Always written empty since #35544; older files may still carry events, which load ignores.
   events: StatsEvent[]
   aggregates: StatsAggregates
 }

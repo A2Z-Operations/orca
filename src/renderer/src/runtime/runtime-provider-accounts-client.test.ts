@@ -8,11 +8,11 @@ import {
   setClaudeAutoSwitch,
   watchProviderAccounts,
   type ProviderAccountsSnapshot
-} from './runtime-provider-accounts-client'
+} from './provider-accounts/observations/runtime-provider-accounts-client'
 import {
   createCompatibleRuntimeStatusResponseIfNeeded,
   type RuntimeEnvironmentCallRequest
-} from './runtime-compatibility-test-fixture'
+} from './rpc/testing/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from './runtime-rpc-client'
 
 const LOCAL = { kind: 'local' } as const

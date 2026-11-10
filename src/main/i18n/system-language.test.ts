@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SystemLanguageReader } from './system-language'
+import type { SystemLanguageRead } from './system-language'
 
-let readPreferences: SystemLanguageReader = () => ['fr-FR', 'en-US']
+let readPreferences: () => SystemLanguageRead = () => ({
+  preferences: ['fr-FR', 'en-US'],
+  settled: true
+})
 
 beforeEach(() => {
   vi.resetModules()
-  readPreferences = () => ['fr-FR', 'en-US']
+  readPreferences = () => ({ preferences: ['fr-FR', 'en-US'], settled: true })
 })
 
 async function loadSystemLanguage() {
@@ -17,21 +20,27 @@ async function loadSystemLanguage() {
 describe('native language snapshot', () => {
   it('reads preferences once after app readiness and shares the ordered result', async () => {
     let ready = false
-    readPreferences = () => (ready ? ['fr-FR', 'en-US'] : null)
+    let reads = 0
+    readPreferences = () => {
+      reads += 1
+      return { preferences: ready ? ['fr-FR', 'en-US'] : ['ja-JP'], settled: ready }
+    }
     const { getSystemLanguageDetection } = await loadSystemLanguage()
-    expect(getSystemLanguageDetection()).toBeNull()
+    // Pre-ready reads serve startup-failure dialogs without pinning the post-ready snapshot.
+    expect(getSystemLanguageDetection()?.locale).toBe('ja')
     ready = true
     expect(getSystemLanguageDetection()).toMatchObject({
       detectedTag: 'fr-FR',
       locale: 'fr',
       source: 'native'
     })
-    readPreferences = () => ['en-US']
+    readPreferences = () => ({ preferences: ['en-US'], settled: true })
     expect(getSystemLanguageDetection()?.locale).toBe('fr')
+    expect(reads).toBe(2)
   })
 
   it('keeps a C-only native result unknown so Chromium cannot override it', async () => {
-    readPreferences = () => ['C.UTF-8', 'POSIX']
+    readPreferences = () => ({ preferences: ['C.UTF-8', 'POSIX'], settled: true })
     const { getSystemLanguageDetection } = await loadSystemLanguage()
     expect(getSystemLanguageDetection()).toMatchObject({ status: 'unknown', source: 'native' })
   })
@@ -43,7 +52,7 @@ describe('native language snapshot', () => {
         if (kind === 'failed') {
           throw new Error('Unavailable')
         }
-        return []
+        return { preferences: [], settled: true }
       }
       const { getSystemLanguageDetection } = await loadSystemLanguage()
       expect(getSystemLanguageDetection()).toBeNull()
@@ -88,7 +97,7 @@ it.each([
   { platform: 'Linux C-only', preferences: ['C.UTF-8', 'C'], locale: 'en', status: 'unknown' },
   { platform: 'unsupported', preferences: ['de-DE', 'fr-FR'], locale: 'en', status: 'unsupported' }
 ])('handles $platform preference lists', async ({ preferences, locale, status }) => {
-  readPreferences = () => preferences
+  readPreferences = () => ({ preferences, settled: true })
   const { getSystemLanguageDetection } = await loadSystemLanguage()
   expect(getSystemLanguageDetection()).toMatchObject({ locale, status })
 })

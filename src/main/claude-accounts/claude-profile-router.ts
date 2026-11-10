@@ -1,3 +1,5 @@
+import { claudeAccountUsagePreparation } from './claude-account-usage-preparation'
+import { claudeProfileSelectionHomes } from './claude-profile-selection-homes'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -15,12 +17,9 @@ import {
   prepareChosenAccountLaunch,
   type ChosenAccountRouting
 } from './claude-profile-chosen-account'
-import {
-  claudeAccountUsagePreparation,
-  systemDefaultRunsAnotherAccount
-} from './claude-profile-system-default-comparison'
-import { claudeAuthProxyEnabled } from '../../shared/claude-account-switch-settings'
+import { systemDefaultRunsAnotherAccount } from './claude-profile-system-default-comparison'
 import type { GlobalSettings } from '../../shared/global-settings-types'
+import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
 import {
   describeClaudeProfile,
@@ -47,7 +46,7 @@ import {
   type ClaudeFolderLogin
 } from './claude-account-folder'
 import { resolveLoginShellEnvironment } from '../startup/login-shell-environment'
-import { claudeAuthProxyBaseUrl } from './claude-auth-proxy/claude-auth-proxy-host'
+import { withClaudeAuthProxyUrl } from './claude-auth-proxy/claude-auth-proxy-launch-env'
 import { claudeAssignedAccountForProviderSession } from './claude-pane-account-registry'
 
 export type ClaudeProfileRouterSettings = Pick<
@@ -104,11 +103,11 @@ export class ClaudeProfileRouter {
     })
   }
 
-  private get userHome(): string {
+  get userHome(): string {
     return this.args.userHome ?? homedir()
   }
 
-  private selectedProfile(): ClaudeProfileDescriptor | null {
+  selectedProfile(): ClaudeProfileDescriptor | null {
     const id = getSelectedClaudeAccountIdForTarget(this.args.getSettings(), { runtime: 'host' })
     return id ? this.describe(id) : null
   }
@@ -131,19 +130,24 @@ export class ClaudeProfileRouter {
     if (this.accountLogin(accountId)) {
       return false
     }
-    const saved = findClaudeAccount(this.args.getSettings(), accountId)
+    const saved = this.savedAccount(accountId)
     const systemDefault = this.systemDefaultLogin()
     return Boolean(saved && systemDefault && isSameClaudeLogin(saved, systemDefault))
+  }
+
+  savedAccount(accountId: string): ClaudeManagedAccount | undefined {
+    return findClaudeAccount(this.args.getSettings(), accountId)
   }
 
   systemDefaultHome(): string {
     return resolveClaudeDefaultHome(this.userHome, this.userConfigDir())
   }
 
-  /** Never fall back from a missing folder: that would run the wrong account. */
-  routedHome(): string | null {
+  /** Never fall back from a missing folder: that would run the wrong account. `identity` names
+   *  the selected route before its folder exists; launches and reads still check availability. */
+  routedHome(availability: 'checked' | 'identity' = 'checked'): string | null {
     const home = this.routedProfile()?.home ?? null
-    if (home !== null && !isDirectory(home)) {
+    if (availability === 'checked' && home !== null && !isDirectory(home)) {
       throw claudeProfileMissing()
     }
     return home
@@ -241,15 +245,7 @@ export class ClaudeProfileRouter {
     accountId: string | null | undefined,
     patch: ClaudeEnvPatch
   ): ClaudeEnvPatch {
-    if (patch.ANTHROPIC_BASE_URL) {
-      return patch
-    }
-    const url = claudeAuthProxyBaseUrl(
-      accountId,
-      this.env,
-      claudeAuthProxyEnabled(this.args.getSettings())
-    )
-    return url ? { ...patch, ANTHROPIC_BASE_URL: url } : patch
+    return withClaudeAuthProxyUrl(accountId, patch, this.env, this.args.getSettings())
   }
 
   /** Env for a launch Orca makes itself. Throws like routedHome. */
@@ -359,6 +355,11 @@ export class ClaudeProfileRouter {
     return claudeAccountUsagePreparation(this, accountId)
   }
 
+  async accountSelectionHomes(launchEnv: NodeJS.ProcessEnv = process.env): Promise<string[]> {
+    return claudeProfileSelectionHomes(this, this.args.getSettings(), this.envReady, launchEnv)
+  }
+
+  /** Every account folder on this host, selected or not. */
   accountHomes(): string[] {
     return listClaudeProfileHomes(this.args.dataRoot)
   }

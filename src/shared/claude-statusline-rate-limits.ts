@@ -18,7 +18,7 @@ export type ClaudeStatusLineRateLimits = {
   configDir: string | null
   fiveHour: ClaudeStatusLineWindow | null
   sevenDay: ClaudeStatusLineWindow | null
-  /** Hook pane key, attached after parse. The parser itself does not return it. */
+  /** Hook pane key, when the statusline body carried one. */
   paneKey?: string
   /** Account the proxy bills when it differs from the spawn folder. */
   billingAccountId?: string
@@ -53,8 +53,8 @@ function parseWindow(value: unknown): ClaudeStatusLineWindow | null {
   }
 }
 
-/** Hook pane key on the raw statusline body. The rate-limit parser does not return it. */
-export function claudeStatusLinePaneKey(body: unknown): string | undefined {
+/** Hook pane key on the raw statusline body; the parser attaches it when present. */
+function claudeStatusLinePaneKey(body: unknown): string | undefined {
   if (typeof body !== 'object' || body === null || !('paneKey' in body)) {
     return undefined
   }
@@ -90,5 +90,6 @@ export function parseClaudeStatusLineBody(body: unknown): ClaudeStatusLineRateLi
     return null
   }
   const configDir = typeof fields.configDir === 'string' ? fields.configDir.trim() : ''
-  return { configDir: configDir || null, fiveHour, sevenDay }
+  const paneKey = claudeStatusLinePaneKey(body)
+  return { configDir: configDir || null, fiveHour, sevenDay, ...(paneKey ? { paneKey } : {}) }
 }

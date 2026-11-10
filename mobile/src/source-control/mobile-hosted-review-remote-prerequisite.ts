@@ -1,4 +1,5 @@
-import { resolveCreatePrIntentRemoteStep } from '../../../src/shared/source-control-create-review-intent'
+import { translate } from '../i18n/mobile-i18n'
+import { resolveCreatePrIntentRemoteStep } from '../../../src/shared/source-control/decisions/source-control-create-review-intent'
 import type { MobileGitStatusResult } from './mobile-git-status'
 import type { MobileHostedReviewCreateIntentProgress } from './mobile-hosted-review-create-intent'
 import type { MobilePrPrefill } from './mobile-pr-create'
@@ -7,22 +8,20 @@ import {
   pushMobileHostedReviewBranch
 } from './mobile-hosted-review-git-preparation'
 import { readBranchCompareOutcome } from './mobile-branch-compare-outcome'
-import type { RpcOperationSender } from '../transport/rpc-operation-sender'
+import type { RpcOperationSender } from '../transport/rpc/rpc-operation-sender'
 
 type RemotePrerequisiteInput = {
   status: MobileGitStatusResult | null
   onProgress?: (progress: MobileHostedReviewCreateIntentProgress) => void
 }
 
-const ALWAYS_CURRENT = { isCurrent: () => true }
-
 // Desktop publishes only a branch with commits beyond its base; read them only when that decides it.
 async function readBranchCommitsAhead(
   client: RpcOperationSender,
   worktreeId: string
 ): Promise<number | undefined> {
-  const compare = await readBranchCompareOutcome(client, worktreeId, ALWAYS_CURRENT)
-  return compare?.kind === 'ready' && compare.result.summary.status === 'ready'
+  const compare = await readBranchCompareOutcome(client, worktreeId)
+  return compare.kind === 'ready' && compare.result.summary.status === 'ready'
     ? compare.result.summary.commitsAhead
     : undefined
 }
@@ -50,19 +49,32 @@ export async function applyMobileHostedReviewRemotePrerequisite(
       result = await pushMobileHostedReviewBranch(
         client,
         { worktree, publish: true },
-        'Failed to publish branch'
+        translate(
+          'sourceControl.hostedReviewRemotePrerequisite.publishFailed',
+          'Failed to publish branch'
+        )
       )
       break
     case 'push':
       input.onProgress?.('pushing')
-      result = await pushMobileHostedReviewBranch(client, { worktree }, 'Failed to push commits')
+      result = await pushMobileHostedReviewBranch(
+        client,
+        { worktree },
+        translate(
+          'sourceControl.hostedReviewRemotePrerequisite.pushFailed',
+          'Failed to push commits'
+        )
+      )
       break
     case 'force_push':
       input.onProgress?.('force_pushing')
       result = await pushMobileHostedReviewBranch(
         client,
         { worktree, forceWithLease: true },
-        'Failed to force push with lease'
+        translate(
+          'sourceControl.hostedReviewRemotePrerequisite.forcePushFailed',
+          'Failed to force push with lease'
+        )
       )
       break
     case 'fast_forward':

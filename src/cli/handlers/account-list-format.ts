@@ -1,3 +1,4 @@
+import type { AntigravityAccountState } from '../../shared/antigravity-account-types'
 import type { ManagedDataAccountsState } from '../../shared/managed-account-types'
 
 type AccountsBlock = {
@@ -96,8 +97,10 @@ function formatSessionCount(count: number, chatCount: number | undefined): strin
 }
 
 export function formatAccountsBlock(label: string, block: AccountsBlock): string {
+  const hostAccountId = block.activeAccountIdsByRuntime?.host ?? block.activeAccountId
+  const system = `  system  System default${hostAccountId === null ? ' (active)' : ''}`
   if (block.accounts.length === 0) {
-    return `No managed ${label} accounts.`
+    return `No managed ${label} accounts.\n${system}`
   }
   const activeAccountIds = new Set([
     block.activeAccountId,
@@ -108,6 +111,7 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
     (block.assignedSessions ?? []).map((row) => [row.accountId, row])
   )
   const windowsByAccount = new Map((block.usageWindows ?? []).map((row) => [row.accountId, row]))
+  // Why the id: `orca account select --account` needs it when one email signs into several orgs.
   const lines = block.accounts.map((account) => {
     const row = sessionCountByAccount.get(account.id)
     const sessions =
@@ -119,7 +123,7 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
       ? `  weekly ${formatWindowPercent(windows.weekly, windows.unavailable)} · fable ${formatWindowPercent(windows.fable, windows.unavailable)}`
       : ''
     const lapsed = windows?.unavailable === 'lapsed'
-    return `  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
+    return `  ${account.id}  ${account.email}${activeAccountIds.has(account.id) ? ' (active)' : ''}${
       account.needsSignIn || lapsed
         ? ' (sign in again in Orca Settings > AI Provider Accounts)'
         : ''
@@ -152,5 +156,20 @@ export function formatAccountsBlock(label: string, block: AccountsBlock): string
   for (const assignment of block.paneAssignments ?? []) {
     lines.push(`  pane ${assignment.ptyId}: account ${assignment.accountId}`)
   }
-  return `Managed ${label} accounts (${block.accounts.length}):\n${lines.join('\n')}`
+  return `Managed ${label} accounts (${block.accounts.length}):\n${system}\n${lines.join('\n')}`
+}
+
+/** Antigravity has no system default: one saved account always owns the native login. */
+export function formatAntigravityAccounts(state: AntigravityAccountState): string {
+  if (state.accounts.length === 0) {
+    return 'No managed Antigravity accounts.'
+  }
+  return `Managed Antigravity accounts (${state.accounts.length}):\n${state.accounts
+    .map(
+      (account) =>
+        `  ${account.id}  ${account.email ?? account.subject ?? account.id}${
+          account.id === state.activeAccountId ? ' (active)' : ''
+        }`
+    )
+    .join('\n')}`
 }

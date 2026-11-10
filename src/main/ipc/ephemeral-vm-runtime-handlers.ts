@@ -5,30 +5,27 @@ import {
   updateEphemeralVmRuntimeStatus
 } from '../../shared/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../../shared/ephemeral-vm-runtimes'
-import {
-  getEphemeralVmRecipeResultConnection,
-  getEphemeralVmRecipeResultPairingCode
-} from '../../shared/ephemeral-vm-recipes'
-import { updateEnvironmentFromPairingCode } from '../../shared/runtime-environment-store'
 import { releaseEphemeralVmRuntimeEnvironments } from '../ephemeral-vm/runtime-environment-release'
-import {
-  cleanupEphemeralVmRuntime,
-  resumeEphemeralVmRuntime
-} from '../ephemeral-vm/runtime-service'
+import { cleanupEphemeralVmRuntime } from '../ephemeral-vm/runtime-service'
 import { stopEphemeralVmRuntimeCleanup } from '../ephemeral-vm/runtime-cleanup-control'
 import { removeEphemeralVmRuntimeSshTarget } from '../ephemeral-vm/runtime-ssh-cleanup'
 import {
   buildEphemeralVmRecipeCleanupCommand,
   buildEphemeralVmRecipeCleanupPayload
 } from '../../shared/ephemeral-vm-recipe-lifecycle-payload'
-import {
-  connectRuntimeOwnedSshTarget,
-  removeRuntimeOwnedSshTarget
-} from '../ephemeral-vm/runtime-ssh'
+import { removeRuntimeOwnedSshTarget } from '../ephemeral-vm/runtime-ssh'
 import { getRuntimeRecipeContext } from './ephemeral-vm-recipe-context'
+import {
+  ephemeralVmFailure,
+  ephemeralVmFailureFromError
+} from '../../shared/ephemeral-vm-failure-copy'
 import { invalidateRuntimeEnvironmentTransport } from './runtime-environments/runtime-environments'
 import { retireRemovedRuntimeEnvironment } from './runtime-environments/runtime-environment-removal-cleanup'
 import { attachEphemeralVmRuntimeToWorkspace } from '../ephemeral-vm/runtime-attachment'
+import {
+  forgetInterruptedEphemeralVmProvision,
+  isEphemeralVmProvisionLive
+} from '../ephemeral-vm/runtime-provisioning-persistence'
 
 export type EphemeralVmCleanupCommandResult = {
   runtimeId: string
@@ -43,7 +40,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:listRuntimes')
   ipcMain.removeHandler('ephemeralVm:cleanup')
   ipcMain.removeHandler('ephemeralVm:stopCleanup')
-  ipcMain.removeHandler('ephemeralVm:resumeWorkspace')
+  ipcMain.removeHandler('ephemeralVm:forgetRuntime')
   ipcMain.removeHandler('ephemeralVm:getCleanupCommand')
 
   ipcMain.handle('ephemeralVm:listRuntimes', (): EphemeralVmRuntimeRecord[] => {
@@ -71,8 +68,9 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
       if (!runtime) {
         throw new Error(`Unknown ephemeral VM runtime: ${args.runtimeId}`)
       }
-      if (!runtime.repoId) {
-        throw new Error(`Ephemeral VM runtime has no repo id: ${args.runtimeId}`)
+      if (runtime.status === 'provisioning' && isEphemeralVmProvisionLive(runtime.id)) {
+        // Why: don't mark a create in flight as cleanup_failed; its own outcome settles the row.
+        throw new Error(`Ephemeral VM runtime is still provisioning: ${runtime.id}`)
       }
       let result
       if (runtime.cleanupStatus === 'succeeded') {
@@ -86,7 +84,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
             status: 'cleanup_failed',
             cleanupStatus: 'failed',
             cleanupLastAttemptAt: Date.now(),
-            cleanupLastError: error instanceof Error ? error.message : String(error)
+            cleanupLastError: ephemeralVmFailureFromError(error)
           })
           return removeEphemeralVmRuntimeSshTarget({
             userDataPath,
@@ -96,7 +94,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
         }
         result = await cleanupEphemeralVmRuntime({
           userDataPath,
-          repoPath: resolved.repo.repo.path,
+          repoPath: resolved.repoPath,
           recipe: resolved.recipe,
           runtimeId: runtime.id
         })
@@ -151,70 +149,14 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
       return updateEphemeralVmRuntimeStatus(userDataPath, runtime.id, {
         status: 'cleanup_failed',
         cleanupStatus: 'failed',
-        cleanupLastError: 'Cleanup was interrupted. Retry cleanup to continue.'
+        cleanupLastError: ephemeralVmFailure('cleanupInterrupted')
       })
     }
   )
 
-  ipcMain.handle(
-    'ephemeralVm:resumeWorkspace',
-    async (_event, args: { workspaceId: string }): Promise<EphemeralVmRuntimeRecord | null> => {
-      const userDataPath = app.getPath('userData')
-      const runtime = listEphemeralVmRuntimes(userDataPath).find(
-        (entry) =>
-          entry.workspaceId === args.workspaceId &&
-          entry.status !== 'cleaned' &&
-          entry.status !== 'cleanup_pending'
-      )
-      if (!runtime?.repoId) {
-        return null
-      }
-      if (runtime.status !== 'suspended' && runtime.status !== 'resume_failed') {
-        return runtime
-      }
-      const recipeContext = getRuntimeRecipeContext(store, userDataPath, runtime.id)
-      const result = await resumeEphemeralVmRuntime({
-        userDataPath,
-        repoPath: recipeContext.repo.repo.path,
-        recipe: recipeContext.recipe,
-        runtimeId: runtime.id
-      })
-      if (!result.ok) {
-        throw new Error(result.error)
-      }
-      const connection = getEphemeralVmRecipeResultConnection(result.runtime.recipeResult)
-      // SSH servers use their target and have no pairing to refresh.
-      if (!result.skipped && connection.type !== 'ssh' && runtime.runtimeEnvironmentId) {
-        const pairingCode = getEphemeralVmRecipeResultPairingCode(result.runtime.recipeResult)
-        if (!pairingCode) {
-          throw new Error('Resume result did not include an Orca Server pairing code.')
-        }
-        updateEnvironmentFromPairingCode(userDataPath, runtime.runtimeEnvironmentId, {
-          pairingCode
-        })
-        invalidateRuntimeEnvironmentTransport(runtime.runtimeEnvironmentId)
-      }
-      if (!result.skipped && connection.type === 'ssh') {
-        try {
-          const ssh = await connectRuntimeOwnedSshTarget({
-            runtimeId: result.runtime.id,
-            connection
-          })
-          return updateEphemeralVmRuntimeStatus(userDataPath, result.runtime.id, {
-            connectionMode: 'ssh',
-            sshTargetId: ssh.targetId,
-            runtimeEnvironmentId: ssh.environmentId
-          })
-        } catch (error) {
-          updateEphemeralVmRuntimeStatus(userDataPath, result.runtime.id, {
-            status: 'resume_failed'
-          })
-          throw error
-        }
-      }
-      return result.runtime
-    }
-  )
+  ipcMain.handle('ephemeralVm:forgetRuntime', (_event, args: { runtimeId: string }): void => {
+    forgetInterruptedEphemeralVmProvision(app.getPath('userData'), args.runtimeId)
+  })
 
   ipcMain.handle(
     'ephemeralVm:getCleanupCommand',
@@ -229,7 +171,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
           projectId: resolved.runtime.projectId,
           workspaceId: resolved.runtime.workspaceId,
           workspaceName: resolved.runtime.workspaceName,
-          repoPath: resolved.repo.repo.path
+          repoPath: resolved.repoPath
         },
         recipeResult: resolved.runtime.recipeResult
       })

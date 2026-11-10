@@ -1,21 +1,21 @@
 import type { BrowserWindow } from 'electron'
 import { registerCoreHandlers } from '../ipc/register-core-handlers/register-core-handlers'
 import { attachMainWindowServices } from '../window/attach-main-window-services'
-import { initTccPromptNotice } from '../macos-tcc-prompt-notice'
-import { resolveUpdateInstallMode } from '../updater'
+import { initTccPromptNotice } from '../macos-permissions/macos-tcc-prompt-notice'
+import { resolveUpdateInstallMode } from '../updater/updater-service'
 import { desktopConnectorCloud } from './main-process-connector-startup'
 import { mainProcessState as state } from './main-process-state'
-import { prepareCodexAiVaultSessionResume } from '../codex/codex-ai-vault-session-resume'
-import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
-import { preserveAgentAuthBeforeRestart } from '../agent-auth-restart-preservation'
-import { preserveStateBeforeUpdateRestart } from '../update-restart-preservation'
+import { prepareCodexAiVaultSessionResume } from '../codex/history/resume/codex-ai-vault-session-resume'
+import { resolveHostCodexSessionSourceHome } from '../codex/history/rollouts/codex-session-source-home'
+import { preserveAgentAuthBeforeRestart } from '../providers/accounts/agent-auth-restart-preservation'
+import { preserveStateBeforeUpdateRestart } from '../updater/update-restart-preservation'
 import {
   emitPluginWorktreeLifecycle,
   handleCodexHomePtySpawned,
   handlePtyExit
 } from './main-process-pty-startup'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
-import { resolveHostAgentBaseEnvironment } from '../runtime/structured-agent-shell-environment'
+import { resolveHostAgentBaseEnvironment } from '../runtime/agent-session/environment/structured-agent-shell-environment'
 import {
   prepareCodexPinnedLaunchHome,
   prepareCodexSessionResumeForLaunch
@@ -118,10 +118,19 @@ export function attachMainWindowCoreServices(
     },
     state.pluginService ?? undefined,
     state.pluginMarketplaceService && state.pluginMarketplaceInstaller
-      ? { marketplace: state.pluginMarketplaceService, installer: state.pluginMarketplaceInstaller }
+      ? {
+          marketplace: state.pluginMarketplaceService,
+          installer: state.pluginMarketplaceInstaller,
+          ...(state.pluginAutoUpdater ? { autoUpdater: state.pluginAutoUpdater } : {}),
+          ...(state.pluginInstallStatsService
+            ? { installStats: state.pluginInstallStatsService }
+            : {}),
+          ...(state.pluginUpdateReviewNotices
+            ? { reviewNotices: state.pluginUpdateReviewNotices }
+            : {})
+        }
       : undefined
   )
-  automations.setWebContents(window.webContents)
   automations.start()
   attachMainWindowServices(
     window,
@@ -152,21 +161,13 @@ export function attachMainWindowCoreServices(
   // Attach durable diagnostic pulls now, defer process launch past first paint.
   initTccPromptNotice(window, { deferWatchUntilReadyToShow: true })
   rateLimits.attach(window)
-  if (state.isServeMode) {
-    // A window opened after serve launch must not call desktop start() and clear the headless flags.
-    if (armServeClaudeUsagePolling()) {
-      const stop = state.stopClaudeUsagePolling
-      window.on('closed', () => {
-        if (stop && state.stopClaudeUsagePolling === stop) {
-          stop()
-        }
-      })
-    }
-    return
+  if (state.isServeMode && armServeClaudeUsagePolling()) {
+    // A window opened after serve launch keeps the headless poll; the desktop timer already runs in the services.
+    const stop = state.stopClaudeUsagePolling
+    window.on('closed', () => {
+      if (stop && state.stopClaudeUsagePolling === stop) {
+        stop()
+      }
+    })
   }
-  console.info(
-    '[claude-usage] polling switch: mode=desktop pollInactive=false pollWithoutWindow=false'
-  )
-  // Quota probes spawn CLIs/use network; defer to show/focus refresh so they do not compete with first paint.
-  rateLimits.start({ fetchImmediately: false })
 }

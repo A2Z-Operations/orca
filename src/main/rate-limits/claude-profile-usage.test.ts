@@ -21,7 +21,7 @@ vi.mock('./claude-oauth-usage-request', () => ({ fetchClaudeOAuthUsage: calls.us
 const runningDistros = vi.hoisted(() => ({
   filter: vi.fn(async (paths: readonly string[]) => [...paths])
 }))
-vi.mock('../wsl-running-path-filter', () => ({
+vi.mock('../wsl/filesystem/wsl-running-path-filter', () => ({
   filterPathsToRunningWslDistrosAsync: runningDistros.filter
 }))
 vi.mock('@orca/process-host', () => ({

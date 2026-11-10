@@ -1,15 +1,16 @@
+import { readTerminalStartFailure } from '../../../shared/terminal/pty/lifecycle/terminal-start-failure'
 import type { ClaudeRuntimeAuthPreparation } from '../../claude-accounts/runtime-auth-service'
 import type { PtySpawnSizeSeed } from './spawn-options-assembly'
-import { isValidTerminalTabId } from '../../../shared/terminal-tab-id'
-import type { AgentSessionClaimedSpawnResult } from '../../../shared/agent-session-host-authority'
+import { isValidTerminalTabId } from '../../../shared/workspace-layout/terminal-tab-id'
+import type { AgentSessionClaimedSpawnResult } from '../../../shared/agent-session/agent-session-host-authority'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
-import type { TuiAgent } from '../../../shared/tui-agent'
-import type { Store, PtyBindingSourceExpectation } from '../../persistence'
+import type { TuiAgent } from '../../../shared/agent-launch/catalog/tui-agent'
+import type { Store, PtyBindingSourceExpectation } from '../../persistence/loading-store/store'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
-import type { PtyRegistrationClaim } from '../../runtime/runtime-terminal-state-records'
-import { markNativeWindowsConptyPty } from '../../runtime/terminal-model-query-authority'
+import type { PtyRegistrationClaim } from '../../runtime/terminal/records/runtime-terminal-state-records'
+import { markNativeWindowsConptyPty } from '../../runtime/terminal/output/terminal-model-query-authority'
 import type { IPtyProvider, PtySpawnResult } from '../../providers/pty-provider-contract'
-import type { CodexPaneHomeRoute } from '../../codex/codex-pane-account-registry'
+import type { CodexPaneHomeRoute } from '../../codex/configuration/homes/codex-pane-account-registry-types'
 import type { CodexAccountSelectionTarget } from '../../codex-accounts/runtime-selection'
 import type { PtySpawnTiming } from './pty-spawn-timing'
 import type { CodexHomePtySpawnedLifecycleArgs } from './host-env/types'
@@ -94,6 +95,8 @@ export type PtySpawnCommitInput = {
     worktreeId: string | null | undefined
     shellOverride: string | undefined
     rendererLaunchAuthority: { launchToken: string; launchAgent: TuiAgent } | null
+    /** The agent a fresh spawn's launch command starts; null for reattaches, adoptions and shells. */
+    launchedAgent: TuiAgent | null
   }
   preAllocatedHandle: string | null | undefined
   spawnTiming?: PtySpawnTiming
@@ -145,6 +148,7 @@ export async function commitPtySpawn(input: PtySpawnCommitInput): Promise<PtySpa
       runtime,
       registration.store,
       state.pendingRegistrationClaim,
+      result,
       result.id,
       registration.worktreeId,
       null,
@@ -161,16 +165,19 @@ export async function commitPtySpawn(input: PtySpawnCommitInput): Promise<PtySpa
             ...(registration.rendererLaunchAuthority
               ? { agentLaunchAuthority: registration.rendererLaunchAuthority }
               : {}),
+            ...(registration.launchedAgent ? { launchedAgent: registration.launchedAgent } : {}),
             ...(providerReattachLaunchIdentity ? { providerReattachLaunchIdentity } : {})
           }
         : undefined,
       shouldSkipCodexHomeEnvForWindowsShell(registration.shellOverride, state.cwd)
     )
     if (rejectedRegistration) {
+      let terminalStartFailure
       await rejectedRegistration.catch((error: unknown) => {
         if (!(error instanceof Error) || error.message !== 'agent_session_exited_during_start') {
           throw error
         }
+        terminalStartFailure = readTerminalStartFailure(error)
       })
       runtime?.cancelPendingPtyRegistration?.(
         result.id,
@@ -178,7 +185,11 @@ export async function commitPtySpawn(input: PtySpawnCommitInput): Promise<PtySpa
         state.pendingRegistrationClaim
       )
       state.pendingRegistrationPtyId = null
-      return { kind: 'registration-exited', result: input.response }
+      return {
+        kind: 'registration-exited',
+        result: input.response,
+        ...(terminalStartFailure ? { terminalStartFailure } : {})
+      }
     }
   } else if (state.pendingRegistrationPtyId) {
     runtime?.cancelPendingPtyRegistration?.(
@@ -207,6 +218,7 @@ async function commitAdoptedAgentSession(
     runtime,
     input.registration.store,
     state.pendingRegistrationClaim,
+    adoptedResult,
     result.id,
     surface.worktreeId,
     null,

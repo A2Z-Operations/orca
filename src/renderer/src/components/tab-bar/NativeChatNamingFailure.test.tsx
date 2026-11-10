@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TabHoverCard } from './TabHoverCard'
 import { TAB_TOOLTIP_DELAY_MS, TabStripTooltipProvider } from './TabStripTooltipProvider'
 import { NativeChatNamingErrorBlock } from './NativeChatNamingFailure'
-import type { AgentSessionStatusEvent } from '../../../../shared/agent-session-wire'
-import { resetStructuredAgentSessionStatusFeedsForTests } from '@/runtime/structured-agent-session-status-feed'
+import type { AgentSessionStatusEvent } from '../../../../shared/agent-session/agent-session-wire'
+import { resetStructuredAgentSessionStatusFeedsForTests } from '@/runtime/native-chat/status/structured-agent-session-status-feed'
 import { useNativeChatNamingFailure } from './use-native-chat-naming-failure'
 
 const client = vi.hoisted(() => ({
@@ -24,15 +24,18 @@ vi.mock('@/store', () => ({
 vi.mock('@/lib/web-client-location', () => ({
   isWebClientLocation: () => client.web
 }))
-vi.mock('@/runtime/structured-agent-session-client', () => ({
+vi.mock('../../runtime/native-chat/requests/structured-agent-session-subscriptions', () => ({
   subscribeStructuredAgentSessionStatus: async (_target: unknown, emit: typeof client.emit) => {
     client.emit = emit
     return { unsubscribe: () => {} }
-  },
+  }
+}))
+
+vi.mock('../../runtime/native-chat/naming/structured-agent-session-name-regeneration', () => ({
   regenerateStructuredAgentSessionName: client.regenerate
 }))
 
-vi.mock('@/runtime/structured-agent-session-host-capability', () => ({
+vi.mock('@/runtime/native-chat/host-capabilities/structured-agent-session-host-capability', () => ({
   useStructuredAgentSessionHostCapabilityState: () =>
     client.supported ? 'supported' : 'unsupported'
 }))
@@ -50,7 +53,11 @@ function ChatTab(): React.JSX.Element {
       title="Repair the login flow"
       icon={<span />}
       programName="Claude"
-      alert={naming ? <NativeChatNamingErrorBlock naming={naming} /> : undefined}
+      alert={
+        naming
+          ? (dismiss) => <NativeChatNamingErrorBlock naming={naming} onDismiss={dismiss} />
+          : undefined
+      }
     >
       <button>chat tab</button>
     </TabHoverCard>
@@ -95,15 +102,6 @@ describe('chat tab naming failure', () => {
       expect(screen.getAllByRole('button', { name: 'view error' }).length).toBeGreaterThan(0)
       const settingsButtons = screen.queryAllByRole('button', { name: 'Settings' })
       expect(settingsButtons.length > 0).toBe(!web)
-      if (!web) {
-        fireEvent.click(settingsButtons[0])
-        expect(settings.openSettingsPage).toHaveBeenCalledOnce()
-        expect(settings.openSettingsTarget).toHaveBeenCalledExactlyOnceWith({
-          pane: 'chat',
-          repoId: null,
-          sectionId: 'chat-names'
-        })
-      }
       const regenerate = screen.queryAllByRole('button', { name: 'Regenerate name' })
       expect(regenerate.length > 0).toBe(supported)
       if (supported) {
@@ -121,6 +119,25 @@ describe('chat tab naming failure', () => {
         act(() => client.emit({ type: 'snapshot', sessions: [], namingActiveSessionIds: [] }))
         await act(async () => acceptance.resolve(true))
         expect(screen.queryAllByRole('button', { name: 'Regenerating…' })).toHaveLength(0)
+      }
+      if (!web) {
+        settings.openSettingsPage.mockImplementationOnce(() => {
+          expect(screen.queryByText("Couldn't name this chat")).toBeNull()
+        })
+        fireEvent.click(settingsButtons[0])
+        expect(screen.queryByText("Couldn't name this chat")).toBeNull()
+        expect(settings.openSettingsPage).toHaveBeenCalledOnce()
+        expect(settings.openSettingsTarget).toHaveBeenCalledExactlyOnceWith({
+          pane: 'chat',
+          repoId: null,
+          sectionId: 'chat-names'
+        })
+        fireEvent.pointerLeave(screen.getByRole('button', { name: 'chat tab' }))
+        fireEvent.pointerMove(screen.getByRole('button', { name: 'chat tab' }), {
+          pointerType: 'mouse'
+        })
+        act(() => vi.advanceTimersByTime(TAB_TOOLTIP_DELAY_MS))
+        expect(screen.getAllByText("Couldn't name this chat").length).toBeGreaterThan(0)
       }
     }
   )

@@ -45,7 +45,7 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     this.clearDeferredStartupRefresh()
     this.deferredStartupRefreshTimer = setTimeout(() => {
       this.deferredStartupRefreshTimer = null
-      void this.refreshIfWindowActive()
+      void this.refreshIfWatched()
     }, DEFERRED_STARTUP_ACTIVE_REFRESH_MS)
   }
 
@@ -59,6 +59,10 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
   protected shouldBackgroundPoll(): boolean {
     // Headless serve attaches a hidden window. The opt-in still has to poll; desktop start omits it.
     if (this.pollWithoutWindow) {
+      return true
+    }
+    // Poll only while someone watches: a paired client's stream, or the focused desktop window.
+    if (this.usageViewers > 0) {
       return true
     }
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
@@ -83,12 +87,17 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
       grok: this.state.grok,
       antigravity: this.state.antigravity,
       cursor: this.state.cursor,
-      zcode: this.state.zcode
+      zcode: this.state.zcode,
+      muse: this.state.muse
     }
-    return Object.entries(byProvider).map(([provider, limits]) => ({
-      provider: provider as ActiveRateLimitProvider,
-      limits
-    }))
+    // A hidden Muse meter keeps an idle snapshot, which must not force a full refresh on every focus.
+    const museEnabled = this.museUsageEnabledResolver?.() ?? true
+    return Object.entries(byProvider)
+      .filter(([provider]) => provider !== 'muse' || museEnabled)
+      .map(([provider, limits]) => ({
+        provider: provider as ActiveRateLimitProvider,
+        limits
+      }))
   }
 
   protected getActiveWindowRefreshPlan(now: number): ActiveWindowRefreshPlan {
@@ -181,7 +190,7 @@ export abstract class RateLimitServicePolling extends RateLimitServiceFetchQueue
     }
   }
 
-  protected async refreshIfWindowActive(): Promise<void> {
+  protected async refreshIfWatched(): Promise<void> {
     if (!this.shouldBackgroundPoll()) {
       return
     }

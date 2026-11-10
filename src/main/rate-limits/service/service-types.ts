@@ -35,9 +35,12 @@ export type {
 export { normalizeCodexAccountSelectionTarget } from '../../codex-accounts/runtime-selection'
 export type { CodexRateLimitHomeResolution } from '../../codex-accounts/runtime-home-service'
 
+export type InactiveCodexHome = { kind: 'ready'; managedHomePath: string } | { kind: 'skip' }
+
 export type InactiveCodexAccountInfo = {
   id: string
-  resolveHome: () => { kind: 'ready'; managedHomePath: string } | { kind: 'skip' }
+  /** May be async: a WSL home is checked before a preview reads it. */
+  resolveHome: () => InactiveCodexHome | Promise<InactiveCodexHome>
 }
 
 export type CodexHomePathResolver = (
@@ -88,6 +91,7 @@ export type ZcodePlanResolvedConfig = {
 export type GeminiCliOAuthEnabledResolver = () => boolean
 
 export type AntigravityUsageEnabledResolver = () => boolean
+export type MuseUsageEnabledResolver = () => boolean
 export type ActiveRateLimitProvider = ProviderRateLimits['provider']
 export type ActiveProviderState = {
   provider: ActiveRateLimitProvider
@@ -135,6 +139,7 @@ export type InternalRateLimitState = {
   grok: ProviderRateLimits | null
   cursor: ProviderRateLimits | null
   zcode: ProviderRateLimits | null
+  muse: ProviderRateLimits | null
 }
 
 export function normalizePollingInterval(ms: number): number {

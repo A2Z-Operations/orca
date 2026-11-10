@@ -26,7 +26,11 @@ export function shouldPollClaudeUsage(settings: ClaudeUsagePollingSettings): boo
   )
 }
 
-/** Starts polling when a usage-driven feature needs it and stops it when none does; idempotent. */
+/**
+ * Turns headless polling on when a usage-driven feature needs it and back off when none does; idempotent.
+ * Why `start` both ways: the account services keep the poll timer running on every host, so "off" returns
+ * the service to that baseline (ticks only while someone watches) instead of stopping the timer.
+ */
 export function createClaudeUsagePollingSwitch(
   rateLimits: Pick<RateLimitService, 'start' | 'stop'>,
   getSettings: () => ClaudeUsagePollingSettings
@@ -47,7 +51,7 @@ export function createClaudeUsagePollingSwitch(
         })
         polling = true
       } else if (!wanted && polling) {
-        rateLimits.stop()
+        rateLimits.start({ fetchImmediately: false })
         polling = false
       }
       return polling
