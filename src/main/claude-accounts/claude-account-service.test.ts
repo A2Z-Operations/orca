@@ -15,6 +15,7 @@ import { describeClaudeProfile } from './claude-profile-paths'
 import type { ClaudeAccountSelectionTarget } from './runtime-selection'
 import { ClaudeAccountService } from './service'
 
+const DEFAULT_SETTINGS = getDefaultSettings('/tmp')
 const roots: string[] = []
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))
 
@@ -47,7 +48,7 @@ function fixture(accounts: ClaudeManagedAccount[] = [account('a'), account('b')]
   const covered = new Set<string>()
   const notifiedWrites: Partial<GlobalSettings>[] = []
   let settings: GlobalSettings = {
-    ...getDefaultSettings('/tmp'),
+    ...DEFAULT_SETTINGS,
     claudeManagedAccounts: accounts,
     activeClaudeManagedAccountId: 'a',
     activeClaudeManagedAccountIdsByRuntime: { host: 'a', wsl: {} }
@@ -154,8 +155,12 @@ describe('ClaudeAccountService', () => {
 
   it('turns automatic switching on where the accounts live, and reports it with the accounts', () => {
     const f = fixture()
-    expect(f.service.listAccounts().autoSwitchEnabled).toBe(false)
+    // A fresh store reports the shared default, whichever way that default points.
+    expect(f.service.listAccounts().autoSwitchEnabled).toBe(
+      DEFAULT_SETTINGS.claudeAutoSwitchEnabled === true
+    )
 
+    expect(f.service.setAutoSwitch(false)).toMatchObject({ autoSwitchEnabled: false })
     expect(f.service.setAutoSwitch(true)).toMatchObject({ autoSwitchEnabled: true })
     expect(f.settings().claudeAutoSwitchEnabled).toBe(true)
     // Every window hears about it, as it does about a select.
@@ -164,7 +169,8 @@ describe('ClaudeAccountService', () => {
 
   it('turns the account pool on where the accounts live, and reports it with the accounts', () => {
     const f = fixture()
-    expect(f.service.listAccounts().pool).toBe('off')
+    // A fresh store reports the shared default, whichever way that default points.
+    expect(f.service.listAccounts().pool).toBe(DEFAULT_SETTINGS.claudeAccountPool ?? 'off')
 
     expect(f.service.setAccountPool(true)).toMatchObject({ pool: 'on' })
     expect(f.settings().claudeAccountPool).toBe('on')

@@ -180,9 +180,11 @@ describe('orcad account services', () => {
 
   it('follows usage settings and cannot restart polling after cleanup', async () => {
     const { store } = createRuntime()
+    // Every usage-driven feature off, including the default-on pool; nothing wants a reading.
     store.updateSettings({
       claudeSessionMover: 'off',
       claudeAutoSwitchEnabled: false,
+      claudeAccountPool: 'off',
       claudeModelPolicy: { enabled: false }
     })
     const start = vi.spyOn(RateLimitService.prototype, 'start').mockImplementation(() => {})
