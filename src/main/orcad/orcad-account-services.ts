@@ -110,7 +110,7 @@ export function createOrcadAccountServices(args: {
     unsubscribePolling()
     services.sessionMover?.stop()
     await stopClaudeAuthProxy()
-    closeClaudeAccountLog()
+    await closeClaudeAccountLog()
     attachedRuntime = null
     services.rateLimits.stop()
     args.setClaudeStatusLineListener(null)

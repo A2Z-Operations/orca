@@ -178,7 +178,7 @@ export function initializeMainProcessAccountServices(): void {
     services.sessionMover?.stop()
     stopClaudeModelPolicyTicker()
     void stopClaudeAuthProxy()
-    closeClaudeAccountLog()
+    void closeClaudeAccountLog()
   }
   state.rateLimits = services.rateLimits
   state.codexRuntimeHome = services.codexRuntimeHome
