@@ -1,3 +1,4 @@
+import type * as RuntimeEnvironmentStore from '../shared/remote-runtime/host-store/runtime-environment-store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const {
@@ -34,10 +35,17 @@ vi.mock('./runtime-client', async () => {
 
 vi.mock('./runtime/environments', () => ({
   addEnvironmentFromPairingCode: addEnvironmentFromPairingCodeMock,
-  listEnvironments: listEnvironmentsMock,
   removeEnvironment: removeEnvironmentMock,
   resolveEnvironment: resolveEnvironmentMock
 }))
+
+vi.mock(
+  '../shared/remote-runtime/host-store/runtime-environment-store',
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof RuntimeEnvironmentStore>()),
+    listEnvironments: listEnvironmentsMock
+  })
+)
 
 vi.mock('child_process', async () => {
   const { createChildProcessModuleMock } = await import('./index-test-harness.js')

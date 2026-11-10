@@ -1,4 +1,5 @@
 import type * as ChildProcessModule from 'node:child_process'
+import type * as BackgroundDistroGateModule from '../../../wsl/discovery/wsl-background-distro-gate'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -25,6 +26,11 @@ import type { ClaudeProfileSetupReport } from '../../../claude-accounts/claude-p
 import { resolveRuntimeClaudeAuth } from './spawn-claude-auth'
 
 const { regQueryStdout } = vi.hoisted(() => ({ regQueryStdout: { value: '' } }))
+// The WSL pane test never boots a distro: the running-state read answers "running" for it.
+vi.mock('../../../wsl/discovery/wsl-background-distro-gate', async (importOriginal) => ({
+  ...(await importOriginal<typeof BackgroundDistroGateModule>()),
+  readWslDistroRunningState: vi.fn(async () => 'running' as const)
+}))
 
 // Answers only the OpenSSH DefaultShell registry query; every other spawn is real.
 vi.mock('node:child_process', async (importOriginal) => {

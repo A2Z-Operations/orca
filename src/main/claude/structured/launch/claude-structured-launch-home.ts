@@ -71,14 +71,15 @@ export async function prepareClaudeStructuredLaunchAccount(
   if (!router) {
     return { route: 'system', home: recordHome, configDir: env.CLAUDE_CONFIG_DIR ?? null }
   }
-  const userDir = env.CLAUDE_CONFIG_DIR?.trim() || undefined
+  // Why no folder pin: upstream strips inherited CLAUDE_CONFIG_DIR before a launch, so the router's
+  // selection owns the home; System default still honours the env folder through the router.
   dropForeignProxyUrl(env)
   const userPinnedUrl = Boolean(
     env.ANTHROPIC_BASE_URL && claudeAuthProxySlotId(env.ANTHROPIC_BASE_URL) === null
   )
   if (!session) {
     const preparation = await router.prepareLaunch()
-    const launchHome = await pinClaudeLaunchHome(router, env, preparation, userDir)
+    const launchHome = await pinClaudeLaunchHome(router, env, preparation)
     releasePreparedClaudeSlot(
       preparation,
       preparedClaudeProxySlot({ ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL })
@@ -91,10 +92,10 @@ export async function prepareClaudeStructuredLaunchAccount(
     router,
     existing,
     providerSessionId: session.providerSessionId,
-    // A folder the user set is the launch. The pool still chooses when only the base URL is pinned.
-    allowPool: !userDir
+    // The pool still chooses when only the base URL is pinned.
+    allowPool: true
   })
-  const launchHome = await pinClaudeLaunchHome(router, env, chosen.preparation, userDir)
+  const launchHome = await pinClaudeLaunchHome(router, env, chosen.preparation)
   const proxySlot = applyStructuredClaudeProxySlot({
     env,
     preparation: chosen.preparation,
@@ -123,7 +124,7 @@ export async function prepareClaudeStructuredLaunchAccount(
     accountId: recorded ? recorded.accountId : accountId,
     configDir: launchHome,
     launchedAt: recorded?.launchedAt ?? Date.now(),
-    pinned: Boolean(userDir) || userPinnedUrl,
+    pinned: userPinnedUrl,
     source: chosen.pooled ? 'pool' : recorded ? recorded.source : 'spawn',
     ...(chosen.preparation.appliedModel
       ? {
@@ -165,8 +166,7 @@ function dropForeignProxyUrl(env: Record<string, string>): void {
 async function pinClaudeLaunchHome(
   router: ClaudeProfileRouter,
   env: Record<string, string>,
-  preparation: ClaudeRuntimeAuthPreparation,
-  userDir: string | undefined
+  preparation: ClaudeRuntimeAuthPreparation
 ): Promise<string> {
   // Read before patching: System default preserves the launch environment's CLAUDE_CONFIG_DIR.
   const launchHome =
@@ -187,10 +187,6 @@ async function pinClaudeLaunchHome(
     if (applied.inject) {
       env.ANTHROPIC_MODEL = applied.inject
     }
-  }
-  if (userDir) {
-    env.CLAUDE_CONFIG_DIR = userDir
-    return userDir
   }
   return launchHome
 }

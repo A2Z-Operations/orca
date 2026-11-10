@@ -1,7 +1,8 @@
 import { getClaudeAgentViewService } from '../claude/agent-view/agent-view-service'
 // Runs a host Claude account folder's setup in the worker: one at a time per account, and the
 // capped wait a launch puts on it. The router decides which folder; this decides how it is set up.
-import { access } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { isDirectory } from './claude-profile-homes'
 import { isAgentStatusHooksEnabledForAgent } from '../../shared/agent-hook-listener/configuration/agent-status-hooks-setting'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { probeRecentClaudeCliVersion } from '../claude/claude-hook-event-versions'
@@ -52,16 +53,13 @@ export class ClaudeProfileSetupQueue {
   }
 
   /**
-   * The setup a launch waits on. Why the marker: setup writes it last, so a missing folder is set
-   * up too, and that first setup must succeed. Why capped and never thrown after that: a set-up
-   * folder runs on its last refresh rather than not at all.
+   * The setup a launch waits on. Why the marker and the home: setup writes the marker last, so a
+   * folder without one, or a marker whose home is gone, needs a first setup that must succeed. Why
+   * capped and never thrown after that: a set-up folder runs on its last refresh rather than not at all.
    */
   async runForLaunch(profile: ClaudeProfileDescriptor): Promise<void> {
-    const prepared = await access(claudeProfileMarkerPath(profile)).then(
-      () => true,
-      () => false
-    )
-    if (!prepared) {
+    // Sync like upstream's prepareClaudeProfileForLaunch: a launch's setup must start within the tick.
+    if (!isDirectory(profile.home) || !existsSync(claudeProfileMarkerPath(profile))) {
       const report = await this.run(profile).catch((error: unknown) => {
         console.warn('[claude-profile] Account setup failed:', error)
         return null

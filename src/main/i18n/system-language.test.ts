@@ -95,7 +95,7 @@ it.each([
     status: 'supported'
   },
   { platform: 'Linux C-only', preferences: ['C.UTF-8', 'C'], locale: 'en', status: 'unknown' },
-  { platform: 'unsupported', preferences: ['de-DE', 'fr-FR'], locale: 'en', status: 'unsupported' }
+  { platform: 'unsupported', preferences: ['sw-KE', 'fr-FR'], locale: 'en', status: 'unsupported' }
 ])('handles $platform preference lists', async ({ preferences, locale, status }) => {
   readPreferences = () => ({ preferences, settled: true })
   const { getSystemLanguageDetection } = await loadSystemLanguage()

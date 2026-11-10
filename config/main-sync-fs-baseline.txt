@@ -83,6 +83,7 @@
 5 src/main/claude-accounts/claude-profile-provisioning.ts
 5 src/main/claude-accounts/claude-profile-router.ts
 1 src/main/claude-accounts/claude-profile-settings.ts
+1 src/main/claude-accounts/claude-profile-setup-queue.ts
 1 src/main/claude-accounts/claude-profile-setup-worker.ts
 1 src/main/claude-accounts/claude-profile-setup.ts
 12 src/main/claude-accounts/claude-profile-sharing.ts

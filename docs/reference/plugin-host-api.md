@@ -40,6 +40,7 @@ Methods whose capability is `none` need no capability but still need the plugin 
 | [`agent.launch`](#agentlaunch) | `agent:launch` | worker | yes | 1.3 | Starts an agent's CLI in a new terminal of a workspace, in the background, and returns as soon as it starts; a `prompt` is sent once the agent is ready. |
 | [`editor.open`](#editoropen) | `workspace:write` | worker | yes | 1.3 | Opens a file of a workspace in an editor tab of Orca's window; desktop app only. `workspace.open` shows the workspace. |
 | [`commands.run`](#commandsrun) | `workspace:write` | worker | yes | 1.3 | Runs one of Orca's built-in actions in its window, never a plugin's replacement of it; desktop app only. |
+| [`accounts.listClaudeAccounts`](#accountslistclaudeaccounts) | `accounts.read` | worker | no | 1.1 | Lists the managed Claude accounts with their labels, usage windows and how many sessions each is running. Tokens and credential paths never leave the host. |
 
 ### `workspace.readContext`
 
@@ -182,7 +183,7 @@ The agents in the focused workspace: their terminal, title, agent kind and statu
 Delivers a workspace or agent event to this panel as `orca.on(event)`; needs the event's read capability. The frame APIs call it for you.
 
 ```ts
-(params: { event: "workspace.created" | "workspace.removed" | "agent.status.changed" | "workspace.changed" }) => { ok: true }
+(params: { event: "workspace.created" | "workspace.removed" | "agent.status.changed" | "workspace.changed" | "accounts.usage.changed" | "accounts.session.moved" | "accounts.model.changed" }) => { ok: true }
 ```
 
 ### `statusBar.update`
@@ -265,6 +266,14 @@ Runs one of Orca's built-in actions in its window, never a plugin's replacement 
 (params: { action: "worktree.history.back" | "worktree.history.forward" | "sidebar.left.toggle" | "sidebar.sleepingWorkspaces.toggle" | "floatingWorkspace.maximize" | "tab.rename" | "workspace.rename" | "workspace.openBoard" | "view.tasks" | "sidebar.right.toggle" | "sidebar.explorer.toggle" | "sidebar.search.toggle" | "sidebar.sourceControl.toggle" | "sidebar.checks.toggle" | "sidebar.ports.toggle" }) => { ran: true }
 ```
 
+### `accounts.listClaudeAccounts`
+
+Lists the managed Claude accounts with their labels, usage windows and how many sessions each is running. Tokens and credential paths never leave the host.
+
+```ts
+(params?: {}) => { accounts: { id: string; label: string; usage: { session: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; weekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; fableWeekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; updatedAt: number | null }; assignedSessionCount: number }[] }
+```
+
 ## Events
 
 A worker receives the events its manifest lists in `contributes.events` through `orca.events.on(event, handler)`, which returns `{ dispose() }`. Each needs `main`, the `trusted-worker` profile and its domain's capability (`workspace:read` or `agent:read`). `orca plugin types` writes the payloads as `PluginEvents` in `orca/host`.
@@ -275,6 +284,9 @@ A worker receives the events its manifest lists in `contributes.events` through 
 | `workspace.removed` | `{ workspaceId: string; kind: "worktree" \| "folder"; path: string }` | A worktree workspace was removed. |
 | `agent.status.changed` | `{ workspaceId: string \| null; paneKey: string; terminalId?: string; title?: string; state: "working" \| "blocked" \| "waiting" \| "done"; receivedAt: number; mainAgent?: { state: "working" \| "blocked" \| "waiting" \| "done"; outcome?: "success" \| "failure" \| "cancellation" \| "superseded" \| "interruption" \| "unconfirmed"; stateStartedAt: number } }` | An agent in a terminal pane changed status; `workspaceId` is null when Orca cannot tie the pane to a workspace, and `terminalId` names its terminal when Orca lists it. |
 | `workspace.changed` | `{ context: { branch: string; displayName: string; terminals: { id: string; title?: string }[] } \| null }` | The focused workspace changed, or its terminals were opened, closed or renamed; `context` is what `workspace.readContext` now answers. Each new subscriber first gets the current context. |
+| `accounts.usage.changed` | `{ accountId: string; label: string; usage: { session: { usedPercent: number; windowMinutes: number; resetsAt: number \| null } \| null; weekly: { usedPercent: number; windowMinutes: number; resetsAt: number \| null } \| null; fableWeekly: { usedPercent: number; windowMinutes: number; resetsAt: number \| null } \| null; updatedAt: number \| null } }` | A managed Claude account's usage windows were re-read; carries the account's public view. |
+| `accounts.session.moved` | `{ ptyId: string; fromAccountId: string; toAccountId: string; previousPtyId?: string }` | The session mover billed a running Claude session to another managed account. |
+| `accounts.model.changed` | `{ ptyId: string; accountId: string; from: "fable" \| "opus"; to: "fable" \| "opus"; reason: string }` | The model policy changed a Claude session's model; names the session and both models. |
 
 ## Hooks
 

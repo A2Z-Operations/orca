@@ -202,11 +202,9 @@ describe('serve usage polling', () => {
 
   it('keeps the desktop focus gate when serve mode is off', () => {
     attach()
-    expect(start).toHaveBeenCalledTimes(1)
-    expect(start).toHaveBeenCalledWith({ fetchImmediately: false })
-    expect(info).toHaveBeenCalledWith(
-      '[claude-usage] polling switch: mode=desktop pollInactive=false pollWithoutWindow=false'
-    )
+    // The account services own the desktop poll timer; a window attach arms nothing headless.
+    expect(start).not.toHaveBeenCalled()
+    expect(info).not.toHaveBeenCalledWith(expect.stringContaining('mode=serve'))
   })
 
   it('starts inactive Claude polling from Electron serve when a usage feature is on', () => {

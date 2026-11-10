@@ -138,7 +138,7 @@ declare module 'orca/host' {
     }
     /** Delivers a workspace or agent event to this panel as `orca.on(event)`; needs the event's read capability. The frame APIs call it for you. Since host API 1.2. */
     "events.subscribe": {
-      params: { event: "workspace.created" | "workspace.removed" | "agent.status.changed" | "workspace.changed" }
+      params: { event: "workspace.created" | "workspace.removed" | "agent.status.changed" | "workspace.changed" | "accounts.usage.changed" | "accounts.session.moved" | "accounts.model.changed" }
       result: { ok: true }
       surfaces: "panel" | "editor"
     }
@@ -202,6 +202,12 @@ declare module 'orca/host' {
       result: { ran: true }
       surfaces: "worker"
     }
+    /** Lists the managed Claude accounts with their labels, usage windows and how many sessions each is running. Tokens and credential paths never leave the host. Since host API 1.1. */
+    "accounts.listClaudeAccounts": {
+      params: Record<string, never> | undefined
+      result: { accounts: { id: string; label: string; usage: { session: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; weekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; fableWeekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; updatedAt: number | null }; assignedSessionCount: number }[] }
+      surfaces: "worker"
+    }
   }
   export type HostMethodName = keyof HostMethods
   /** Methods a surface may call; any other gets `not_permitted`. */
@@ -230,6 +236,12 @@ declare module 'orca/host' {
     "agent.status.changed": { workspaceId: string | null; paneKey: string; terminalId?: string; title?: string; state: "working" | "blocked" | "waiting" | "done"; receivedAt: number; mainAgent?: { state: "working" | "blocked" | "waiting" | "done"; outcome?: "success" | "failure" | "cancellation" | "superseded" | "interruption" | "unconfirmed"; stateStartedAt: number } }
     /** The focused workspace changed, or its terminals were opened, closed or renamed; `context` is what `workspace.readContext` now answers. Each new subscriber first gets the current context. */
     "workspace.changed": { context: { branch: string; displayName: string; terminals: { id: string; title?: string }[] } | null }
+    /** A managed Claude account's usage windows were re-read; carries the account's public view. */
+    "accounts.usage.changed": { accountId: string; label: string; usage: { session: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; weekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; fableWeekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; updatedAt: number | null } }
+    /** The session mover billed a running Claude session to another managed account. */
+    "accounts.session.moved": { ptyId: string; fromAccountId: string; toAccountId: string; previousPtyId?: string }
+    /** The model policy changed a Claude session's model; names the session and both models. */
+    "accounts.model.changed": { ptyId: string; accountId: string; from: "fable" | "opus"; to: "fable" | "opus"; reason: string }
   }
   export type PluginEventName = keyof PluginEvents
 

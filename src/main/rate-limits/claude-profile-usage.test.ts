@@ -18,11 +18,11 @@ vi.mock('../claude-accounts/claude-profile-installed-router', () => ({
   getClaudeWslProfileRouter: () => wslRouter
 }))
 vi.mock('./claude-oauth-usage-request', () => ({ fetchClaudeOAuthUsage: calls.usage }))
-const runningDistros = vi.hoisted(() => ({
-  filter: vi.fn(async (paths: readonly string[]) => [...paths])
+const uncGate = vi.hoisted(() => ({
+  blocked: vi.fn(async (_path: string) => null as { distro: string; state: 'stopped' } | null)
 }))
-vi.mock('../wsl/filesystem/wsl-running-path-filter', () => ({
-  filterPathsToRunningWslDistrosAsync: runningDistros.filter
+vi.mock('../wsl/filesystem/wsl-unc-access-gate', () => ({
+  blockedWslDistroForPath: uncGate.blocked
 }))
 vi.mock('@orca/process-host', () => ({
   spawnProcess: () => {
@@ -341,7 +341,7 @@ it('reads an inactive WSL account where the WSL router says its launches would r
 })
 it('does not read an inactive WSL account through a stopped distro', async () => {
   const { fetchInactiveClaudeAccountUsage } = await import('./claude-managed-account-usage')
-  runningDistros.filter.mockResolvedValueOnce([])
+  uncGate.blocked.mockResolvedValueOnce({ distro: 'Ubuntu', state: 'stopped' })
   wslRouter.accountUsagePreparation.mockClear()
   const result = await fetchInactiveClaudeAccountUsage({
     id: 'acct',
@@ -349,9 +349,7 @@ it('does not read an inactive WSL account through a stopped distro', async () =>
     wslDistro: 'Ubuntu',
     wslLinuxAuthPath: '/home/u/.local/share/orca/claude-profiles/acct/home'
   })
-  expect(runningDistros.filter).toHaveBeenCalledWith(['\\\\wsl.localhost\\Ubuntu\\'], {
-    requireConfirmed: true
-  })
+  expect(uncGate.blocked).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\')
   expect(result).toMatchObject({ usageMetadata: { failureKind: 'usage-unavailable' } })
   expect(wslRouter.accountUsagePreparation).not.toHaveBeenCalled()
   expect(calls.keychain).not.toHaveBeenCalled()

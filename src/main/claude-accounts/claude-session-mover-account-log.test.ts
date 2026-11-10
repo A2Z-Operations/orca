@@ -33,6 +33,8 @@ describe('session mover writes the durable account log', () => {
     f.publish(state(96, { b: limits(20), c: limits(50) }))
     await vi.runAllTimersAsync()
     closeClaudeAccountLog()
+    // Why real timers: the read is an fs/promises call; faked timers never let it settle.
+    vi.useRealTimers()
     const rows = (await readClaudeAccountLog({ filePath: path })).entries
     const reasons = rows.map((row) => (row.type === 'decision' ? row.reason : row.type))
     expect(reasons.filter((reason) => reason === reasons[0])).toHaveLength(1)
@@ -70,6 +72,7 @@ describe('session mover writes the durable account log', () => {
     expect(reasons['pty-1']).toBe('no-target')
     expect(reasons['pty-3']).toBe('wait:mid-turn')
     closeClaudeAccountLog()
+    vi.useRealTimers()
     const logged = (await readClaudeAccountLog({ filePath: path })).entries
     expect(logged.some((row) => row.type === 'decision' && row.reason === 'stay')).toBe(false)
     expect(logged.filter((row) => row.type === 'decision').map((row) => row.reason)).toEqual(

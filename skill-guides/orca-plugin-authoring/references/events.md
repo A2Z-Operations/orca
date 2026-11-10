@@ -14,6 +14,12 @@ List each in `contributes.events` (`{ "on": "<event>" }`), with `main`, the `tru
   `{ workspaceId: string | null; paneKey: string; terminalId?: string; title?: string; state: "working" | "blocked" | "waiting" | "done"; receivedAt: number; mainAgent?: { state: "working" | "blocked" | "waiting" | "done"; outcome?: "success" | "failure" | "cancellation" | "superseded" | "interruption" | "unconfirmed"; stateStartedAt: number } }`
 - `workspace.changed` (capability `workspace:read`; since 1.4.246): The focused workspace changed, or its terminals were opened, closed or renamed; `context` is what `workspace.readContext` now answers. Each new subscriber first gets the current context.
   `{ context: { branch: string; displayName: string; terminals: { id: string; title?: string }[] } | null }`
+- `accounts.usage.changed` (capability `accounts.read`; since 1.4.244): A managed Claude account's usage windows were re-read; carries the account's public view.
+  `{ accountId: string; label: string; usage: { session: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; weekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; fableWeekly: { usedPercent: number; windowMinutes: number; resetsAt: number | null } | null; updatedAt: number | null } }`
+- `accounts.session.moved` (capability `accounts.read`; since 1.4.244): The session mover billed a running Claude session to another managed account.
+  `{ ptyId: string; fromAccountId: string; toAccountId: string; previousPtyId?: string }`
+- `accounts.model.changed` (capability `accounts.read`; since 1.4.244): The model policy changed a Claude session's model; names the session and both models.
+  `{ ptyId: string; accountId: string; from: "fable" | "opus"; to: "fable" | "opus"; reason: string }`
 
 ## Frame events (`orca.on(event, handler)` in HTML panels and custom editors)
 
