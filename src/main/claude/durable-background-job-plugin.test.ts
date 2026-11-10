@@ -95,6 +95,7 @@ describe('sweepOldDurableJobPlugins', () => {
     const wslWaiter = readFileSync(join(jobsRoot, 'bin-wsl', 'orca-durable-job'), 'utf8')
     expect(wslWaiter).toContain('exec node ')
     expect(wslWaiter).toContain('durable-background-job.mjs')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the plugin wrote this hooks.json shape a few lines above.
     const wslHooks = JSON.parse(
       readFileSync(join(plugin!, '..', 'orca-durable-jobs-wsl', 'hooks', 'hooks.json'), 'utf8')
     ) as { hooks: { PreToolUse: { matcher: string }[] } }

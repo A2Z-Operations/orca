@@ -53,6 +53,7 @@
 5 src/main/browser/cookies/sources/browser-cookie-source-profiles.ts
 11 src/main/browser/cookies/staging/browser-session-cookie-staging.ts
 1 src/main/browser/downloads/browser-download-destination.ts
+2 src/main/browser/electron-fixtures/popup-identity-electron-probe.ts
 2 src/main/browser/extensions/api-runtime/browser-extension-worker-shim-source.ts
 8 src/main/browser/extensions/installation/browser-extension-install-store.ts
 1 src/main/browser/extensions/installation/browser-extension-load-directory.ts
@@ -62,7 +63,6 @@
 4 src/main/browser/extensions/profile-storage/browser-extension-profile-state-store.ts
 3 src/main/browser/extensions/profile-storage/browser-extension-retired-profile-storage.ts
 1 src/main/browser/guest-lifecycle/popups/compatibility/browser-popup-background-cdp-probe.ts
-2 src/main/browser/electron-fixtures/popup-identity-electron-probe.ts
 1 src/main/browser/identity/mode/browser-identity-mode-record.ts
 2 src/main/browser/identity/mode/browser-identity-mode-store.ts
 2 src/main/browser/network/egress/browser-route-egress-electron-launch.ts
@@ -74,6 +74,7 @@
 2 src/main/browser/site-settings/browser-profile-site-store.ts
 7 src/main/claude-accounts/claude-account-folder.ts
 1 src/main/claude-accounts/claude-observed-config-dirs.ts
+2 src/main/claude-accounts/claude-pane-account-persistence.ts
 14 src/main/claude-accounts/claude-profile-history.ts
 2 src/main/claude-accounts/claude-profile-homes.ts
 1 src/main/claude-accounts/claude-profile-launch-preparation.ts
@@ -88,12 +89,14 @@
 1 src/main/claude-accounts/claude-profile-wsl-router.ts
 2 src/main/claude-accounts/keychain.ts
 1 src/main/claude-accounts/runtime-paths.ts
+1 src/main/claude-accounts/wsl-auth-proxy-status.ts
 3 src/main/claude/agent-view/agent-view-install.ts
 1 src/main/claude/claude-diff-panel-auto-open.ts
 14 src/main/claude/claude-folder-trust-file.ts
 2 src/main/claude/claude-profile-hook-target.ts
 1 src/main/claude/claude-rejected-api-key.ts
 1 src/main/claude/claude-rewind-transcript.ts
+26 src/main/claude/durable-background-job-plugin.ts
 1 src/main/claude/hook-service.ts
 3 src/main/claude/statusline-install.ts
 6 src/main/claude/windows-hook-files.ts
@@ -537,6 +540,7 @@
 1 src/main/updater/linux-package/linux-package-install-command.ts
 1 src/main/updater/linux-package/linux-update-package-type.ts
 6 src/main/updater/serve-update-handoff.ts
+1 src/main/updater/updater-disabled.ts
 2 src/main/usage/usage-provider-store-lifecycle.ts
 1 src/main/usage/usage-scan-worker-spawn.ts
 1 src/main/warp-themes/discovery.ts

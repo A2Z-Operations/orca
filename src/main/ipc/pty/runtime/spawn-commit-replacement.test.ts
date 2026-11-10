@@ -50,6 +50,7 @@ describe('runtime spawn commit: a replacement that loses its pane', () => {
     const { outcome, shutdown, persistPtyBinding } = await commitReplacement(async () => false)
     expect(typeof persistPtyBinding.mock.calls[0]?.[0]).toBe('function')
     expect(outcome).toBeInstanceOf(Error)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the previous assertion proved the outcome is an Error.
     expect((outcome as Error).message).toBe('terminal_pane_owner_changed')
     expect(shutdown).toHaveBeenCalledWith(PTY_ID, expect.objectContaining({ immediate: true }))
   })
@@ -58,6 +59,7 @@ describe('runtime spawn commit: a replacement that loses its pane', () => {
     const { outcome, shutdown } = await commitReplacement(async () => {
       throw new Error('terminal_split_source_not_found')
     })
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the previous assertion proved the outcome is an Error.
     expect((outcome as Error).message).toBe('terminal_split_source_not_found')
     expect(outcome).not.toHaveProperty('agentSessionOperationOutcome')
     expect(shutdown).toHaveBeenCalled()

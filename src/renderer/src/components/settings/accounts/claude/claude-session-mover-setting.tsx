@@ -1,6 +1,6 @@
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import type { ClaudeSessionMoverSetting } from '../../../../../../shared/claude-account-switch-settings'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { Label } from '../../../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
@@ -18,11 +18,12 @@ export function ClaudeSessionMoverSetting({
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
-  const title = translate(
+  const t = useTranslate()
+  const title = t(
     'accounts.claude.sessionMover.settingTitle',
     'Move running sessions before a usage limit'
   )
-  const description = translate(
+  const description = t(
     'accounts.claude.sessionMover.settingDescription',
     'A running Claude session whose own account nears its limit continues on the account with the most room, between turns, in the same pane.'
   )
@@ -49,14 +50,10 @@ export function ClaudeSessionMoverSetting({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="off">
-            {translate('accounts.claude.sessionMover.settingOff', 'Off')}
-          </SelectItem>
-          <SelectItem value="ask">
-            {translate('accounts.claude.sessionMover.settingAsk', 'Ask')}
-          </SelectItem>
+          <SelectItem value="off">{t('accounts.claude.sessionMover.settingOff', 'Off')}</SelectItem>
+          <SelectItem value="ask">{t('accounts.claude.sessionMover.settingAsk', 'Ask')}</SelectItem>
           <SelectItem value="move">
-            {translate('accounts.claude.sessionMover.settingMove', 'Move')}
+            {t('accounts.claude.sessionMover.settingMove', 'Move')}
           </SelectItem>
         </SelectContent>
       </Select>

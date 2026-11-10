@@ -88,6 +88,7 @@ describe('AccountsPane', () => {
       if (originalOwnUserAgent) {
         Object.defineProperty(globalThis.navigator, 'userAgent', originalOwnUserAgent)
       } else {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test removes the one navigator field the pane reads.
         delete (globalThis.navigator as { userAgent?: string }).userAgent
       }
     }
@@ -146,6 +147,7 @@ describe('AccountsPane', () => {
   })
 
   it('omits the scope control on the web client, which cannot select Local desktop', () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the web-client marker is an own property the pane reads.
     const webGlobal = globalThis as { window?: { __ORCA_WEB_CLIENT__?: boolean } }
     const hadWindow = 'window' in webGlobal
     webGlobal.window = { ...webGlobal.window, __ORCA_WEB_CLIENT__: true }

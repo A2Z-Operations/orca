@@ -5,7 +5,7 @@ import type {
   ClaudeSessionMoveSummary
 } from '../../../../../../shared/managed-account-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import { cn } from '@/lib/utils'
 import { translateSearchKeyword } from '../../search/settings-search-keywords'
@@ -34,6 +34,26 @@ const CHIPS: readonly [ClaudeMoveFilter['category'], string, string][] = [
 ]
 
 /** Older hosts omit `sessionMoves`. An empty array is a host that has the list and nothing on it. */
+/** The page before `oldest`, or null when the host could not answer. Module-level: the compiler cannot lower try/finally in a component. */
+async function readOlderClaudeMoves(
+  owner: RuntimeClientTarget,
+  oldest: number | undefined
+): Promise<ClaudeSessionMoveSummary[] | null> {
+  try {
+    // Why +1: the host reads strictly before this stamp. Rows that share the oldest row's
+    // millisecond past the page limit would never come back; the merge drops the repeats.
+    const before = oldest === undefined ? Date.now() : oldest + 1
+    const result = await callRuntimeRpc<{ entries: ClaudeAccountLogEntry[] }>(
+      owner,
+      'accounts.claudeAccountLog',
+      { before, limit: CLAUDE_RECENT_MOVES_CAP }
+    )
+    return claudeMoveRowsFromLog(result.entries)
+  } catch {
+    return null
+  }
+}
+
 export function ClaudeRecentMoves({
   accounts,
   owner
@@ -42,6 +62,7 @@ export function ClaudeRecentMoves({
   /** The runtime whose durable log "Load older" reads. */
   owner: RuntimeClientTarget
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const [category, setCategory] = useState<ClaudeMoveFilter['category']>('all')
   const [query, setQuery] = useState('')
   const [accountId, setAccountId] = useState<string | null>(null)
@@ -74,28 +95,19 @@ export function ClaudeRecentMoves({
   const loadOlder = useCallback(async () => {
     setLoading(true)
     setLoadFailed(false)
-    try {
-      // Why +1: the host reads strictly before this stamp. Rows that share the oldest row's
-      // millisecond past the page limit would never come back; the merge drops the repeats.
-      const oldest = rows.at(-1)?.at
-      const before = oldest === undefined ? Date.now() : oldest + 1
-      const result = await callRuntimeRpc<{ entries: ClaudeAccountLogEntry[] }>(
-        owner,
-        'accounts.claudeAccountLog',
-        { before, limit: CLAUDE_RECENT_MOVES_CAP }
-      )
-      setLoaded((previous) => [...previous, ...claudeMoveRowsFromLog(result.entries)])
-    } catch {
+    const older = await readOlderClaudeMoves(owner, rows.at(-1)?.at)
+    if (older) {
+      setLoaded((previous) => [...previous, ...older])
+    } else {
       setLoadFailed(true)
-    } finally {
-      setLoading(false)
     }
+    setLoading(false)
   }, [owner, rows])
   if (moves === undefined) {
     return null
   }
-  const title = translate('accounts.claude.sessionMover.recentMoves', 'Recent moves')
-  const description = translate(
+  const title = t('accounts.claude.sessionMover.recentMoves', 'Recent moves')
+  const description = t(
     'accounts.claude.recentMoves.description',
     'What the mover and the model policy decided for each Claude session, newest first.'
   )
@@ -132,21 +144,21 @@ export function ClaudeRecentMoves({
             aria-pressed={category === value}
             onClick={() => setCategory(value)}
           >
-            {translate(key, fallback)}
+            {t(key, fallback)}
           </Button>
         ))}
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={translate('accounts.claude.recentMoves.search', 'Search session or email')}
-          aria-label={translate('accounts.claude.recentMoves.search', 'Search session or email')}
+          placeholder={t('accounts.claude.recentMoves.search', 'Search session or email')}
+          aria-label={t('accounts.claude.recentMoves.search', 'Search session or email')}
           variant="code"
           className="h-7 min-w-[160px] flex-1"
         />
       </div>
       {lines.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          {translate('accounts.claude.sessionMover.recentMovesEmpty', 'No Claude session moves.')}
+          {t('accounts.claude.sessionMover.recentMovesEmpty', 'No Claude session moves.')}
         </p>
       ) : (
         <ClaudeRecentMovesTable
@@ -166,12 +178,12 @@ export function ClaudeRecentMoves({
       )}
       <div className="flex items-center gap-2">
         <Button type="button" size="xs" variant="outline" disabled={loading} onClick={loadOlder}>
-          {translate('accounts.claude.recentMoves.loadOlder', 'Load older')}
+          {t('accounts.claude.recentMoves.loadOlder', 'Load older')}
         </Button>
         <span className={cn('text-xs', loadFailed ? 'text-destructive' : 'text-muted-foreground')}>
           {loadFailed
-            ? translate('accounts.claude.recentMoves.loadFailed', 'Could not read the account log.')
-            : translate('accounts.claude.recentMoves.count', '{{count}} rows', {
+            ? t('accounts.claude.recentMoves.loadFailed', 'Could not read the account log.')
+            : t('accounts.claude.recentMoves.count', '{{count}} rows', {
                 count: rows.length
               })}
         </span>

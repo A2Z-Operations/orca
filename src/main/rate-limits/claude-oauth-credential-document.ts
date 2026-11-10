@@ -55,12 +55,12 @@ export async function readClaudeOAuthCredentialDocument(
   }
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
 export function asClaudeOAuthRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null
-  }
-  // SAFETY: the check above excludes null and arrays, so this is a plain object.
-  return value as Record<string, unknown>
+  return isPlainRecord(value) ? value : null
 }
 
 export function claudeOAuthStringField(

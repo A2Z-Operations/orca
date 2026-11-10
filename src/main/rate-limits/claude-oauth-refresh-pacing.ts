@@ -175,12 +175,11 @@ function limitErrorCode(value: unknown, depth = 0): string {
   if (direct) {
     return direct
   }
-  if (depth > 1 || value === null || typeof value !== 'object' || Array.isArray(value)) {
+  if (depth > 1 || !isUpstreamErrorBody(value)) {
     return '-'
   }
   const nested = own(value, 'error')
-  const nestedRecord =
-    nested !== null && typeof nested === 'object' && !Array.isArray(nested) ? nested : null
+  const nestedRecord = isUpstreamErrorBody(nested) ? nested : null
   const type = nestedRecord ? safeCode(own(nestedRecord, 'type')) : null
   if (type) {
     return type
@@ -203,7 +202,14 @@ function safeCode(value: unknown): string | null {
   return typeof value === 'string' && SAFE_ERROR_CODE.test(value) ? value : null
 }
 
-function own(value: object, key: string): unknown {
+/** An upstream error body is untyped JSON; read one own field without walking the prototype. */
+type UpstreamErrorBody = Record<string, unknown>
+
+function isUpstreamErrorBody(value: unknown): value is UpstreamErrorBody {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function own(value: UpstreamErrorBody, key: string): unknown {
   if (!Object.hasOwn(value, key)) {
     return undefined
   }

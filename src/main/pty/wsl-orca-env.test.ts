@@ -44,6 +44,7 @@ describe('addOrcaWslInteropEnv', () => {
     addOrcaWslInteropEnv(env)
 
     expect(env.ORCA_SHELL_READY_ROOT).toBe(getShellReadyWrapperRoot())
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the assertion above checked the variable is set.
     expect(isAbsolute(env.ORCA_SHELL_READY_ROOT as string)).toBe(true)
     // Translate the host wrapper path for guest access.
     expect(env.WSLENV?.split(':')).toContain('ORCA_SHELL_READY_ROOT/p')

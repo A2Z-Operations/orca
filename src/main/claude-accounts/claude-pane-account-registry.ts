@@ -115,7 +115,9 @@ export function setClaudePaneProxySlotReleaser(release: ((slot: string) => void)
 }
 
 /** The account whose quota this pane consumes: the proxy assignment when one exists. */
-export function claudeBillingAccountId(record: ClaudePaneAccountRecord): string {
+export function claudeBillingAccountId(
+  record: Pick<ClaudePaneAccountRecord, 'accountId' | 'assignedAccountId'>
+): string {
   return record.assignedAccountId ?? record.accountId
 }
 

@@ -1,5 +1,5 @@
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { Label } from '../../../ui/label'
 import { Switch } from '../../../ui/switch'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
@@ -11,10 +11,11 @@ export function ClaudeModelPolicySetting({
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   const fable = settings.claudeModelPolicy?.fableLine ?? 90
   const weekly = settings.claudeModelPolicy?.weeklyGuard ?? 91
-  const title = translate('accounts.claude.modelPolicy.settingTitle', 'Spend Fable first')
-  const description = translate(
+  const title = t('accounts.claude.modelPolicy.settingTitle', 'Spend Fable first')
+  const description = t(
     'accounts.claude.modelPolicy.settingDescription',
     'Run Fable while its window is under {{fable}}% and the weekly window is under {{weekly}}%. Otherwise run Opus 5.5. A running session switches without a restart.',
     { fable, weekly }

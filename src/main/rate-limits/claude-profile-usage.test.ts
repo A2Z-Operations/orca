@@ -40,6 +40,9 @@ import {
 } from './claude-oauth-credentials'
 import { OAuthUsageError } from './claude-oauth-usage-error'
 import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../shared/claude-profile-routing'
+
+/** Far enough ahead that the credential never counts as expired while the suite runs. */
+const UNEXPIRED_AT = Date.UTC(2100, 0, 1)
 const roots: string[] = []
 afterEach(() => {
   roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }))
@@ -113,7 +116,7 @@ it('tags a successful reading with the account it was read for', async () => {
   const f = profile()
   writeFileSync(
     join(f.home, '.credentials.json'),
-    JSON.stringify({ claudeAiOauth: { accessToken: 'fake', expiresAt: Date.now() + 3_600_000 } })
+    JSON.stringify({ claudeAiOauth: { accessToken: 'fake', expiresAt: UNEXPIRED_AT } })
   )
   calls.usage.mockResolvedValueOnce({ provider: 'claude', status: 'ok' })
   expect(await fetchActiveClaudeRateLimits(f.options)).toMatchObject({
@@ -177,6 +180,7 @@ it('reports an unreadable selected account before any credential read and reques
 it('strict Keychain lookup never falls back to the unsuffixed service', async () => {
   const f = profile()
   calls.keychainService.mockResolvedValue(null)
+  // ast-grep-ignore: test-no-in-test-import-actual -- Asserts the real strict lookup behind the mocked keychain module.
   const actual = await vi.importActual<typeof Keychain>('../claude-accounts/keychain')
   await actual.readActiveClaudeKeychainCredentialsStrict(f.home)
   expect(calls.keychainService).toHaveBeenCalled()
@@ -195,7 +199,7 @@ it('uses the credentials file when the keychain denies the read', async () => {
   writeFileSync(
     join(f.home, '.credentials.json'),
     JSON.stringify({
-      claudeAiOauth: { accessToken: 'file-fake', expiresAt: Date.now() + 3_600_000 }
+      claudeAiOauth: { accessToken: 'file-fake', expiresAt: UNEXPIRED_AT }
     })
   )
   calls.usage.mockResolvedValueOnce({ provider: 'claude', status: 'ok' })
@@ -250,6 +254,7 @@ it("keeps a 429's Retry-After and rate-limit message so polling waits it out", a
   )
   const message = 'Claude usage is rate limited right now.'
   calls.usage.mockRejectedValueOnce(new OAuthUsageError(message, 429, true, 3_000_000))
+  // ast-grep-ignore: test-no-wall-clock -- retryAtMs is stamped from the real clock; the test brackets it.
   const before = Date.now()
   const limited = await fetchActiveClaudeRateLimits(f.options)
   expect(limited).toMatchObject({
@@ -258,6 +263,7 @@ it("keeps a 429's Retry-After and rate-limit message so polling waits it out", a
     usageMetadata: { failureKind: 'rate-limited', httpStatus: 429 }
   })
   expect(limited.usageMetadata?.retryAtMs).toBeGreaterThanOrEqual(before + 3_000_000)
+  // ast-grep-ignore: test-no-wall-clock -- The upper bracket of the same real-clock stamp.
   expect(limited.usageMetadata?.retryAtMs).toBeLessThanOrEqual(Date.now() + 3_000_000)
   calls.usage.mockRejectedValueOnce(new OAuthUsageError(message, 429, true, null))
   expect((await fetchActiveClaudeRateLimits(f.options)).usageMetadata?.retryAtMs).toBeUndefined()

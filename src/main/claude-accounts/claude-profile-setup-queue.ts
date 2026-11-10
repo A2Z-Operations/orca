@@ -1,7 +1,7 @@
 import { getClaudeAgentViewService } from '../claude/agent-view/agent-view-service'
 // Runs a host Claude account folder's setup in the worker: one at a time per account, and the
 // capped wait a launch puts on it. The router decides which folder; this decides how it is set up.
-import { existsSync } from 'node:fs'
+import { access } from 'node:fs/promises'
 import { isAgentStatusHooksEnabledForAgent } from '../../shared/agent-hook-listener/configuration/agent-status-hooks-setting'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { probeRecentClaudeCliVersion } from '../claude/claude-hook-event-versions'
@@ -57,7 +57,11 @@ export class ClaudeProfileSetupQueue {
    * folder runs on its last refresh rather than not at all.
    */
   async runForLaunch(profile: ClaudeProfileDescriptor): Promise<void> {
-    if (!existsSync(claudeProfileMarkerPath(profile))) {
+    const prepared = await access(claudeProfileMarkerPath(profile)).then(
+      () => true,
+      () => false
+    )
+    if (!prepared) {
       const report = await this.run(profile).catch((error: unknown) => {
         console.warn('[claude-profile] Account setup failed:', error)
         return null

@@ -27,42 +27,59 @@ export function claudeMoveVia(row: ClaudeSessionMoveSummary): 'proxy' | 'restart
   return row.strategy === 'resume' ? 'restart' : null
 }
 
-const PREFIX = 'accounts.claude.recentMoves.decision'
-
+// Why literal keys: the catalog verifier reads them from source; a template prefix hides them.
 const STAY_WORDS: Record<string, [string, string]> = {
-  'under-line': [`${PREFIX}.underLine`, 'Stayed: under the line'],
-  'no-target': [`${PREFIX}.noTarget`, 'Stayed: no account under the line'],
-  cooldown: [`${PREFIX}.cooldown`, 'Stayed: moved recently'],
-  'failed-recently': [`${PREFIX}.failedRecently`, 'Stayed: a move failed recently'],
-  'prompt-cache': [`${PREFIX}.promptCache`, 'Stayed: turn just ended'],
-  'no-usage': [`${PREFIX}.noUsage`, 'Stayed: no usage reading'],
-  stay: [`${PREFIX}.stay`, 'Stayed'],
-  off: [`${PREFIX}.off`, 'Mover is off'],
-  pinned: [`${PREFIX}.pinned`, 'Pinned'],
-  'read-usage': [`${PREFIX}.readUsage`, 'Reading usage'],
-  'wait:mid-turn': [`${PREFIX}.waitMidTurn`, 'Waiting: mid-turn'],
-  'wait:no-status': [`${PREFIX}.waitNoStatus`, 'Waiting: no status yet'],
-  'wait:background-work': [`${PREFIX}.waitBackgroundWork`, 'Waiting: background work'],
-  ask: [`${PREFIX}.ask`, 'Asked to move'],
-  moving: [`${PREFIX}.moving`, 'Moving'],
-  failed: [`${PREFIX}.failed`, 'Move failed'],
-  skipped: [`${PREFIX}.skipped`, 'Move skipped'],
-  rebalance: [`${PREFIX}.rebalance`, 'Moved to balance accounts']
+  'under-line': ['accounts.claude.recentMoves.decision.underLine', 'Stayed: under the line'],
+  'no-target': [
+    'accounts.claude.recentMoves.decision.noTarget',
+    'Stayed: no account under the line'
+  ],
+  cooldown: ['accounts.claude.recentMoves.decision.cooldown', 'Stayed: moved recently'],
+  'failed-recently': [
+    'accounts.claude.recentMoves.decision.failedRecently',
+    'Stayed: a move failed recently'
+  ],
+  'prompt-cache': ['accounts.claude.recentMoves.decision.promptCache', 'Stayed: turn just ended'],
+  'no-usage': ['accounts.claude.recentMoves.decision.noUsage', 'Stayed: no usage reading'],
+  stay: ['accounts.claude.recentMoves.decision.stay', 'Stayed'],
+  off: ['accounts.claude.recentMoves.decision.off', 'Mover is off'],
+  pinned: ['accounts.claude.recentMoves.decision.pinned', 'Pinned'],
+  'read-usage': ['accounts.claude.recentMoves.decision.readUsage', 'Reading usage'],
+  'wait:mid-turn': ['accounts.claude.recentMoves.decision.waitMidTurn', 'Waiting: mid-turn'],
+  'wait:no-status': ['accounts.claude.recentMoves.decision.waitNoStatus', 'Waiting: no status yet'],
+  'wait:background-work': [
+    'accounts.claude.recentMoves.decision.waitBackgroundWork',
+    'Waiting: background work'
+  ],
+  ask: ['accounts.claude.recentMoves.decision.ask', 'Asked to move'],
+  moving: ['accounts.claude.recentMoves.decision.moving', 'Moving'],
+  failed: ['accounts.claude.recentMoves.decision.failed', 'Move failed'],
+  skipped: ['accounts.claude.recentMoves.decision.skipped', 'Move skipped'],
+  rebalance: ['accounts.claude.recentMoves.decision.rebalance', 'Moved to balance accounts']
 }
 
 const MODEL_NAMES: Record<string, [string, string]> = {
-  fable: [`${PREFIX}.model.fable`, 'Fable'],
-  opus: [`${PREFIX}.model.opus`, 'Opus'],
-  unset: [`${PREFIX}.model.unset`, 'unset']
+  fable: ['accounts.claude.recentMoves.decision.model.fable', 'Fable'],
+  opus: ['accounts.claude.recentMoves.decision.model.opus', 'Opus'],
+  unset: ['accounts.claude.recentMoves.decision.model.unset', 'unset']
 }
 
 const FLIP_WHY: Record<string, [string, string]> = {
-  'fable-line': [`${PREFIX}.flipWhy.fableLine`, 'Fable window at its line'],
-  'weekly-guard': [`${PREFIX}.flipWhy.weeklyGuard`, 'weekly window at its guard'],
-  hysteresis: [`${PREFIX}.flipWhy.hysteresis`, 'still near a line'],
-  'window-reset': [`${PREFIX}.flipWhy.windowReset`, 'a window reset'],
-  'fable-headroom': [`${PREFIX}.flipWhy.fableHeadroom`, 'Fable has room'],
-  uncovered: [`${PREFIX}.flipWhy.uncovered`, 'fixed model restored']
+  'fable-line': [
+    'accounts.claude.recentMoves.decision.flipWhy.fableLine',
+    'Fable window at its line'
+  ],
+  'weekly-guard': [
+    'accounts.claude.recentMoves.decision.flipWhy.weeklyGuard',
+    'weekly window at its guard'
+  ],
+  hysteresis: ['accounts.claude.recentMoves.decision.flipWhy.hysteresis', 'still near a line'],
+  'window-reset': ['accounts.claude.recentMoves.decision.flipWhy.windowReset', 'a window reset'],
+  'fable-headroom': [
+    'accounts.claude.recentMoves.decision.flipWhy.fableHeadroom',
+    'Fable has room'
+  ],
+  uncovered: ['accounts.claude.recentMoves.decision.flipWhy.uncovered', 'fixed model restored']
 }
 
 /** A catalog word for a known token; a token newer hosts add shows as itself. */
@@ -75,7 +92,7 @@ function word(words: Record<string, [string, string]>, token: string | undefined
 export function claudeMoveDecision(row: ClaudeSessionMoveSummary): ClaudeMovePhrase {
   if (row.kind === 'model') {
     return {
-      key: `${PREFIX}.flip`,
+      key: 'accounts.claude.recentMoves.decision.flip',
       fallback: 'Switched model: {{from}} → {{to}} ({{why}})',
       values: {
         from: word(MODEL_NAMES, row.modelFrom),
@@ -86,11 +103,15 @@ export function claudeMoveDecision(row: ClaudeSessionMoveSummary): ClaudeMovePhr
   }
   if (row.reason === 'moved') {
     return row.strategy === 'proxy'
-      ? { key: `${PREFIX}.movedProxy`, fallback: 'Moved (no restart)' }
-      : { key: `${PREFIX}.movedResume`, fallback: 'Moved (restarted)' }
+      ? { key: 'accounts.claude.recentMoves.decision.movedProxy', fallback: 'Moved (no restart)' }
+      : { key: 'accounts.claude.recentMoves.decision.movedResume', fallback: 'Moved (restarted)' }
   }
   const words = STAY_WORDS[row.reason]
   return words
     ? { key: words[0], fallback: words[1] }
-    : { key: `${PREFIX}.other`, fallback: '{{reason}}', values: { reason: row.reason } }
+    : {
+        key: 'accounts.claude.recentMoves.decision.other',
+        fallback: '{{reason}}',
+        values: { reason: row.reason }
+      }
 }

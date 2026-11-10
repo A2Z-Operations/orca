@@ -157,6 +157,7 @@ describe('watchProviderAccounts', () => {
       }
     ])
     expect(errors).toHaveLength(1)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the previous assertion proved one Error was recorded.
     expect((errors[0] as Error).message).toBe(
       'Could not load Claude accounts: Claude keychain unavailable'
     )
@@ -184,6 +185,7 @@ describe('watchProviderAccounts', () => {
       }
     ])
     expect(errors).toHaveLength(1)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the previous assertion proved one Error was recorded.
     expect((errors[0] as Error).message).toBe('Could not load Codex accounts: Codex home missing')
   })
 
@@ -202,8 +204,11 @@ describe('watchProviderAccounts', () => {
     expect(snapshots).toHaveLength(0)
     expect(errors).toHaveLength(1)
     expect(errors[0]).toBeInstanceOf(AggregateError)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the previous assertion proved an AggregateError was recorded.
     expect((errors[0] as AggregateError).message).toContain('Could not load Claude accounts')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the previous assertion proved an AggregateError was recorded.
     expect((errors[0] as AggregateError).message).toContain('Could not load Codex accounts')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the previous assertion proved an AggregateError was recorded.
     expect((errors[0] as AggregateError).errors).toHaveLength(2)
   })
 
@@ -278,7 +283,9 @@ describe('fetchProviderAccountsSnapshot', () => {
     await flushMicrotasks()
 
     expect(runtimeEnvironmentSubscribe).toHaveBeenCalledTimes(2)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the subscribe mock received the callbacks the client passed.
     const firstCallbacks = runtimeEnvironmentSubscribe.mock.calls[0]?.[1] as SubscriptionCallbacks
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the subscribe mock received the callbacks the client passed.
     const secondCallbacks = runtimeEnvironmentSubscribe.mock.calls[1]?.[1] as SubscriptionCallbacks
     firstCallbacks.onResponse({
       ok: true,

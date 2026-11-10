@@ -13684,7 +13684,10 @@
           "worktreeRemoved": "When a workspace is removed",
           "agentStatusChanged": "When an agent’s status changes",
           "detail": "Background code runs",
-          "workspaceChanged": "When you switch workspace or its terminals change"
+          "workspaceChanged": "When you switch workspace or its terminals change",
+          "accountsUsageChanged": "When a Claude account’s usage changes",
+          "accountsSessionMoved": "When a Claude session moves to another account",
+          "accountsModelChanged": "When the model policy changes a Claude session’s model"
         },
         "pluginInstallAction": {
           "installed": "{{value0}} installed",

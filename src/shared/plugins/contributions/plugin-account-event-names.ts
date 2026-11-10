@@ -8,5 +8,5 @@ export const PLUGIN_ACCOUNT_EVENT_NAMES = [
 export type PluginAccountEventName = (typeof PLUGIN_ACCOUNT_EVENT_NAMES)[number]
 
 export function isPluginAccountEventName(event: string): event is PluginAccountEventName {
-  return (PLUGIN_ACCOUNT_EVENT_NAMES as readonly string[]).includes(event)
+  return PLUGIN_ACCOUNT_EVENT_NAMES.some((name) => name === event)
 }

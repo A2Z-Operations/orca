@@ -28,9 +28,8 @@ type PluginClaudeAccountRateLimits = Pick<RateLimitState, 'claude' | 'inactiveCl
 
 type PluginClaudeAccountPane = Pick<ClaudePaneAccountRecord, 'accountId' | 'assignedAccountId'>
 
-// SAFETY: claudeBillingAccountId reads only assignedAccountId and accountId.
 function billingAccountId(pane: PluginClaudeAccountPane): string {
-  return claudeBillingAccountId(pane as ClaudePaneAccountRecord)
+  return claudeBillingAccountId(pane)
 }
 
 function projectWindow(window: RateLimitWindow | null | undefined): PluginClaudeUsageWindow | null {

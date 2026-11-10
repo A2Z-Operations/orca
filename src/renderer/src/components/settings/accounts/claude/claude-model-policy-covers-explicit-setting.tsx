@@ -1,7 +1,7 @@
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import type { ClaudeModelPolicyEvaluation } from '../../../../../../shared/managed-account-types'
 import { claudeFixedModelSessionCount } from '../../../../../../shared/claude-model-policy-view'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { Label } from '../../../ui/label'
 import { Switch } from '../../../ui/switch'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
@@ -16,15 +16,16 @@ export function ClaudeModelPolicyCoversExplicitSetting({
   updateSettings: (updates: Partial<GlobalSettings>) => void
   evaluations: readonly ClaudeModelPolicyEvaluation[] | undefined
 }): React.JSX.Element | null {
+  const t = useTranslate()
   if (settings.claudeModelPolicy?.enabled === false) {
     return null
   }
   const fixed = claudeFixedModelSessionCount(evaluations)
-  const title = translate(
+  const title = t(
     'accounts.claude.modelPolicy.coversExplicitTitle',
     'Also switch sessions launched with a fixed model'
   )
-  const description = translate(
+  const description = t(
     'accounts.claude.modelPolicy.coversExplicitDescription',
     'A session started with --model or ANTHROPIC_MODEL set to Fable or Opus follows the same lines. Other models are never switched.'
   )
@@ -40,7 +41,7 @@ export function ClaudeModelPolicyCoversExplicitSetting({
         <p className="text-xs text-muted-foreground">{description}</p>
         {fixed > 0 ? (
           <p data-testid="claude-fixed-model-sessions" className="text-xs text-muted-foreground">
-            {translate(
+            {t(
               'accounts.claude.modelPolicy.fixedModelSessions',
               '{{count}} live sessions were launched with a fixed model.',
               { count: fixed }

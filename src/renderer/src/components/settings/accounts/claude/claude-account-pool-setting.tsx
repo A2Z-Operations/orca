@@ -1,5 +1,5 @@
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { Label } from '../../../ui/label'
 import { Switch } from '../../../ui/switch'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
@@ -11,8 +11,9 @@ export function ClaudeAccountPoolSetting({
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void
 }): React.JSX.Element {
-  const title = translate('accounts.claude.pool.settingTitle', 'Spread sessions across accounts')
-  const description = translate(
+  const t = useTranslate()
+  const title = t('accounts.claude.pool.settingTitle', 'Spread sessions across accounts')
+  const description = t(
     'accounts.claude.pool.settingDescription',
     'New Claude sessions start on the signed-in account with the most room left.'
   )

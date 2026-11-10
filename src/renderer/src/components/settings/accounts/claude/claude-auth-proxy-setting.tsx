@@ -3,7 +3,7 @@ import { claudeAuthProxyHealthView } from '../../../../../../shared/claude-auth-
 import { formatClaudeRelativeAge } from '../../../../../../shared/claude-relative-age'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 import type { ClaudeAuthProxyHealth } from '../../../../../../shared/managed-account-types'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
 import { Label } from '../../../ui/label'
 import { Switch } from '../../../ui/switch'
@@ -17,14 +17,15 @@ function ClaudeAuthProxyHealthLine({
   health: ClaudeAuthProxyHealth
   now: number
 }): React.JSX.Element {
+  const t = useTranslate()
   const view = claudeAuthProxyHealthView(health, now)
-  const unknown = translate(
+  const unknown = t(
     'accounts.claude.authProxy.healthUnknownSlots',
     'Requests from unknown slots: {{count}}',
     { count: view.unknownSlotRequests }
   )
   const error = view.lastError
-    ? translate(
+    ? t(
         'accounts.claude.authProxy.healthLastError',
         'Last upstream error: {{status}} {{method}} {{path}}, {{age}}',
         {
@@ -34,7 +35,7 @@ function ClaudeAuthProxyHealthLine({
           age: formatClaudeRelativeAge(Math.min(view.lastError.at, now), now)
         }
       )
-    : translate('accounts.claude.authProxy.healthNoError', 'No upstream errors')
+    : t('accounts.claude.authProxy.healthNoError', 'No upstream errors')
   return (
     <p
       data-testid="claude-auth-proxy-health"
@@ -62,12 +63,13 @@ export function ClaudeAuthProxySetting({
   /** Tests pin the clock. The pane re-renders when the account list refreshes. */
   now?: number
 }): React.JSX.Element {
+  const t = useTranslate()
   const clock = useHalfMinuteClock()
-  const title = translate(
+  const title = t(
     'accounts.claude.authProxy.settingTitle',
     'Bill Claude through a local auth proxy'
   )
-  const description = translate(
+  const description = t(
     'accounts.claude.authProxy.settingDescription',
     'A running Claude session can change accounts without restarting. The next request uses the new account.'
   )

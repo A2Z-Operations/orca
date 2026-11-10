@@ -81,6 +81,7 @@ type Api = {
 let api: Api
 
 beforeAll(async () => {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the runner is the fork’s own script; its exports are this Api.
   api = (await import(runnerPath)) as Api
 })
 
@@ -302,6 +303,7 @@ describe('durable job hook', () => {
       child.on('exit', (status) => resolve(status ?? 1))
     )
     expect(code).toBe(0)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the runner printed the plan response it was given.
     const response = JSON.parse(stdout) as Plan['response']
     expect(response.hookSpecificOutput.updatedInput.run_in_background).toBe(true)
     expect(response.hookSpecificOutput.permissionDecision).toBe('allow')

@@ -1,3 +1,4 @@
+import type { GlobalSettings } from '../../shared/global-settings-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
@@ -13,7 +14,7 @@ const {
     flushPendingOrThrowAsync: vi.fn(async () => {}),
     writeLatestProfileStateJsonExportAsync: vi.fn(async () => {}),
     getSettings: vi.fn(() => ({})),
-    onSettingsChanged: vi.fn((_listener: (updates: object) => void) => () => {}),
+    onSettingsChanged: vi.fn((_listener: (updates: Partial<GlobalSettings>) => void) => () => {}),
     getSshTargets: vi.fn(() => [{ id: 'ssh-1', reconnectOnLaunch: false }])
   }
   return {
@@ -233,7 +234,7 @@ describe('serve usage polling', () => {
   it('does not poll when every usage feature is off, then starts when one turns on', () => {
     state.isServeMode = true
     store.getSettings.mockImplementation(() => usageOff)
-    let listener: ((updates: object) => void) | undefined
+    let listener: ((updates: Partial<GlobalSettings>) => void) | undefined
     store.onSettingsChanged.mockImplementation((callback) => {
       listener = callback
       return () => {

@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { formatClaudeRelativeAge } from '../../../../../../shared/claude-relative-age'
 import type { ClaudeSessionMoveSummary } from '../../../../../../shared/managed-account-types'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { ClaudeIcon } from '../../../status-bar/icons'
 import type { ClaudeMoveLine } from './claude-recent-moves-rows'
 import type { ClaudeMoveSessionName } from './claude-recent-moves-session-name'
@@ -32,6 +33,7 @@ function MoveRow({
   context: ClaudeMoveTableContext
   nested?: boolean
 }): React.JSX.Element {
+  const t = useTranslate()
   const session = context.sessionName(row)
   const moved =
     row.kind !== 'model' && row.toAccountId !== null && row.toAccountId !== row.fromAccountId
@@ -57,9 +59,9 @@ function MoveRow({
       <td className={CELL}>{phrase(claudeMoveDecision(row))}</td>
       <td className={CELL}>
         {via === 'proxy'
-          ? translate('accounts.claude.recentMoves.viaProxy', 'proxy')
+          ? t('accounts.claude.recentMoves.viaProxy', 'proxy')
           : via === 'restart'
-            ? translate('accounts.claude.recentMoves.viaRestart', 'restart')
+            ? t('accounts.claude.recentMoves.viaRestart', 'restart')
             : ''}
       </td>
     </tr>
@@ -77,28 +79,29 @@ export function ClaudeRecentMovesTable({
   expanded: ReadonlySet<string>
   onToggle: (key: string) => void
 }): React.JSX.Element {
+  const t = useTranslate()
   return (
     <div className="max-h-[420px] overflow-y-auto rounded-md border border-border/60 scrollbar-sleek">
       <table className="w-full table-fixed text-xs">
         <thead className="sticky top-0 bg-background text-left text-[11px] text-muted-foreground">
           <tr>
             <th className="w-[16%] px-2 py-1 font-medium">
-              {translate('accounts.claude.recentMoves.when', 'When')}
+              {t('accounts.claude.recentMoves.when', 'When')}
             </th>
             <th className="w-[24%] px-2 py-1 font-medium">
-              {translate('accounts.claude.recentMoves.session', 'Session')}
+              {t('accounts.claude.recentMoves.session', 'Session')}
             </th>
             <th className="w-[24%] px-2 py-1 font-medium">
-              {translate('accounts.claude.recentMoves.account', 'Account')}
+              {t('accounts.claude.recentMoves.account', 'Account')}
             </th>
             <th className="w-[10%] px-2 py-1 font-medium">
-              {translate('accounts.claude.recentMoves.model', 'Model')}
+              {t('accounts.claude.recentMoves.model', 'Model')}
             </th>
             <th className="w-[18%] px-2 py-1 font-medium">
-              {translate('accounts.claude.recentMoves.decisionColumn', 'Decision')}
+              {t('accounts.claude.recentMoves.decisionColumn', 'Decision')}
             </th>
             <th className="w-[8%] px-2 py-1 font-medium">
-              {translate('accounts.claude.recentMoves.via', 'Via')}
+              {t('accounts.claude.recentMoves.via', 'Via')}
             </th>
           </tr>
         </thead>
@@ -130,7 +133,7 @@ export function ClaudeRecentMovesTable({
                     ) : (
                       <ChevronRight className="size-3" />
                     )}
-                    {translate(
+                    {t(
                       'accounts.claude.recentMoves.group',
                       '{{count}} sessions stayed on {{email}} — {{decision}}',
                       {

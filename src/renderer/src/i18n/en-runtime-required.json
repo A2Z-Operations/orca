@@ -1,6 +1,63 @@
 {
   "accounts": {
     "claude": {
+      "recentMoves": {
+        "decision": {
+          "ask": "Asked to move",
+          "cooldown": "Stayed: moved recently",
+          "failed": "Move failed",
+          "failedRecently": "Stayed: a move failed recently",
+          "flip": "Switched model: {{from}} → {{to}} ({{why}})",
+          "flipWhy": {
+            "fableHeadroom": "Fable has room",
+            "fableLine": "Fable window at its line",
+            "hysteresis": "still near a line",
+            "uncovered": "fixed model restored",
+            "weeklyGuard": "weekly window at its guard",
+            "windowReset": "a window reset"
+          },
+          "model": {
+            "fable": "Fable",
+            "opus": "Opus",
+            "unset": "unset"
+          },
+          "movedProxy": "Moved (no restart)",
+          "movedResume": "Moved (restarted)",
+          "moving": "Moving",
+          "noTarget": "Stayed: no account under the line",
+          "noUsage": "Stayed: no usage reading",
+          "off": "Mover is off",
+          "other": "{{reason}}",
+          "pinned": "Pinned",
+          "promptCache": "Stayed: turn just ended",
+          "readUsage": "Reading usage",
+          "rebalance": "Moved to balance accounts",
+          "skipped": "Move skipped",
+          "stay": "Stayed",
+          "underLine": "Stayed: under the line",
+          "waitBackgroundWork": "Waiting: background work",
+          "waitMidTurn": "Waiting: mid-turn",
+          "waitNoStatus": "Waiting: no status yet"
+        },
+        "filterAll": "All",
+        "filterFlips": "Flips",
+        "filterMoves": "Moves",
+        "filterStays": "Stays"
+      },
+      "sessionMover": {
+        "handoff": {
+          "backgroundTask": "a background task was still running",
+          "continue": "Re-run what is still needed, then continue.",
+          "detailFallback": "its usage limit",
+          "ended": "The restart ended subagents of the previous process ({{known}}).",
+          "monitoring": "monitoring",
+          "more": "and {{count}} more",
+          "moved": "Orca moved this session from {{from}} to {{to}} because {{detail}}.",
+          "none": "none reported",
+          "subagent": "{{agentType}} {{id}} ({{state}})",
+          "subagentUntyped": "{{id}} ({{state}})"
+        }
+      },
       "switchSessions": {
         "body_one": "{{count}} Claude session is still running on {{previous}}. Restarting continues the conversation on {{next}}. Busy sessions wait for idle before restarting.",
         "body_other": "{{count}} Claude sessions are still running on {{previous}}. Restarting continues each conversation on {{next}}. Busy sessions wait for idle before restarting.",
@@ -8,6 +65,16 @@
         "restartCount_other": "Restart {{count}} sessions",
         "reviewBody_one": "{{count}} other Claude session wasn't moved to {{next}}.",
         "reviewBody_other": "{{count}} other Claude sessions weren't moved to {{next}}."
+      },
+      "usageStrip": {
+        "state": {
+          "atLine": "at line",
+          "nearLine": "near line",
+          "ok": "ok",
+          "refreshing": "refreshing",
+          "signIn": "sign-in needed",
+          "unreadable": "unreadable"
+        }
       }
     },
     "hostSignIn": {
@@ -644,14 +711,14 @@
           "fullCoverage_one": "All 1 detected agent has the skill.",
           "fullCoverage_other": "All {{value0}} detected agents have the skill."
         },
+        "PluginAuthor": {
+          "shownPluginCount_one": "{{count}} matching plugin shown, including this one",
+          "shownPluginCount_other": "{{count}} matching plugins shown, including this one"
+        },
         "PluginConsentDialog": {
           "capability": {
             "accountsRead": "Read Claude account ids, labels, usage windows, and how many sessions each account is running. Does not include tokens or credential paths."
           }
-        },
-        "PluginAuthor": {
-          "shownPluginCount_one": "{{count}} matching plugin shown, including this one",
-          "shownPluginCount_other": "{{count}} matching plugins shown, including this one"
         },
         "PluginDevelopmentSection": {
           "title": "Development"
@@ -1597,12 +1664,12 @@
         "couldNotStopTheAgent": "Couldn't stop the agent.",
         "editSavedArguments": "Edit them in Settings > Agents > Arguments.",
         "emptyMessage": "This message is empty, so it was not sent.",
-        "forkOriginalMissing": "{{agent}} could not find this response in the original chat. Open it and fork from there.",
-        "forkOriginalUnavailable": "{{agent}} cannot fork this response in the original chat. Open it and fork from there.",
-        "forkOriginalMissingNamed": "{{agent}} could not find this response in \"{{detail}}\". Open that chat and fork from there.",
-        "forkOriginalUnavailableNamed": "{{agent}} cannot fork this response in \"{{detail}}\". Open that chat and fork from there.",
         "forkOriginalLatestOnly": "{{agent}} can only fork the latest response in the original chat. Open that chat and fork its latest response once it has finished.",
         "forkOriginalLatestOnlyNamed": "{{agent}} can only fork the latest response in \"{{detail}}\". Open that chat and fork its latest response once it has finished.",
+        "forkOriginalMissing": "{{agent}} could not find this response in the original chat. Open it and fork from there.",
+        "forkOriginalMissingNamed": "{{agent}} could not find this response in \"{{detail}}\". Open that chat and fork from there.",
+        "forkOriginalUnavailable": "{{agent}} cannot fork this response in the original chat. Open it and fork from there.",
+        "forkOriginalUnavailableNamed": "{{agent}} cannot fork this response in \"{{detail}}\". Open that chat and fork from there.",
         "fullAccessAsRoot": "{{agent}} won't use Full access while it runs as root. Choose another permission for {{agent}} in Settings → Agents for the computer running this chat, then start a new chat.",
         "historyInOtherAccount": "This chat's history is in another Claude account. Switch back to that account to continue it.",
         "historyTooLarge": "This conversation's history is too large to restore here.",

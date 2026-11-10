@@ -82,6 +82,7 @@ describe('account auto-switch', () => {
     expect(callMock).not.toHaveBeenCalled()
   })
 
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the flag tuples are the literal shapes HandlerContext.flags holds.
   it.each([
     [[]],
     [

@@ -1,6 +1,6 @@
 import { formatClaudeRelativeAge } from '../../../../../../shared/claude-relative-age'
 import type { ClaudeRateLimitAccountsState } from '../../../../../../shared/managed-account-types'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/utils'
 import {
   claudeAccountUsageState,
@@ -55,6 +55,7 @@ export function ClaudeAccountUsageStrip({
   selectedAccountId: string | null
   onSelectAccount: (accountId: string | null) => void
 }): React.JSX.Element | null {
+  const t = useTranslate()
   const now = useHalfMinuteClock()
   if (accounts.accounts.length === 0) {
     return null
@@ -64,9 +65,7 @@ export function ClaudeAccountUsageStrip({
   )
   return (
     <div className="space-y-1" data-testid="claude-account-usage-strip">
-      <p className="text-xs font-medium">
-        {translate('accounts.claude.usageStrip.title', 'Accounts')}
-      </p>
+      <p className="text-xs font-medium">{t('accounts.claude.usageStrip.title', 'Accounts')}</p>
       <ul className="divide-y divide-border/50 rounded-md border border-border/60">
         {accounts.accounts.map((account) => {
           const row = rows.get(account.id)
@@ -88,16 +87,16 @@ export function ClaudeAccountUsageStrip({
                   {account.email}
                 </span>
                 <Bar
-                  label={translate('accounts.claude.usageStrip.window.session', '5h')}
+                  label={t('accounts.claude.usageStrip.window.session', '5h')}
                   value={row?.session}
                 />
                 <Bar
-                  label={translate('accounts.claude.usageStrip.window.weekly', 'week')}
+                  label={t('accounts.claude.usageStrip.window.weekly', 'week')}
                   value={row?.weekly}
                 />
                 {typeof row?.fable === 'number' ? (
                   <Bar
-                    label={translate('accounts.claude.usageStrip.window.fable', 'fable')}
+                    label={t('accounts.claude.usageStrip.window.fable', 'fable')}
                     value={row.fable}
                   />
                 ) : null}
@@ -105,7 +104,7 @@ export function ClaudeAccountUsageStrip({
                   {row?.readAt ? formatClaudeRelativeAge(Math.min(row.readAt, now), now) : '–'}
                 </span>
                 <span className={cn('w-24 text-[10px] font-medium', STATE_TONE[state])}>
-                  {translate(key, fallback)}
+                  {t(key, fallback)}
                   {state === 'unreadable' && row?.unavailable ? ` (${row.unavailable})` : ''}
                 </span>
               </button>

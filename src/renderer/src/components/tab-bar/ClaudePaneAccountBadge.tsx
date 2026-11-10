@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -30,14 +31,15 @@ export function ClaudePaneAccountChip({
   email: string
   model?: string
 }): React.JSX.Element {
+  const t = useTranslate()
   const shown = model ? `${label} · ${model}` : label
-  const name = translate('accounts.claude.pool.paneBadge', 'Claude account {{label}}', {
+  const name = t('accounts.claude.pool.paneBadge', 'Claude account {{label}}', {
     label: shown
   })
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant="hostContext" aria-label={name} className="mr-1 max-w-32 text-3xs">
+        <Badge variant="hostContext" aria-label={name} className="mr-1 max-w-32">
           <span className="truncate">{shown}</span>
         </Badge>
       </TooltipTrigger>

@@ -452,6 +452,7 @@ describe('accounts.listClaudeAccounts', () => {
 
     // SAFETY: the service type forbids a token field; this plants one to prove the schema rejects it.
     host.listClaudeAccounts = () =>
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: plants a token field on purpose to prove the result schema rejects it.
       ({ accounts: [], accessToken: SECRET }) as { accounts: PluginClaudeAccountView[] }
     const leaked = await executePluginHostCall({
       pluginId: 'orca-samples.demo',
@@ -531,7 +532,7 @@ function discovered(events: string[], capabilities: string[]): ValidDiscoveredPl
 describe('deliverPluginEvent account capability', () => {
   it('skips account events unless the grant covers accounts.read', async () => {
     const delivered: string[] = []
-    // SAFETY: delivery only calls deliverEvent on the handle.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: delivery only calls deliverEvent on the handle.
     const ensureWorker = vi.fn(async () => ({
       deliverEvent: (event: string) => {
         delivered.push(event)
