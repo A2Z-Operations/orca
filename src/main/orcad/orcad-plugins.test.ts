@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { build } from 'esbuild'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '../persistence/loading-store/store'
 import { ProfileStateSqliteAuthority } from '../persistence/profile-state/profile-state-sqlite-authority'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -27,12 +28,33 @@ const HOST_VERSION = '1.4.256'
 const directories: string[] = []
 const stores: Store[] = []
 let cleanups: OrcadRuntimeCleanup[] = []
+// The real worker host, bundled once as `build-orcad.mjs` ships it beside `orcad-server.js`.
+let bundledHostEntryPath = ''
+let bundleRoot = ''
 
 async function tempDirectory(prefix: string): Promise<string> {
   const directory = await realpath(await mkdtemp(join(tmpdir(), prefix)))
   directories.push(directory)
   return directory
 }
+
+beforeAll(async () => {
+  bundleRoot = await realpath(await mkdtemp(join(tmpdir(), 'orcad-plugins-host-bundle-')))
+  bundledHostEntryPath = join(bundleRoot, 'plugin-host-entry.cjs')
+  await build({
+    entryPoints: [join(process.cwd(), 'src', 'main', 'plugins', 'workers', 'plugin-host-entry.ts')],
+    outfile: bundledHostEntryPath,
+    bundle: true,
+    platform: 'node',
+    target: 'node18',
+    format: 'cjs',
+    logLevel: 'silent'
+  })
+}, 30_000)
+
+afterAll(async () => {
+  await rm(bundleRoot, { recursive: true, force: true })
+})
 
 beforeEach(async () => {
   const home = await tempDirectory('orcad-plugins-home-')
@@ -61,7 +83,7 @@ afterEach(async () => {
 })
 
 async function startHeadless(
-  options: { claudeAccounts?: OrcadPluginClaudeAccountSource } = {}
+  options: { claudeAccounts?: OrcadPluginClaudeAccountSource; hostEntryPath?: string } = {}
 ): Promise<{
   runtime: OrcaRuntimeService
   store: Store
@@ -87,7 +109,7 @@ async function startHeadless(
     registerCleanup: (cleanup) => cleanups.push(cleanup),
     userDataPath,
     hostVersion: HOST_VERSION,
-    hostEntryPath: join(userDataPath, 'missing-plugin-host-entry.js'),
+    hostEntryPath: options.hostEntryPath ?? join(userDataPath, 'missing-plugin-host-entry.js'),
     // Never reach the safety list or the catalogs from a test.
     networkAllowed: false,
     claudeAccounts: options.claudeAccounts
@@ -120,6 +142,57 @@ const PANEL_PLUGIN = {
     statusBarItems: [{ id: 'notes-count', text: 'Notes' }]
   },
   capabilities: []
+}
+
+const WORKER_PLUGIN = {
+  manifestVersion: 2,
+  id: 'counter',
+  publisher: 'acme',
+  name: 'Counter',
+  version: '1.0.0',
+  execution: 'trusted-worker',
+  pluginApi: 1,
+  main: 'main.mjs',
+  engines: { orca: `>=${HOST_VERSION}` },
+  contributes: { commands: [{ id: 'bump', title: 'Bump' }] },
+  capabilities: [{ kind: 'storage:own' }]
+}
+
+async function writeWorkerPlugin(): Promise<string> {
+  const folder = await tempDirectory('orcad-plugins-worker-dev-')
+  await mkdir(folder, { recursive: true })
+  await writeFile(join(folder, 'orca-plugin.json'), JSON.stringify(WORKER_PLUGIN))
+  await writeFile(
+    join(folder, 'main.mjs'),
+    `export default function activate(orca) {
+      orca.commands.register('bump', async () => {
+        const { value } = await orca.host.call('storage.get', { key: 'bumps' })
+        const bumps = (value ?? 0) + 1
+        await orca.host.call('storage.set', { key: 'bumps', value: bumps })
+        return { bumps, pid: process.pid }
+      })
+    }`
+  )
+  return folder
+}
+
+async function devLoadApproved(folder: string): Promise<void> {
+  const refusal = await call('plugins.devLoad', { path: folder }).catch((error: unknown) => error)
+  expect(refusal).toBeInstanceOf(PluginApprovalRequiredError)
+  const fingerprint =
+    refusal instanceof PluginApprovalRequiredError ? refusal.data.approvalFingerprint : ''
+  await expect(
+    call('plugins.devLoad', { path: folder, approvalFingerprint: fingerprint })
+  ).resolves.toMatchObject({ added: true })
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function writePanelPlugin(): Promise<string> {
@@ -197,6 +270,41 @@ describe('headless serve plugin service', () => {
     await handle.pluginService.whenReady()
     await expect(call('plugins.getLogs', { pluginKey: 'acme.notes' })).resolves.toEqual(before)
   })
+
+  // Forks a real worker process from the bundled host entry; seconds on a loaded machine.
+  it('activates a trusted-worker plugin and answers its storage host calls, then disposes the worker at stop', async () => {
+    const { handle } = await startHeadless({ hostEntryPath: bundledHostEntryPath })
+    await call('plugins.setSystemEnabled', { enabled: true })
+    await devLoadApproved(await writeWorkerPlugin())
+    await handle.pluginService.whenReady()
+    // Approved and inert: the worker starts on its first command, as on the desktop.
+    await expect(call('plugins.list', null)).resolves.toMatchObject([
+      { pluginKey: 'acme.counter', isDev: true, status: 'idle' }
+    ])
+
+    const first = await call('plugins.invokeCommand', {
+      pluginKey: 'acme.counter',
+      commandId: 'bump'
+    })
+    expect(first).toMatchObject({ bumps: 1, pid: expect.any(Number) })
+    await expect(call('plugins.list', null)).resolves.toMatchObject([
+      { pluginKey: 'acme.counter', status: 'running' }
+    ])
+    // storage.set/get round-trip over the worker channel: the second call reads the first write.
+    await expect(
+      call('plugins.invokeCommand', { pluginKey: 'acme.counter', commandId: 'bump' })
+    ).resolves.toMatchObject({ bumps: 2 })
+    const pid = (first as { pid: number }).pid
+    expect(pid).not.toBe(process.pid)
+    expect(isAlive(pid)).toBe(true)
+
+    for (const cleanup of cleanups.splice(0).toReversed()) {
+      await cleanup({ failed: false })
+    }
+    await vi.waitFor(() => {
+      expect(isAlive(pid)).toBe(false)
+    })
+  }, 30_000)
 
   it('answers accounts.read with an empty list when this host owns no accounts', async () => {
     // A WSL guest: `createOrcadAccountServices` returns null, so no source is bound.

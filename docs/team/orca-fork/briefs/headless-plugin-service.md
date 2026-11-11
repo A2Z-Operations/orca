@@ -103,4 +103,4 @@ or fonts on a headless host, the orcad binding writes a `warn` line to that plug
    `src/shared/orcad-artifacts.ts`: ship `plugin-host-entry.js`.
 5. Tests: `orcad-plugins.test.ts` (service bound after headless start, `plugins.list` answers,
    `plugins.devInspect` reports desktop-only, headless log line for renderer-only contributions,
-   worker RPC paths unaffected), `main-process-plugin-rpc` desktop path unchanged.
+   worker RPC paths unaffected, a `trusted-worker` dev plugin activated against the bundled `plugin-host-entry` answering `storage.set`/`storage.get` over the worker channel and disposed at stop, `accounts.read` bound from the host's accounts and empty without them), `main-process-plugin-rpc` desktop path unchanged.
