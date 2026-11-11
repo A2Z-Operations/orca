@@ -90,6 +90,17 @@ export function claudeAuthProxySlotOwner(slot: string): {
   }
 }
 
+/** Every slot bound to this PTY, left in place. The shell's own slot is first when it was bound at spawn. */
+export function claudeAuthProxySlotsForPty(ptyId: string): string[] {
+  const slots: string[] = []
+  for (const [slot, owner] of owners) {
+    if (owner.ptyId === ptyId) {
+      slots.push(slot)
+    }
+  }
+  return slots
+}
+
 /** Removes and returns every slot bound to this PTY. The caller releases them. */
 export function takeClaudeAuthProxySlotsForPty(ptyId: string): string[] {
   const slots: string[] = []

@@ -1,5 +1,6 @@
 import { advertisedUrlWatcher } from '../../../ports/advertised-url-watcher'
 import { unregisterPty } from '../../../memory/pty-registry'
+import { scheduleClaudeAuthProxyPrune } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-prune'
 import { forgetCodexPaneAccount } from '../../../codex/configuration/homes/codex-pane-account-registry'
 import { forgetClaudePaneAccount } from '../../../claude-accounts/claude-pane-account-registry'
 import { openCodeHookService } from '../../../opencode/hook-service'
@@ -65,6 +66,8 @@ export function clearProviderPtyState(
   const stillOwnsPaneKey = paneKey ? paneKeyPtyId.get(paneKey) === id : false
   // Stop memory snapshots from resolving dead PIDs; SSH PTYs may never have registered.
   unregisterPty(id)
+  // A slot this PTY carried without a row is decidable now; the prune reads the rest.
+  scheduleClaudeAuthProxyPrune()
   // SSH reattach/shutdown and spawn failure can bypass runtime exit cleanup; unbind their URL watcher too.
   advertisedUrlWatcher.unbindPty(id)
   clearMigrationUnsupportedPty(id)

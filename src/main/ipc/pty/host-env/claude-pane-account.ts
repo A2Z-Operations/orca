@@ -13,11 +13,13 @@ import {
   type ClaudeAccountSelectionTarget
 } from '../../../claude-accounts/runtime-selection'
 import {
-  proxySlotFromUrl,
-  readProcessAnthropicBaseUrl,
   recoverReattachedProxySlot,
   type ReattachSlotProxy
 } from './claude-pane-proxy-slot-recovery'
+import {
+  adoptClaudePaneProxySlot,
+  type ClaudePaneSlotAdoptionSources
+} from './claude-pane-slot-adoption'
 
 const REJECTED_PROFILE_IDS = new Set(['unavailable', 'undefined', 'null'])
 
@@ -67,43 +69,19 @@ function proxySlotFromBaseUrl(envPatch: ClaudeEnvPatch): string | undefined {
   }
 }
 
-type ReattachSources = {
-  pid?: number | null
-  /** Defaults to the live listener. Tests pass a fake. */
-  proxy?: ReattachSlotProxy | null
-  /** Defaults to reading the process environment. Tests pass a fake. */
-  readBaseUrl?: (pid: number | null | undefined) => Promise<string | null>
-}
+type ReattachSources = ClaudePaneSlotAdoptionSources
 
 function reattachProxy(sources: ReattachSources): ReattachSlotProxy | null {
   return sources.proxy === undefined ? getClaudeAuthProxy() : sources.proxy
 }
 
 /**
- * The slot a reattached process still carries, read from its environment once the read lands. The
- * row is already recorded without a slot; a pane evaluated in between resumes, as before this fix.
- * A row that gained a slot or vanished meanwhile is left alone, and the listener never adopts a
- * slot for it: an adopted slot with no row would bill the account until the pane's next prune.
+ * The slot a reattached process still carries, from the owner table or its environment once the
+ * read lands. The row is already recorded without a slot; a pane evaluated in between resumes, as
+ * before this fix.
  */
 function adoptSlotFromProcessEnv(sources: ReattachSources, ptyId: string, accountId: string): void {
-  const read = sources.readBaseUrl ?? readProcessAnthropicBaseUrl
-  void read(sources.pid).then(
-    (url) => {
-      const current = getClaudePaneAccount(ptyId)
-      if (!current || current.proxySlot) {
-        return
-      }
-      const slot = recoverReattachedProxySlot({
-        recovered: proxySlotFromUrl(url),
-        accountId,
-        proxy: reattachProxy(sources)
-      })
-      if (slot) {
-        recordClaudePaneAccount({ ...current, proxySlot: slot, assignedAccountId: accountId })
-      }
-    },
-    () => {}
-  )
+  adoptClaudePaneProxySlot(ptyId, accountId, sources)
 }
 
 /**
