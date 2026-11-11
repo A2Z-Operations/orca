@@ -26,6 +26,7 @@ import { getPluginsDataDir, isInvalidDiscoveredPlugin } from '../plugins/plugin-
 import { resolvePluginHostEntryPath } from '../plugins/workers/plugin-host-process'
 import { revokePluginConsent } from '../plugins/plugin-enablement'
 import { projectPluginAgentStatusChangedPayload } from '../plugins/plugin-agent-status-event'
+import { bindPluginClaudeAccountEvents } from '../plugins/plugin-claude-account-events'
 import {
   bindPluginRuntime,
   createPluginAgentStatusForwarder,
@@ -35,6 +36,7 @@ import { emitPluginWorktreeLifecycleTo } from '../plugins/plugin-worktree-lifecy
 import { bindPluginRpcServices } from '../startup/main-process-plugin-rpc'
 import type { AgentHookServer } from '../agent-hooks/server/agent-hook-server'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
+import type { OrcadPluginClaudeAccountSource } from './orcad-account-services'
 
 export type OrcadPluginsHandle = {
   pluginService: PluginService
@@ -93,6 +95,10 @@ export function startOrcadPlugins(input: {
   hostEntryPath?: string
   /** Whether the safety list and catalog seeds may reach the network; packaged hosts do. */
   networkAllowed?: boolean
+  /** This host's Claude accounts for plugins holding `accounts.read`, as the desktop binds its own.
+   *  Absent when the host owns no accounts (a WSL guest, whose accounts stay on the desktop): then
+   *  `accounts.read` answers `{ accounts: [] }` and no `accounts.*` event fires, by design. */
+  claudeAccounts?: OrcadPluginClaudeAccountSource
 }): OrcadPluginsHandle {
   const { runtime, store, hookServer, registerCleanup } = input
   const userDataPath = input.userDataPath ?? getAppEnvironment().getPath('userData')
@@ -226,8 +232,18 @@ export function startOrcadPlugins(input: {
   const stopWorktreeLifecycle = runtime.onWorktreeLifecycle((event) =>
     emitPluginWorktreeLifecycleTo(service, event)
   )
+  // Same binding as the desktop's `bindDesktopPluginClaudeAccountEvents`: `accounts.read` answers
+  // this host's view, `accounts.usage/session/model.changed` fire from its own rate-limit service.
+  const releaseClaudeAccounts = input.claudeAccounts
+    ? bindPluginClaudeAccountEvents({
+        emit: (event, payload) => service.emitEvent(event, payload),
+        readAccounts: input.claudeAccounts.readAccounts,
+        subscribeRateLimits: input.claudeAccounts.subscribeRateLimits
+      })
+    : () => undefined
 
   registerCleanup(async () => {
+    releaseClaudeAccounts()
     stopAgentStatus()
     stopWorkspaceContext()
     stopWorktreeLifecycle()

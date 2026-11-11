@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '../persistence/loading-store/store'
 import { ProfileStateSqliteAuthority } from '../persistence/profile-state/profile-state-sqlite-authority'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { readPluginClaudeAccounts } from '../plugins/plugin-claude-account-events'
+import type { PluginClaudeAccountView } from '../../shared/plugins/workers/plugin-claude-account-contract'
+import type { OrcadPluginClaudeAccountSource } from './orcad-account-services'
 import { eraseRpcMethods, isStreamingMethod, type RpcContext } from '../runtime/rpc/core'
 import { PLUGIN_METHODS } from '../runtime/rpc/methods/plugins/plugins'
 import { PluginApprovalRequiredError } from '../../shared/plugins/approval/plugin-cli-approval'
@@ -57,7 +60,9 @@ afterEach(async () => {
   }
 })
 
-async function startHeadless(): Promise<{
+async function startHeadless(
+  options: { claudeAccounts?: OrcadPluginClaudeAccountSource } = {}
+): Promise<{
   runtime: OrcaRuntimeService
   store: Store
   handle: OrcadPluginsHandle
@@ -84,7 +89,8 @@ async function startHeadless(): Promise<{
     hostVersion: HOST_VERSION,
     hostEntryPath: join(userDataPath, 'missing-plugin-host-entry.js'),
     // Never reach the safety list or the catalogs from a test.
-    networkAllowed: false
+    networkAllowed: false,
+    claudeAccounts: options.claudeAccounts
   })
   await handle.pluginService.whenReady()
   return { runtime, store, handle, userDataPath }
@@ -190,6 +196,55 @@ describe('headless serve plugin service', () => {
     await handle.pluginService.refresh()
     await handle.pluginService.whenReady()
     await expect(call('plugins.getLogs', { pluginKey: 'acme.notes' })).resolves.toEqual(before)
+  })
+
+  it('answers accounts.read with an empty list when this host owns no accounts', async () => {
+    // A WSL guest: `createOrcadAccountServices` returns null, so no source is bound.
+    await startHeadless()
+    expect(readPluginClaudeAccounts()).toEqual({ accounts: [] })
+  })
+
+  it("serves this host's Claude accounts to plugins and emits usage changes until stop", async () => {
+    const accountView = (usedPercent: number): PluginClaudeAccountView => ({
+      id: 'acct-1',
+      label: 'one@example.com',
+      assignedSessionCount: 0,
+      usage: {
+        session: { usedPercent, windowMinutes: 300, resetsAt: null },
+        weekly: null,
+        fableWeekly: null,
+        updatedAt: 1
+      }
+    })
+    let accounts = [accountView(10)]
+    const rateLimits = { notify: null as (() => void) | null }
+    const unsubscribe = vi.fn()
+    const { handle } = await startHeadless({
+      claudeAccounts: {
+        readAccounts: () => accounts,
+        subscribeRateLimits: (listener) => {
+          rateLimits.notify = listener
+          return unsubscribe
+        }
+      }
+    })
+    const emitted = vi.spyOn(handle.pluginService, 'emitEvent')
+    // `accounts.read` host calls read through this binding, as on the desktop.
+    expect(readPluginClaudeAccounts()).toEqual({ accounts: [accountView(10)] })
+
+    accounts = [accountView(55)]
+    expect(rateLimits.notify).not.toBeNull()
+    rateLimits.notify?.()
+    expect(emitted).toHaveBeenCalledWith(
+      'accounts.usage.changed',
+      expect.objectContaining({ accountId: 'acct-1' })
+    )
+
+    for (const cleanup of cleanups.splice(0).toReversed()) {
+      await cleanup({ failed: false })
+    }
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(readPluginClaudeAccounts()).toEqual({ accounts: [] })
   })
 
   it('unbinds the RPC services when the host stops', async () => {

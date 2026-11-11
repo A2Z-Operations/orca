@@ -321,7 +321,13 @@ async function startOrcadRuntime(
   // Fork: the plugin service for this windowless host (#19). After RPC start so discovery never
   // delays readiness; `plugins.*` waits on the service's own `whenReady()`.
   const { startOrcadPlugins } = await import('./orcad-plugins')
-  startOrcadPlugins({ runtime, store: profileStore, hookServer: agentHookServer, registerCleanup })
+  startOrcadPlugins({
+    runtime,
+    store: profileStore,
+    hookServer: agentHookServer,
+    registerCleanup,
+    claudeAccounts: accountLaunch?.pluginClaudeAccounts
+  })
   // The daemon has no window to wait for; its CI-line watches start with the runtime.
   runtime.startPullRequestWatches()
   startOrcadAutomations(runtime, profileStore, registerCleanup)
