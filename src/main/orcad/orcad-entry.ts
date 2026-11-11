@@ -318,6 +318,10 @@ async function startOrcadRuntime(
   // Stop RPC before cleanup can tear down writers and runtime state.
   registerCleanup(() => rpc.stop())
   await timed('rpc', () => rpc.start())
+  // Fork: the plugin service for this windowless host (#19). After RPC start so discovery never
+  // delays readiness; `plugins.*` waits on the service's own `whenReady()`.
+  const { startOrcadPlugins } = await import('./orcad-plugins')
+  startOrcadPlugins({ runtime, store: profileStore, hookServer: agentHookServer, registerCleanup })
   // The daemon has no window to wait for; its CI-line watches start with the runtime.
   runtime.startPullRequestWatches()
   startOrcadAutomations(runtime, profileStore, registerCleanup)
