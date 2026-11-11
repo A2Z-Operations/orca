@@ -29,6 +29,12 @@ export function createClaudeAuthProxyRequestLog(
     status: number,
     startupGrace: boolean
   ) => void
+  /**
+   * A request with no `/p/<slot>/` prefix, refused before upstream. Nothing this host launches
+   * sends one, so it is neither the stale-slot count nor `lastError`; the account log still gets
+   * its `proxy-error` row so a mispointed client is diagnosable.
+   */
+  observeNoSlot: (method: string, upstreamPath: string, status: number) => void
   snapshot: () => Pick<
     ClaudeAuthProxyStatus,
     'requestsLastHour' | 'unknownSlotRequests' | 'lastError'
@@ -68,6 +74,10 @@ export function createClaudeAuthProxyRequestLog(
       if (!startupGrace) {
         unknownSlotRequests += 1
       }
+    },
+    observeNoSlot(method, upstreamPath, status) {
+      log(`${method} ${upstreamPath} ${status} -`)
+      onRequest?.({ method, path: upstreamPath, status, accountId: null, unknownSlot: false })
     },
     snapshot() {
       const at = now()

@@ -83,7 +83,7 @@ function printClaudeAuthProxyStatus(
   const health = claudeAuthProxyHealthView(status, now)
   // `!` marks what needs a look: a pane on a slot this listener lost, or an error within the hour.
   const unknownMark = health.unknownSlotRequests > 0 ? '!' : ' '
-  lines.push(`${unknownMark} unknown slots: ${status.unknownSlotRequests}`)
+  lines.push(`${unknownMark} unknown slots after startup: ${status.unknownSlotRequests}`)
   const error = status.lastError
   lines.push(
     error

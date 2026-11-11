@@ -1,4 +1,4 @@
-import { request as httpRequest } from 'node:http'
+import { createServer, request as httpRequest } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installClaudeProfileRouter } from '../claude-profile-installed-router'
 import {
@@ -20,13 +20,30 @@ import {
   adoptPersistedClaudeAuthProxySlots,
   type PersistedSlotProxy
 } from './claude-auth-proxy-persisted-slots'
+import type { ClaudeAuthProxy, ClaudeAuthProxyOptions } from './claude-auth-proxy'
 
 vi.mock('../../rate-limits/claude-oauth-credentials', () => ({
   readClaudeOAuthCredentials: vi.fn()
 }))
 
+/** The host hard-wires api.anthropic.com; a test that sends a real request points it at a fake. */
+const fakeUpstream = vi.hoisted((): { url: string | null } => ({ url: null }))
+vi.mock('./claude-auth-proxy', async (importOriginal) => {
+  const actual = await importOriginal<{
+    createClaudeAuthProxy: (options: ClaudeAuthProxyOptions) => ClaudeAuthProxy
+  }>()
+  return {
+    ...actual,
+    createClaudeAuthProxy: (options: ClaudeAuthProxyOptions) =>
+      actual.createClaudeAuthProxy(
+        fakeUpstream.url ? { ...options, upstream: fakeUpstream.url } : options
+      )
+  }
+})
+
 afterEach(async () => {
   installClaudeProfileRouter(undefined)
+  fakeUpstream.url = null
   await stopClaudeAuthProxy()
 })
 
@@ -175,30 +192,70 @@ describe('adoptPersistedClaudeAuthProxySlots', () => {
   })
 })
 
+/**
+ * A restart on the recovered port: a first listener learns a free port the "previous" listener
+ * would have persisted, then the second starts from the persisted rows on that port.
+ */
+async function restartWithPersistedRows(): Promise<number> {
+  installClaudePaneAccountPersistence(memoryPersistence([]))
+  await startClaudeAuthProxy()
+  const port = getClaudeAuthProxy()?.port()
+  expect(port).not.toBeNull()
+  await stopClaudeAuthProxy()
+
+  installClaudePaneAccountPersistence(
+    memoryPersistence(
+      [
+        persistedRow({ proxyPort: port! }),
+        persistedRow({ ptyId: 'pty-2', proxySlot: SLOT_B, proxyPort: port! + 1 }),
+        persistedRow({ ptyId: 'pty-3', proxySlot: undefined, proxyPort: undefined })
+      ],
+      port
+    )
+  )
+  await startClaudeAuthProxy()
+  expect(getClaudeAuthProxy()?.port()).toBe(port)
+  return port!
+}
+
+function listenFakeUpstream(): Promise<{
+  url: string
+  seen: { url: string | undefined; authorization: string | undefined }[]
+  close: () => Promise<void>
+}> {
+  const seen: { url: string | undefined; authorization: string | undefined }[] = []
+  const upstream = createServer((req, res) => {
+    seen.push({ url: req.url, authorization: req.headers.authorization })
+    req.resume()
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end('{"ok":true}')
+    })
+  })
+  return new Promise((resolve, reject) => {
+    upstream.once('error', reject)
+    upstream.listen(0, '127.0.0.1', () => {
+      const address = upstream.address()
+      const port = address && typeof address === 'object' ? address.port : 0
+      resolve({
+        url: `http://127.0.0.1:${port}`,
+        seen,
+        close: () =>
+          new Promise((done) => {
+            upstream.closeIdleConnections()
+            upstream.close(() => done())
+          })
+      })
+    })
+  })
+}
+
 describe('startClaudeAuthProxy', () => {
   it('registers the persisted slots when the listener starts, before any reattach', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {})
     try {
-      // A first listener, to learn a free port the "previous" listener would have persisted.
-      installClaudePaneAccountPersistence(memoryPersistence([]))
-      await startClaudeAuthProxy()
-      const port = getClaudeAuthProxy()?.port()
-      expect(port).not.toBeNull()
-      await stopClaudeAuthProxy()
-
-      installClaudePaneAccountPersistence(
-        memoryPersistence(
-          [
-            persistedRow({ proxyPort: port! }),
-            persistedRow({ ptyId: 'pty-2', proxySlot: SLOT_B, proxyPort: port! + 1 }),
-            persistedRow({ ptyId: 'pty-3', proxySlot: undefined, proxyPort: undefined })
-          ],
-          port
-        )
-      )
-      await startClaudeAuthProxy()
+      const port = await restartWithPersistedRows()
       const proxy = getClaudeAuthProxy()
-      expect(proxy?.port()).toBe(port)
       expect(proxy?.accountIdForSlot(SLOT_A)).toBe('acct-b')
       expect(proxy?.accountIdForSlot(SLOT_B)).toBeNull()
       expect(info.mock.calls.flat().join('\n')).toContain('re-registered 1 persisted slot')
@@ -215,6 +272,43 @@ describe('startClaudeAuthProxy', () => {
       expect(claudeAuthProxyStatus().lastError).toBeNull()
     } finally {
       info.mockRestore()
+    }
+  })
+
+  it('forwards a request on a re-registered slot with the billed account bearer, before any reattach', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const upstream = await listenFakeUpstream()
+    fakeUpstream.url = upstream.url
+    try {
+      vi.mocked(readClaudeOAuthCredentials).mockClear()
+      vi.mocked(readClaudeOAuthCredentials).mockImplementation(async (options) => ({
+        token:
+          options?.credentialsFileConfigDir === '/tmp/claude-home-acct-b'
+            ? 'tok-acct-b'
+            : 'tok-wrong',
+        hasRefreshableCredentials: false,
+        source: 'credentials-file'
+      }))
+      const port = await restartWithPersistedRows()
+      // No profile router: the host reads the folder bound to the account id (a stop clears the map).
+      bindClaudeAuthProxyAccountDir('acct-a', '/tmp/claude-home-acct-a')
+      bindClaudeAuthProxyAccountDir('acct-b', '/tmp/claude-home-acct-b')
+
+      const response = await statusOf(`http://127.0.0.1:${port}/p/${SLOT_A}/v1/messages`)
+      expect(response).toEqual({ status: 200, retryAfter: undefined })
+      // The slot the row persisted bills the assigned account, not the launch account.
+      expect(upstream.seen).toEqual([{ url: '/v1/messages', authorization: 'Bearer tok-acct-b' }])
+      expect(vi.mocked(readClaudeOAuthCredentials)).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(readClaudeOAuthCredentials).mock.calls[0]?.[0]).toMatchObject({
+        credentialsFileConfigDir: '/tmp/claude-home-acct-b'
+      })
+      expect(claudeAuthProxyStatus().unknownSlotRequests).toBe(0)
+      expect(claudeAuthProxyStatus().lastError).toBeNull()
+      expect(claudeAuthProxyStatus().requestsLastHour).toEqual([{ accountId: 'acct-b', count: 1 }])
+    } finally {
+      info.mockRestore()
+      await stopClaudeAuthProxy()
+      await upstream.close()
     }
   })
 })

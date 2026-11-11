@@ -253,18 +253,33 @@ describe('claude auth proxy', () => {
     expect(proxy.status().unknownSlotRequests).toBe(1)
   })
 
-  it('forwards a request without a slot prefix as before', async () => {
+  it('answers 404 for a request without a slot prefix and never calls upstream', async () => {
     const readToken = vi.fn(async () => TOKEN_A)
-    const { proxy, seen } = await started(readToken)
+    const { proxy, seen, lines } = await started(readToken)
     const base = proxy.slotBaseUrl(proxy.allocateSlot('account-a'))
     const port = new URL(base!).port
-    const response = await proxyRequest(`http://127.0.0.1:${port}/v1/messages`, {
-      headers: { authorization: 'Bearer from-claude' }
-    })
-    expect(response.status).toBe(200)
-    expect(seen[0]?.authorization).toBe('Bearer from-claude')
+    for (const path of ['/v1/messages', '/', '/api/hello', '/p', '/p/']) {
+      const response = await proxyRequest(`http://127.0.0.1:${port}${path}`, {
+        method: 'POST',
+        headers: { authorization: 'Bearer from-claude', 'x-secret': 'HEADER_SENTINEL_1b7c' },
+        body: 'BODY_SENTINEL_1b7c'
+      })
+      expect(response.status).toBe(404)
+      expect(response.chunks.join('')).toBe('no proxy slot in path\n')
+    }
+    expect(seen).toEqual([])
     expect(readToken).not.toHaveBeenCalled()
+    // Nothing Orca launches sends one: not the stale-slot warning, and never went upstream.
     expect(proxy.status().unknownSlotRequests).toBe(0)
+    expect(proxy.status().lastError).toBeNull()
+    expect(lines).toEqual([
+      'POST /v1/messages 404 -',
+      'POST / 404 -',
+      'POST /api/hello 404 -',
+      'POST /p 404 -',
+      'POST /p/ 404 -'
+    ])
+    expect(lines.join('\n')).not.toContain('SENTINEL_1b7c')
   })
 
   it('keeps the incoming Authorization when the account has no token', async () => {

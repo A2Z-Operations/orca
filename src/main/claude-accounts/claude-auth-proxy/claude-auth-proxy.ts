@@ -26,7 +26,8 @@ import {
 } from './claude-auth-proxy-listen'
 import {
   createClaudeAuthProxyStartupGrace,
-  refuseClaudeAuthProxyUnknownSlot
+  refuseClaudeAuthProxyUnknownSlot,
+  refuseClaudeAuthProxyWithoutSlot
 } from './claude-auth-proxy-unknown-slot'
 import { CLAUDE_MODEL_REWRITE_BUFFER_CAP } from '../claude-model-body-rewrite'
 import {
@@ -100,7 +101,7 @@ export type ClaudeAuthProxyOptions = {
   preferredPort?: number | null
   /** Cap on the startup grace. Defaults to 60 s (claude-auth-proxy-unknown-slot.ts). */
   startupGraceMs?: number
-  /** Each request's method, upstream path, status, account, and whether its slot was unknown. */
+  /** Each request's method, path, status, account, and whether its slot was unknown. A path without a slot is a 404 row. */
   onRequest?: Parameters<typeof createClaudeAuthProxyRequestLog>[2]
 }
 
@@ -204,17 +205,19 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const requestUrl = new URL(req.url ?? '/', 'http://127.0.0.1')
+    const method = req.method ?? 'GET'
     const match = requestUrl.pathname.match(SLOT_PATH)
     const slot = match?.[1]
-    const upstreamPath = match
-      ? match[2] && match[2] !== '/'
-        ? match[2]
-        : '/'
-      : requestUrl.pathname
-    const knownAccount = slot ? slots.get(slot) : undefined
-    const accountId = knownAccount ?? null
-    const method = req.method ?? 'GET'
-    if (slot && knownAccount === undefined) {
+    const rest = match?.[2]
+    if (!slot) {
+      // No `/p/<slot>/`: nothing this host launched. Never forwarded (it would go up bearer-less).
+      const status = refuseClaudeAuthProxyWithoutSlot(req, res)
+      requests.observeNoSlot(method, requestUrl.pathname, status)
+      return
+    }
+    const upstreamPath = rest && rest !== '/' ? rest : '/'
+    const accountId = slots.get(slot) ?? null
+    if (accountId === null) {
       // Never forwarded: a bearer-less request would come back 401 and log the pane out.
       const grace = startupGrace.active()
       const status = refuseClaudeAuthProxyUnknownSlot(req, res, grace)
@@ -229,7 +232,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     }
     const contentTypeHeader = req.headers['content-type']
     const contentType = Array.isArray(contentTypeHeader) ? contentTypeHeader[0] : contentTypeHeader
-    const slotModel = slot ? (options.modelForSlot?.(slot) ?? null) : null
+    const slotModel = options.modelForSlot?.(slot) ?? null
     // Snapshot the model before the body, same as the token: a flip mid-body stays on the next request.
     const rewrite = claudeProxyShouldRewriteModel(method, contentType, slotModel)
     const cap = options.modelRewriteBufferCap ?? CLAUDE_MODEL_REWRITE_BUFFER_CAP
