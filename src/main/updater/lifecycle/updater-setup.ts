@@ -21,6 +21,7 @@ import { AUTO_UPDATE_CHECK_INTERVAL_MS } from './updater-state'
 import { UpdaterDownloadInstall } from './updater-download-install'
 import { configureMacShipItScheduling } from '../mac-install/macos-shipit-scheduling'
 import { handleElectronUpdaterProxyLogin } from './electron-updater-proxy-session'
+import { updaterDisabledReason } from '../updater-disabled'
 import { resolveWindowsUpdateInstallDirectory } from './windows-update-install-directory'
 import type { PreQuitCleanupFailureMode, UpdateInstallMode } from './updater-state'
 
@@ -41,10 +42,16 @@ export type UpdaterSetupOptions = {
 
 export class UpdaterSetup extends UpdaterDownloadInstall {
   checkForUpdates(): void {
+    if (updaterDisabledReason()) {
+      return
+    }
     this.checkForUpdatesInBackground()
   }
 
   checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
+    if (updaterDisabledReason()) {
+      return
+    }
     super.checkForUpdatesFromMenu(options)
   }
 
@@ -141,6 +148,12 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
     }
 
     if (!app.isPackaged) {
+      return
+    }
+    // A self-built app never registers wake/focus checks or the daily timer against the stock feed.
+    const disabledReason = updaterDisabledReason()
+    if (disabledReason) {
+      console.log(`[updater] disabled for this build: ${disabledReason}`)
       return
     }
 
