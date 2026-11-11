@@ -27,9 +27,19 @@ import {
   stopClaudeAuthProxy
 } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { closeClaudeAccountLog, openClaudeAccountLog } from '../claude-accounts/claude-account-log'
+import { listClaudePaneAccounts } from '../claude-accounts/claude-pane-account-registry'
+import { normalizeClaudeRuntimeSelection } from '../claude-accounts/runtime-selection'
+import { projectPluginClaudeAccounts } from '../plugins/plugin-claude-account-projection'
+import type { PluginClaudeAccountView } from '../../shared/plugins/workers/plugin-claude-account-contract'
 import type { OrcadRuntimeCleanup } from './orcad-runtime-lifetime'
 
 type StructuredLaunchInput = { launchEnv: NodeJS.ProcessEnv }
+
+/** What plugins holding `accounts.read` see of this host's Claude accounts, and when it changes. */
+export type OrcadPluginClaudeAccountSource = {
+  readAccounts: () => PluginClaudeAccountView[]
+  subscribeRateLimits: (listener: () => void) => () => void
+}
 
 type OrcadAccountServices = {
   prepareCodexHome: ReturnType<typeof createCodexRuntimeHomeLaunchPreparation>
@@ -45,6 +55,8 @@ type OrcadAccountServices = {
     ) => Promise<AiVaultPrepareSessionResumeResult>
   }
   listCodexSessionHomes: () => string[]
+  /** The desktop's `readDesktopPluginClaudeAccounts` view, from this host's own account services. */
+  pluginClaudeAccounts: OrcadPluginClaudeAccountSource
   attachToRuntime: (
     runtime: Pick<
       OrcaRuntimeService,
@@ -154,6 +166,22 @@ export function createOrcadAccountServices(args: {
         })
     },
     listCodexSessionHomes: () => codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery(),
+    pluginClaudeAccounts: {
+      readAccounts: () => {
+        try {
+          const settings = store.getSettings()
+          return projectPluginClaudeAccounts({
+            accounts: settings.claudeManagedAccounts,
+            activeAccountId: normalizeClaudeRuntimeSelection(settings).host,
+            rateLimits: services.rateLimits.getState(),
+            panes: listClaudePaneAccounts()
+          })
+        } catch {
+          return []
+        }
+      },
+      subscribeRateLimits: (listener) => services.rateLimits.onStateChange(() => listener())
+    },
     attachToRuntime: (runtime) => {
       attachedRuntime = runtime
       runtime.setAccountServices({

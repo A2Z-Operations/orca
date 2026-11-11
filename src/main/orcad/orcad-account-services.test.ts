@@ -276,6 +276,35 @@ describe('orcad account services', () => {
     await expect(resume({})).resolves.toMatchObject({ outcome: 'fresh' })
   })
 
+  it("projects this host's managed accounts for plugins holding accounts.read", () => {
+    const { runtime, store } = createRuntime()
+    const services = install(runtime, store, false)
+    expect(services).not.toBeNull()
+    store.updateSettings({
+      claudeManagedAccounts: [
+        {
+          id: 'acct-1',
+          email: 'one@example.com',
+          managedAuthPath: '/secret/one',
+          authMethod: 'subscription-oauth',
+          organizationUuid: 'org-secret',
+          createdAt: 1,
+          updatedAt: 1,
+          lastAuthenticatedAt: 1
+        }
+      ],
+      activeClaudeManagedAccountId: 'acct-1'
+    })
+    expect(services?.pluginClaudeAccounts.readAccounts()).toMatchObject([
+      { id: 'acct-1', label: 'one@example.com' }
+    ])
+    expect(JSON.stringify(services?.pluginClaudeAccounts.readAccounts())).not.toContain('/secret/')
+    const listener = vi.fn()
+    const unsubscribe = services?.pluginClaudeAccounts.subscribeRateLimits(listener)
+    expect(unsubscribe).toEqual(expect.any(Function))
+    unsubscribe?.()
+  })
+
   it('leaves a WSL host to the desktop that owns its accounts', async () => {
     const { runtime, store } = createRuntime()
     expect(install(runtime, store, true)).toBeNull()

@@ -22,7 +22,7 @@ import { resolvePluginHostEntryPath } from '../plugins/workers/plugin-host-proce
 import { applyPluginConsent, revokePluginConsent } from '../plugins/plugin-enablement'
 import { clearRemovedPluginSettings } from '../plugins/plugin-removal-settings'
 import { clearPluginFrameStorage } from '../plugins/panels/plugin-frame-guest-sessions'
-import { bindPluginRpcServices } from './main-process-plugin-rpc'
+import { bindDesktopPluginRpcServices } from './main-process-plugin-rpc-desktop'
 import { bindPluginDesktopViews } from '../plugins/view/plugin-view-desktop-binding'
 import {
   normalizePluginConsents,
@@ -244,7 +244,7 @@ export async function initializeMainProcessPlugins(runtime: OrcaRuntimeService):
   })
   // Bound here, not in the IPC handlers: a headless serve never opens a window to register them.
   const pluginDelegate = bindPluginRuntime(pluginService, runtime, agentHookServer, ALL_RPC_METHODS)
-  bindPluginRpcServices(store, pluginService, {
+  bindDesktopPluginRpcServices(store, pluginService, {
     marketplace: state.pluginMarketplaceService,
     installer: state.pluginMarketplaceInstaller
   })
