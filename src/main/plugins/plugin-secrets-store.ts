@@ -1,10 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { guardedSafeStorage as safeStorage } from '../host/safe-storage-availability'
-import {
-  assessSecretProtection,
-  type SecretProtectionAssessment
-} from '../host/electron-secret-store'
+import { getSecretStore } from '../../shared/secret-store'
+import type { SecretProtectionAssessment } from '../host/electron-secret-store'
 import { isUnreadableError, writeSecureFile } from '../../shared/secure-storage/secure-file'
 import {
   PLUGIN_STORAGE_KEY_LIMIT,
@@ -24,9 +21,23 @@ export type PluginSecretsResult<T> = { ok: true; value: T } | { ok: false; error
 
 const UNREADABLE_VAULT_ERROR = 'secret vault exists but could not be read; refusing to overwrite it'
 
-/** At-rest protection plugin secrets get; backs the `secrets.protection` host method. */
+// Fork: seal through the host's installed SecretStore (Electron safeStorage on the desktop, the
+// plain-Node serve host's own sealed key file), so this module imports no Electron.
+const safeStorage = {
+  isEncryptionAvailable: () => getSecretStore().isEncryptionAvailable(),
+  encryptString: (plainText: string) => getSecretStore().encryptString(plainText),
+  decryptString: (cipher: Buffer) => getSecretStore().decryptString(cipher)
+}
+
+/** At-rest protection plugin secrets get; backs the `secrets.protection` host method. A reported
+ *  gap with sealing still available is `obfuscated` (Linux basic_text, a key kept beside the data). */
 export function pluginSecretsProtection(): SecretProtectionAssessment {
-  return assessSecretProtection()
+  const store = getSecretStore()
+  const gap = store.describeProtectionGap()
+  if (gap === null) {
+    return { level: 'os', gap: null }
+  }
+  return { level: store.isEncryptionAvailable() ? 'obfuscated' : 'unavailable', gap }
 }
 
 export class PluginSecretsStore {
@@ -94,12 +105,13 @@ export class PluginSecretsStore {
     if (!safeStorage.isEncryptionAvailable()) {
       return { ok: false, error: 'OS-backed encryption is unavailable; secret not stored' }
     }
-    // Why: Linux basic_text seals with a built-in key, which is plaintext to anyone reading the file.
-    if (pluginSecretsProtection().level === 'obfuscated') {
+    // Why: a seal whose key sits beside the data (Linux basic_text, a headless host's key file) is
+    // plaintext to anyone reading the account; third-party secrets never go there.
+    const protection = pluginSecretsProtection()
+    if (protection.level === 'obfuscated') {
       return {
         ok: false,
-        error:
-          'OS keyring is unavailable (Linux basic_text backend); secret not stored. Install and unlock gnome-keyring or kwallet, then restart Orca.'
+        error: `OS keyring protection is weak; secret not stored. ${protection.gap}`
       }
     }
     const file = this.read()
