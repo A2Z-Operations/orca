@@ -6,7 +6,6 @@ import {
   assignClaudePaneAccount,
   getClaudePaneAccount,
   listClaudePaneAccounts,
-  recordClaudePaneAccount,
   rememberClaudeSessionAssignment
 } from '../../claude-accounts/claude-pane-account-registry'
 import {
@@ -29,6 +28,7 @@ import {
   claudeAccountUsageWindows
 } from '../../claude-accounts/claude-account-usage-windows'
 import { getSelectedClaudeAccountIdForTarget } from '../../claude-accounts/runtime-selection'
+import { recordInferredClaudePaneAccount } from '../../ipc/pty/host-env/claude-pane-slot-adoption'
 import { getPtyIdForPaneKey, ptyPaneKey } from '../../ipc/pty/pane/key-state'
 import { listRegisteredPtys } from '../../memory/pty-registry'
 import type { Store } from '../../persistence/loading-store/store'
@@ -65,7 +65,9 @@ export function createProviderClaudeSessionMover(
         rateLimits,
         accounts: claudeAccounts,
         hooks: agentHookServer,
-        registry: { list: listClaudePaneAccounts, record: recordClaudePaneAccount },
+        // Why the adopting record: a transcript-inferred pane still runs on the slot its shell minted;
+        // a row without it is what the prune reads as "unused".
+        registry: { list: listClaudePaneAccounts, record: recordInferredClaudePaneAccount },
         resolvePaneKey: (ptyId) => ptyPaneKey.get(ptyId) ?? null,
         resolvePtyIdForPaneKey: (paneKey) => getPtyIdForPaneKey(paneKey) ?? null,
         resolveWorktreeId: (ptyId) =>

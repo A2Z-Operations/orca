@@ -177,7 +177,7 @@ export const ACCOUNT_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'Writes the host setting behind Settings › Accounts › Claude › "Bill Claude through a local auth proxy" (accounts.setClaudeAuthProxy). Default on.',
       "On: each Claude pane talks to a loopback proxy that sets the bearer for the account assigned to that pane. Off: today's behaviour, CLAUDE_CONFIG_DIR only.",
-      '--status prints the live listener (accounts.claudeAuthProxyStatus): port, slot → account, requests in the last hour, and the last error. It does not change the setting.',
+      '--status prints the live listener (accounts.claudeAuthProxyStatus): port, slot → account, requests in the last hour, and the last error. A pure read: it changes neither the setting nor the slot table.',
       'With --environment the setting is written on that paired Orca server. A user-set ANTHROPIC_BASE_URL is left unchanged.'
     ],
     examples: [

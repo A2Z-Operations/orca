@@ -1,17 +1,13 @@
 import { join } from 'node:path'
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
 import { getOrcaUserDataPath } from '../../codex/configuration/homes/codex-home-paths'
-import { listRegisteredPtys } from '../../memory/pty-registry'
 import {
   readClaudeOAuthCredentials,
   type ClaudeOAuthCredentialReadOptions
 } from '../../rate-limits/claude-oauth-credentials'
 import { refreshClaudeOAuthAccessToken } from '../../rate-limits/claude-oauth-refresh'
 import { getClaudeProfileRouter } from '../claude-profile-installed-router'
-import {
-  listClaudePaneAccounts,
-  setClaudePaneProxySlotReleaser
-} from '../claude-pane-account-registry'
+import { setClaudePaneProxySlotReleaser } from '../claude-pane-account-registry'
 import {
   claudePaneAccountPersistence,
   createClaudePaneAccountFileStore,
@@ -22,9 +18,7 @@ import { createClaudeAuthProxy, type ClaudeAuthProxy } from './claude-auth-proxy
 import { createClaudeAuthProxyAccountLogObserver } from '../claude-account-log'
 import { setClaudeAuthProxyStatusReader } from '../claude-account-list-extras'
 import {
-  bindClaudeAuthProxySlotToPty,
   claudeAuthProxySlotModel,
-  claudeAuthProxySlotShouldPrune,
   forgetClaudeAuthProxySlotOwner,
   noteClaudeAuthProxySlotAllocated,
   resetClaudeAuthProxySlotOwners
@@ -134,45 +128,8 @@ export function releaseOwnClaudeAuthProxySlot(slot: string): void {
   getClaudeAuthProxy()?.releaseSlot(slot)
 }
 
-function liveClaudeAuthProxyPtyIds(): Set<string> {
-  const live = new Set<string>()
-  for (const pty of listRegisteredPtys()) {
-    live.add(pty.ptyId)
-  }
-  for (const record of listClaudePaneAccounts()) {
-    live.add(record.ptyId)
-  }
-  return live
-}
-
-/** Drops a slot whose PTY is gone, and an unbound slot older than the spawn grace. */
-function pruneClaudeAuthProxySlots(now = Date.now()): void {
-  const current = getClaudeAuthProxy()
-  if (!current) {
-    return
-  }
-  const live = liveClaudeAuthProxyPtyIds()
-  const referenced = new Map<string, string>()
-  for (const record of listClaudePaneAccounts()) {
-    if (record.proxySlot) {
-      referenced.set(record.proxySlot, record.ptyId)
-    }
-  }
-  for (const { slot } of current.status().slots) {
-    const panePty = referenced.get(slot)
-    if (panePty) {
-      bindClaudeAuthProxySlotToPty(slot, panePty, now)
-      continue
-    }
-    if (!claudeAuthProxySlotShouldPrune(slot, live, now)) {
-      continue
-    }
-    releaseOwnClaudeAuthProxySlot(slot)
-  }
-}
-
+/** A pure read. Nothing here changes the slot table: pruning lives in claude-auth-proxy-prune.ts. */
 export function claudeAuthProxyStatus(): ClaudeAuthProxyStatus {
-  pruneClaudeAuthProxySlots()
   return (
     getClaudeAuthProxy()?.status() ?? {
       listening: false,

@@ -2,6 +2,8 @@
 
 One line per fork build, newest first. Build recipe: `scripts/orca-fork/rebuild.sh` in the BLOWzer repo; version rule: a prerelease of the next upstream patch.
 
+- `1.4.256-blowzer.4` (fork PR `fix/proxy-status-prunes-live-slots`, refs #2) — auth-proxy slot hygiene: `orca account auth-proxy --status` (and every other read of `accounts.claudeAuthProxyStatus`) is a pure read; slot pruning runs once on its own, shortly after a slot is minted or a PTY exits, and, before dropping a slot, reads the live PTYs' environments and keeps (binds, records) any slot a running shell still carries; a transcript-inferred pane row (a typed `claude --resume`) records the slot its shell minted at spawn. Fixes the Leader "Not logged in" cut-off of 2026-11-10.
+
 - `1.4.256-blowzer.2` (fork PR `fix/updater-guard-after-255`, refs #2) — updater guard restored after the v1.4.255 merge (self-built apps never check for, download or install stock releases). Upstream moved `updater-setup.ts` into `updater/lifecycle/`; the merge kept upstream's copy without the fork's `updaterDisabledReason()` hunks, so `1.4.256-blowzer.1` offered "Update Available — Orca v1.4.256". The guard is back in `lifecycle/updater-setup.ts` (menu check, programmatic check, and the packaged configure path before the autoUpdater is touched) with a lifecycle test (`updater.disabled-build.test.ts`) that a disabled build never calls the autoUpdater and sends no status.
 
 - v1.4.255 merge lessons — when upstream moves a file the fork patches, grep the old path's fork hunks (`git log -p <merge-base>..blowzer/fork-only -- <old path>`) against the new path before closing the merge; a clean three-way merge on the new path says nothing about hunks that lived on the old one.
