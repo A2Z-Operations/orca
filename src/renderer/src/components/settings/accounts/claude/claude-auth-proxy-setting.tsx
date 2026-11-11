@@ -21,7 +21,7 @@ function ClaudeAuthProxyHealthLine({
   const view = claudeAuthProxyHealthView(health, now)
   const unknown = t(
     'accounts.claude.authProxy.healthUnknownSlots',
-    'Requests from unknown slots: {{count}}',
+    'Requests from unknown slots after startup: {{count}}',
     { count: view.unknownSlotRequests }
   )
   const error = view.lastError

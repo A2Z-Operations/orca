@@ -25,6 +25,8 @@ export type ClaudePaneAccountPersistence = {
   save: (record: ClaudePaneAccountRecord) => void
   forget: (ptyId: string) => void
   read: (ptyId: string) => PersistedClaudePaneAccount | null
+  /** Every row, newest launch first. The listener re-registers their slots when it starts. */
+  rows: () => PersistedClaudePaneAccount[]
   proxyPort: () => number | null
   setProxyPort: (port: number) => void
 }
@@ -136,6 +138,9 @@ export function createClaudePaneAccountFileStore(options: {
     read(ptyId) {
       const row = load().panes[ptyId]
       return row ? { ...row } : null
+    },
+    rows() {
+      return Object.values(load().panes).map((row) => ({ ...row }))
     },
     proxyPort() {
       return load().proxyPort ?? null

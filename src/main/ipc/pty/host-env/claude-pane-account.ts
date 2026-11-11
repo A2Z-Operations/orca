@@ -5,7 +5,10 @@ import {
   recordClaudePaneAccount
 } from '../../../claude-accounts/claude-pane-account-registry'
 import { claudePaneAccountPersistence } from '../../../claude-accounts/claude-pane-account-persistence'
-import { getClaudeAuthProxy } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
+import {
+  getClaudeAuthProxy,
+  noteClaudePaneReattached
+} from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import type { ClaudeEnvPatch } from '../../../claude-accounts/environment'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth-service'
 import {
@@ -112,6 +115,8 @@ function recordReattachedFromPersisted(
   if (!proxySlot) {
     adoptSlotFromProcessEnv(args, args.ptyId, billed)
   }
+  // Row recorded and slot (if any) adopted: this persisted pane is back.
+  noteClaudePaneReattached(args.ptyId)
   return true
 }
 

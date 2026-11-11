@@ -16,13 +16,25 @@ export function createClaudeAuthProxyRequestLog(
     unknownSlot: boolean
   }) => void
 ): {
-  observe: (
+  /** A request on a known slot (or no slot), with the status the client got. */
+  observe: (method: string, upstreamPath: string, status: number, accountId: string | null) => void
+  /**
+   * A request the listener refused for a slot it does not map. During the startup grace it is the
+   * expected noise of a restart and is not counted; after it the count is the warning Settings and
+   * the CLI show. Neither sets `lastError`: that is the last upstream answer, and this never went up.
+   */
+  observeUnknownSlot: (
     method: string,
     upstreamPath: string,
     status: number,
-    accountId: string | null,
-    unknownSlot: boolean
+    startupGrace: boolean
   ) => void
+  /**
+   * A request with no `/p/<slot>/` prefix, refused before upstream. Nothing this host launches
+   * sends one, so it is neither the stale-slot count nor `lastError`; the account log still gets
+   * its `proxy-error` row so a mispointed client is diagnosable.
+   */
+  observeNoSlot: (method: string, upstreamPath: string, status: number) => void
   snapshot: () => Pick<
     ClaudeAuthProxyStatus,
     'requestsLastHour' | 'unknownSlotRequests' | 'lastError'
@@ -44,20 +56,28 @@ export function createClaudeAuthProxyRequestLog(
   }
 
   return {
-    observe(method, upstreamPath, status, accountId, unknownSlot) {
+    observe(method, upstreamPath, status, accountId) {
       const at = now()
       log(`${method} ${upstreamPath} ${status} ${accountId ?? '-'}`)
-      onRequest?.({ method, path: upstreamPath, status, accountId, unknownSlot })
+      onRequest?.({ method, path: upstreamPath, status, accountId, unknownSlot: false })
       if (accountId) {
         requests.push({ accountId, at })
         prune(at)
       }
-      if (unknownSlot) {
-        unknownSlotRequests += 1
-      }
       if (status >= 400) {
         lastError = { at, method, path: upstreamPath, status, accountId }
       }
+    },
+    observeUnknownSlot(method, upstreamPath, status, startupGrace) {
+      log(`${method} ${upstreamPath} ${status} -`)
+      onRequest?.({ method, path: upstreamPath, status, accountId: null, unknownSlot: true })
+      if (!startupGrace) {
+        unknownSlotRequests += 1
+      }
+    },
+    observeNoSlot(method, upstreamPath, status) {
+      log(`${method} ${upstreamPath} ${status} -`)
+      onRequest?.({ method, path: upstreamPath, status, accountId: null, unknownSlot: false })
     },
     snapshot() {
       const at = now()

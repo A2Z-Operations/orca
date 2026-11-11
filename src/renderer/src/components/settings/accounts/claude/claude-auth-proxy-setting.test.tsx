@@ -35,7 +35,7 @@ describe('ClaudeAuthProxySetting health', () => {
     })
     const line = screen.getByTestId('claude-auth-proxy-health')
     expect(line.dataset.warn).toBe('true')
-    expect(line.textContent).toContain('Requests from unknown slots: 3')
+    expect(line.textContent).toContain('Requests from unknown slots after startup: 3')
     expect(line.textContent).toContain('Last upstream error: 429 POST /v1/messages, 9 minutes ago')
   })
 

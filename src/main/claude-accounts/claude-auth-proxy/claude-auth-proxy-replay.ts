@@ -13,7 +13,6 @@ export type ClaudeAuthProxyExchange = {
   method: string
   upstreamPath: string
   accountId: string | null
-  unknownSlot: boolean
   headers: OutgoingHttpHeaders
   target: URL
   httpAgent: HttpAgent

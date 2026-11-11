@@ -22623,7 +22623,7 @@
       "authProxy": {
         "settingTitle": "Bill Claude through a local auth proxy",
         "settingDescription": "A running Claude session can change accounts without restarting. The next request uses the new account.",
-        "healthUnknownSlots": "Requests from unknown slots: {{count}}",
+        "healthUnknownSlots": "Requests from unknown slots after startup: {{count}}",
         "healthLastError": "Last upstream error: {{status}} {{method}} {{path}}, {{age}}",
         "healthNoError": "No upstream errors"
       },

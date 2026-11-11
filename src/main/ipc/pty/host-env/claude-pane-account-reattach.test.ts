@@ -17,8 +17,18 @@ import {
   setup,
   state
 } from '../../../claude-accounts/claude-session-mover-test-fixture'
+import type * as ProxyHostModule from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
+import { noteClaudePaneReattached } from '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import { recordClaudePaneAccountForSpawn } from './claude-pane-account'
 import type { ReattachSlotProxy } from './claude-pane-proxy-slot-recovery'
+
+vi.mock(
+  '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host',
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof ProxyHostModule>()
+    return { ...actual, noteClaudePaneReattached: vi.fn() }
+  }
+)
 
 const SLOT = 'a'.repeat(32)
 const HOST = { runtime: 'host' as const }
@@ -33,6 +43,7 @@ function memoryPersistence(rows: PersistedClaudePaneAccount[]): ClaudePaneAccoun
       panes.delete(ptyId)
     },
     read: (ptyId) => panes.get(ptyId) ?? null,
+    rows: () => [...panes.values()],
     proxyPort: () => null,
     setProxyPort: () => {}
   }
@@ -104,6 +115,7 @@ describe('reattach keeps the proxy slot', () => {
   afterEach(() => {
     installClaudePaneAccountPersistence(null)
     _internals.reset()
+    vi.mocked(noteClaudePaneReattached).mockClear()
     vi.useRealTimers()
   })
 
@@ -123,6 +135,25 @@ describe('reattach keeps the proxy slot', () => {
     reattach(proxy)
     expect(proxy.adoptSlot).toHaveBeenCalledWith(SLOT, 'b')
     expect(getClaudePaneAccount('pty-1')?.proxySlot).toBe(SLOT)
+  })
+
+  it('tells the listener a persisted pane is back, so its startup grace can end', () => {
+    installClaudePaneAccountPersistence(
+      memoryPersistence([persistedRow({ proxySlot: undefined, proxyPort: undefined })])
+    )
+    reattach(fakeProxy(4100))
+    expect(noteClaudePaneReattached).toHaveBeenCalledTimes(1)
+    expect(noteClaudePaneReattached).toHaveBeenCalledWith('pty-1')
+    // Already in the registry: a second reattach of the same PTY is not a second return.
+    reattach(fakeProxy(4100))
+    expect(noteClaudePaneReattached).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not report a pane that had no persisted row', () => {
+    installClaudePaneAccountPersistence(memoryPersistence([]))
+    reattach(fakeProxy(4100))
+    expect(getClaudePaneAccount('pty-1')).toMatchObject({ accountId: 'c' })
+    expect(noteClaudePaneReattached).not.toHaveBeenCalled()
   })
 
   it('reattach → proxySlot present → proxy strategy chosen', async () => {

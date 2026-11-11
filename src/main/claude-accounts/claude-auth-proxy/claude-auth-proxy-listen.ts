@@ -1,7 +1,22 @@
+import { randomBytes } from 'node:crypto'
 import type { Server } from 'node:http'
 
 /** Slot ids are 16 random bytes in hex. A recovered id must still look like one to be adopted. */
 export const CLAUDE_AUTH_PROXY_SLOT_ID = /^[0-9a-f]{32}$/
+/** 16 bytes: a slot id is an unguessable capability, not a sequential id. */
+const SLOT_ID_BYTES = 16
+
+/** Mints a fresh slot into `slots` for `accountId` and returns it. */
+export function allocateClaudeAuthProxySlot(slots: Map<string, string>, accountId: string): string {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const slot = randomBytes(SLOT_ID_BYTES).toString('hex')
+    if (!slots.has(slot)) {
+      slots.set(slot, accountId)
+      return slot
+    }
+  }
+  throw new Error('claude auth proxy could not allocate a slot')
+}
 
 function listenOnce(server: Server, port: number, host: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {

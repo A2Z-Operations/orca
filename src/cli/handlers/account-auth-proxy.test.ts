@@ -136,7 +136,7 @@ describe('account auth-proxy surface', () => {
     expect(text).toContain('Claude auth-proxy: 127.0.0.1:43121')
     expect(text).toContain('  slot-a → account-a')
     expect(text).toContain('  requests last hour: account-a 4')
-    expect(text).toContain('! unknown slots: 2')
+    expect(text).toContain('! unknown slots after startup: 2')
     expect(text).toContain('  last error: 429 POST /v1/messages account-a')
     expect(text).toContain('  health: needs attention')
   })
@@ -164,7 +164,7 @@ describe('account auth-proxy surface', () => {
     callMock.mockResolvedValue({ id: 'test', ok: true, result: status, _meta: { runtimeId: 'r' } })
     await ACCOUNT_HANDLERS['account auth-proxy'](context(flags))
     const recent = String(logSpy.mock.calls[0]?.[0])
-    expect(recent).toContain('  unknown slots: 0')
+    expect(recent).toContain('  unknown slots after startup: 0')
     expect(recent).toContain('! last error: 429 POST /v1/messages - (12m ago)')
     expect(recent).toContain('  health: needs attention')
     callMock.mockResolvedValue({

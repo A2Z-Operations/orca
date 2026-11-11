@@ -15,6 +15,10 @@ import {
 } from '../claude-pane-account-persistence'
 import { noteUserAnthropicBaseUrl } from './claude-auth-proxy-note'
 import { createClaudeAuthProxy, type ClaudeAuthProxy } from './claude-auth-proxy'
+import {
+  adoptPersistedClaudeAuthProxySlots,
+  type PersistedSlotAdoption
+} from './claude-auth-proxy-persisted-slots'
 import { createClaudeAuthProxyAccountLogObserver } from '../claude-account-log'
 import { setClaudeAuthProxyStatusReader } from '../claude-account-list-extras'
 import {
@@ -31,6 +35,8 @@ export type ClaudeAuthSnapshotIdentity = {
 
 let proxy: ClaudeAuthProxy | null = null
 let pending: Promise<void> | null = null
+/** The persisted panes this listener re-registered at start, until each has reattached. */
+let persistedSlots: PersistedSlotAdoption | null = null
 /** Account id → folder, for a host whose profile router is not installed (the WSL guest). */
 const accountConfigDirs = new Map<string, string>()
 
@@ -73,6 +79,16 @@ export function startClaudeAuthProxy(): Promise<void> {
     .start()
     .then(() => {
       proxy = created
+      // Before any PTY reattach: a restored pane's first request must find its slot registered.
+      persistedSlots = adoptPersistedClaudeAuthProxySlots(
+        created,
+        claudePaneAccountPersistence()?.rows() ?? []
+      )
+      if (persistedSlots.adopted.length > 0) {
+        console.info(
+          `[claude-auth-proxy] re-registered ${persistedSlots.adopted.length} persisted slot(s)`
+        )
+      }
       setClaudePaneProxySlotReleaser((slot) => releaseOwnClaudeAuthProxySlot(slot))
       setClaudeAuthProxyStatusReader(() => created.status())
       const port = created.port()
@@ -108,6 +124,7 @@ export async function stopClaudeAuthProxy(): Promise<void> {
   }
   const current = proxy
   proxy = null
+  persistedSlots = null
   // Teardown after this point must not erase the rows the next start reattaches from.
   installClaudePaneAccountPersistence(null)
   accountConfigDirs.clear()
@@ -121,6 +138,15 @@ export async function stopClaudeAuthProxy(): Promise<void> {
 
 export function getClaudeAuthProxy(): ClaudeAuthProxy | null {
   return proxy
+}
+
+/**
+ * A PTY with a persisted row reattached. Once every persisted pane is back, the listener's
+ * startup grace ends and an unknown slot is answered as stale. No listener, or no persisted rows
+ * for this listener: nothing to note.
+ */
+export function noteClaudePaneReattached(ptyId: string): void {
+  persistedSlots?.reattached(ptyId)
 }
 
 export function releaseOwnClaudeAuthProxySlot(slot: string): void {
