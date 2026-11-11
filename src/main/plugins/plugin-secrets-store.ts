@@ -40,6 +40,16 @@ export function pluginSecretsProtection(): SecretProtectionAssessment {
   return { level: store.isEncryptionAvailable() ? 'obfuscated' : 'unavailable', gap }
 }
 
+/** The desktop's refusal is the sentence it always showed: there `obfuscated` has one source, the
+ *  Linux basic_text backend. A plain-Node host (orcad, no Electron runtime) names its own gap, the
+ *  key file beside the data, so the message never sends a headless operator after gnome-keyring. */
+export function weakSealRefusal(gap: string | null): string {
+  if (process.versions.electron) {
+    return 'OS keyring is unavailable (Linux basic_text backend); secret not stored. Install and unlock gnome-keyring or kwallet, then restart Orca.'
+  }
+  return `OS keyring protection is weak; secret not stored. ${gap ?? ''}`.trimEnd()
+}
+
 export class PluginSecretsStore {
   private readonly filePath: string
 
@@ -109,10 +119,7 @@ export class PluginSecretsStore {
     // plaintext to anyone reading the account; third-party secrets never go there.
     const protection = pluginSecretsProtection()
     if (protection.level === 'obfuscated') {
-      return {
-        ok: false,
-        error: `OS keyring protection is weak; secret not stored. ${protection.gap}`
-      }
+      return { ok: false, error: weakSealRefusal(protection.gap) }
     }
     const file = this.read()
     if (!file) {
