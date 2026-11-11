@@ -40,9 +40,14 @@ So the gap is orcad only. Issue #19's hosts run orcad.
 - **Paths / version**: `getAppEnvironment()` (`orcad-host-adapters.ts`): `getPath('userData')`,
   `getAppPath()` = orcad install root (where `orcad-server.js` and its forked children live),
   `getVersion()`, `isPackaged() === true`.
-- **Secrets / settings**: `prepareOrcadSecretStoreAndMigrate` runs before the Store; the plugin
-  `storage`/`secrets`/`settings` host calls are file-backed under `getPluginsDataDir(userData)`
-  (`plugin-storage-store`, `plugin-secrets-store`, declared settings) and need no Electron.
+- **Secrets / settings**: `prepareOrcadSecretStoreAndMigrate` runs before the Store and installs
+  orcad's `SecretStore` (`shared/secret-store.ts`, a sealed key file beside the data). The plugin
+  `storage`/`settings` host calls are file-backed under `getPluginsDataDir(userData)` and need no
+  Electron. `plugin-secrets-store.ts` was the one Electron import in the plugin host path
+  (`electron.safeStorage` directly); it now seals through the installed `SecretStore`. On orcad
+  that seal reports a gap (key beside the data), which reads as `obfuscated`: `secrets.set` is
+  refused with the gap text and `secrets.protection` answers `unavailable`, as the plugin API
+  documents; `secrets.get` still decrypts what an earlier host sealed.
 - **Cleanup**: `registerCleanup(…)`, run in reverse at stop.
 
 ## What `initializeMainProcessPlugins` needs, and what of it is Electron
@@ -62,6 +67,8 @@ So the gap is orcad only. Issue #19's hosts run orcad.
 
 Hard constraint: `build-orcad.mjs` fails the build if any module in the orcad graph imports
 `electron`, so the new composition root must import only the electron-free modules above.
+Verified by bundling `orcad-server.js` with `buildOrcadEntry` (9128 modules, zero electron /
+node:sqlite importers) and the `plugin-host-entry.js` child (248 modules, 855 KB, zero).
 
 ## Renderer-only contributions (reported unavailable, never a crash)
 
@@ -75,6 +82,7 @@ Hard constraint: `build-orcad.mjs` fails the build if any module in the orcad gr
 | `plugins.devInspect` (frame DevTools)                                                      | "Plugin frame DevTools are only available in the Orca desktop app"                                                                                                                                                                                                                                    |
 | preload / renderer relay (`getPluginHostRendererActions`)                                  | null on headless by design                                                                                                                                                                                                                                                                            |
 | `notifications.*` → `runtime.dispatchPluginNotification`                                   | runtime-level (push to paired devices); not a window call                                                                                                                                                                                                                                             |
+| `secrets.set` / `secrets.protection`                                                       | refused / `unavailable` on orcad (the seal's key sits beside the data); `secrets.get`, `storage.*`, `settings.*` work                                                                                                                                                                                 |
 
 Plus one explicit line: when an approved plugin declares panels, custom editors, status bar items
 or fonts on a headless host, the orcad binding writes a `warn` line to that plugin's log buffer
