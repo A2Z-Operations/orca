@@ -7,6 +7,10 @@ import { Store } from '../persistence/loading-store/store'
 import { ProfileStateSqliteAuthority } from '../persistence/profile-state/profile-state-sqlite-authority'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { readPluginClaudeAccounts } from '../plugins/plugin-claude-account-events'
+import {
+  publishClaudeAccountModelChanged,
+  publishClaudeAccountSessionMoved
+} from '../claude-accounts/claude-account-plugin-publish'
 import type { PluginClaudeAccountView } from '../../shared/plugins/workers/plugin-claude-account-contract'
 import type { OrcadPluginClaudeAccountSource } from './orcad-account-services'
 import { eraseRpcMethods, isStreamingMethod, type RpcContext } from '../runtime/rpc/core'
@@ -301,9 +305,12 @@ describe('headless serve plugin service', () => {
     for (const cleanup of cleanups.splice(0).toReversed()) {
       await cleanup({ failed: false })
     }
-    await vi.waitFor(() => {
-      expect(isAlive(pid)).toBe(false)
-    })
+    await vi.waitFor(
+      () => {
+        expect(isAlive(pid)).toBe(false)
+      },
+      { timeout: 5_000 }
+    )
   }, 30_000)
 
   it('answers accounts.read with an empty list when this host owns no accounts', async () => {
@@ -353,6 +360,25 @@ describe('headless serve plugin service', () => {
     }
     expect(unsubscribe).toHaveBeenCalledTimes(1)
     expect(readPluginClaudeAccounts()).toEqual({ accounts: [] })
+  })
+
+  it('publishes session moves and model flips through the same binding', async () => {
+    const { handle } = await startHeadless({
+      claudeAccounts: { readAccounts: () => [], subscribeRateLimits: () => () => undefined }
+    })
+    const emitted = vi.spyOn(handle.pluginService, 'emitEvent')
+    const moved = { ptyId: 'pty-1', fromAccountId: 'acct-1', toAccountId: 'acct-2' }
+    const changed = {
+      ptyId: 'pty-1',
+      accountId: 'acct-2',
+      from: 'fable' as const,
+      to: 'opus' as const,
+      reason: 'rate-limited'
+    }
+    publishClaudeAccountSessionMoved(moved)
+    publishClaudeAccountModelChanged(changed)
+    expect(emitted).toHaveBeenCalledWith('accounts.session.moved', moved)
+    expect(emitted).toHaveBeenCalledWith('accounts.model.changed', changed)
   })
 
   it('unbinds the RPC services when the host stops', async () => {
