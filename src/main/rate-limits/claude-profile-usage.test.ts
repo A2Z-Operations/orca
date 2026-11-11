@@ -19,7 +19,9 @@ vi.mock('../claude-accounts/claude-profile-installed-router', () => ({
 }))
 vi.mock('./claude-oauth-usage-request', () => ({ fetchClaudeOAuthUsage: calls.usage }))
 const uncGate = vi.hoisted(() => ({
-  blocked: vi.fn(async (_path: string) => null as { distro: string; state: 'stopped' } | null)
+  blocked: vi.fn<(path: string) => Promise<{ distro: string; state: 'stopped' } | null>>(
+    async () => null
+  )
 }))
 vi.mock('../wsl/filesystem/wsl-unc-access-gate', () => ({
   blockedWslDistroForPath: uncGate.blocked
