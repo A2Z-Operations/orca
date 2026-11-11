@@ -72,9 +72,15 @@ export function headlessUnavailableLine(unavailable: readonly string[]): string 
   )
 }
 
-/** Resolve the plugin host entry beside the orcad bundle; the desktop out/main layout is the fallback. */
-export function orcadPluginHostEntryPath(appPath = getAppEnvironment().getAppPath()): string {
-  return resolvePluginHostEntryPath(appPath, false)
+/** The plugin host entry beside the orcad bundle (the desktop out/main layout is the fallback).
+ *  Empty when this process has no bundle root: workers then fail per plugin, never the host. */
+export function orcadPluginHostEntryPath(appPath?: string): string {
+  try {
+    return resolvePluginHostEntryPath(appPath ?? getAppEnvironment().getAppPath(), false)
+  } catch (error) {
+    console.warn('[orcad plugins] no plugin host entry on this host:', error)
+    return ''
+  }
 }
 
 export function startOrcadPlugins(input: {
