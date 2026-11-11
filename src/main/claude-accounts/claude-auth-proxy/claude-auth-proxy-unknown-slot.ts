@@ -51,9 +51,7 @@ export function refuseClaudeAuthProxyUnknownSlot(
   res.writeHead(status, {
     'content-type': 'text/plain; charset=utf-8',
     'content-length': String(Buffer.byteLength(body)),
-    ...(startupGrace
-      ? { 'retry-after': String(CLAUDE_AUTH_PROXY_UNKNOWN_SLOT_RETRY_AFTER_S) }
-      : {})
+    ...(startupGrace ? { 'retry-after': String(CLAUDE_AUTH_PROXY_UNKNOWN_SLOT_RETRY_AFTER_S) } : {})
   })
   res.end(body)
   // Drain the body so the keep-alive socket is reusable.

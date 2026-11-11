@@ -22,10 +22,13 @@ import { noteClaudePaneReattached } from '../../../claude-accounts/claude-auth-p
 import { recordClaudePaneAccountForSpawn } from './claude-pane-account'
 import type { ReattachSlotProxy } from './claude-pane-proxy-slot-recovery'
 
-vi.mock('../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host', async (importOriginal) => {
-  const actual = await importOriginal<typeof ProxyHostModule>()
-  return { ...actual, noteClaudePaneReattached: vi.fn() }
-})
+vi.mock(
+  '../../../claude-accounts/claude-auth-proxy/claude-auth-proxy-host',
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof ProxyHostModule>()
+    return { ...actual, noteClaudePaneReattached: vi.fn() }
+  }
+)
 
 const SLOT = 'a'.repeat(32)
 const HOST = { runtime: 'host' as const }

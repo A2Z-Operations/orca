@@ -60,7 +60,9 @@ describe('readClaudeAuthProxyAccessToken', () => {
 const SLOT_A = 'a'.repeat(32)
 const SLOT_B = 'b'.repeat(32)
 
-function persistedRow(overrides: Partial<PersistedClaudePaneAccount> = {}): PersistedClaudePaneAccount {
+function persistedRow(
+  overrides: Partial<PersistedClaudePaneAccount> = {}
+): PersistedClaudePaneAccount {
   return {
     ptyId: 'pty-1',
     paneKey: null,
