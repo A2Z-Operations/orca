@@ -1,9 +1,9 @@
-import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
+import type { AgentStatusIpcPayload } from '../../shared/agent-status/contracts/agent-status-ipc-payload'
 import {
   AGENT_PROMPT_BRACKETED_PASTE_END,
   AGENT_PROMPT_BRACKETED_PASTE_START,
   AGENT_PROMPT_SUBMIT
-} from '../../shared/agent-prompt-injection'
+} from '../../shared/agent-launch/startup/agent-prompt-injection'
 import { getDefaultSettings } from '../../shared/constants'
 import {
   createResumeMoveStrategy,
@@ -12,7 +12,7 @@ import {
 import { CLAUDE_SESSION_MOVE_HANDOFF_TIMEOUT_MS } from './claude-session-move-handoff'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { account, setup, state, limits, PANE_1, PANE_2 } from './claude-session-mover-test-fixture'
-import { makePaneKey } from '../../shared/stable-pane-id'
+import { makePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import {
   CLAUDE_POOL_REBALANCE_COOLDOWN_MS,
   CLAUDE_SESSION_MOVE_BACKGROUND_WAIT_MS,

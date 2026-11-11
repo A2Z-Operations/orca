@@ -7,9 +7,9 @@ import { Store } from '../persistence/loading-store/store'
 import { ProfileStateSqliteAuthority } from '../persistence/profile-state/profile-state-sqlite-authority'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { eraseRpcMethods, isStreamingMethod } from '../runtime/rpc/core'
-import { ACCOUNT_METHODS } from '../runtime/rpc/methods/accounts'
-import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
-import { getClaudeAgentViewService } from '../claude/agent-view-service'
+import { ACCOUNT_METHODS } from '../runtime/rpc/methods/accounts/accounts'
+import { installFakeAppEnvironment } from '../../../config/scripts/test-runtime/environment/vitest-host-ports-setup'
+import { getClaudeAgentViewService } from '../claude/agent-view/agent-view-service'
 import { createOrcadAccountServices } from './orcad-account-services'
 import { getClaudeAuthProxy } from '../claude-accounts/claude-auth-proxy/claude-auth-proxy-host'
 import {
@@ -124,7 +124,8 @@ describe('orcad account services', () => {
     const start = vi.spyOn(RateLimitService.prototype, 'start').mockImplementation(() => {})
     try {
       expect(create(store, false)).not.toBeNull()
-      expect(start).toHaveBeenCalledExactlyOnceWith({
+      // The services start the baseline timer; the policy then arms the headless flags.
+      expect(start).toHaveBeenLastCalledWith({
         fetchImmediately: true,
         pollWithoutWindow: true,
         pollInactiveClaude: true
@@ -180,34 +181,40 @@ describe('orcad account services', () => {
 
   it('follows usage settings and cannot restart polling after cleanup', async () => {
     const { store } = createRuntime()
+    // Every usage-driven feature off, including the default-on pool; nothing wants a reading.
     store.updateSettings({
       claudeSessionMover: 'off',
       claudeAutoSwitchEnabled: false,
+      claudeAccountPool: 'off',
       claudeModelPolicy: { enabled: false }
     })
     const start = vi.spyOn(RateLimitService.prototype, 'start').mockImplementation(() => {})
     const stop = vi.spyOn(RateLimitService.prototype, 'stop').mockImplementation(() => {})
     try {
       expect(create(store, false)).not.toBeNull()
-      expect(start).not.toHaveBeenCalled()
+      // Only the services' baseline timer: nothing wanted a headless reading.
+      expect(start).toHaveBeenCalledExactlyOnceWith({ fetchImmediately: false })
       store.updateSettings({ claudeSessionMover: 'move' }, { notifyListeners: true })
-      expect(start).toHaveBeenCalledExactlyOnceWith({
+      expect(start).toHaveBeenLastCalledWith({
         fetchImmediately: true,
         pollWithoutWindow: true,
         pollInactiveClaude: true
       })
-      store.updateSettings({ claudeSessionMover: 'off' }, { notifyListeners: true })
-      expect(stop).toHaveBeenCalledTimes(1)
-      store.updateSettings({ claudeAutoSwitchEnabled: true }, { notifyListeners: true })
       expect(start).toHaveBeenCalledTimes(2)
+      // Off returns to the baseline timer rather than stopping it.
+      store.updateSettings({ claudeSessionMover: 'off' }, { notifyListeners: true })
+      expect(start).toHaveBeenLastCalledWith({ fetchImmediately: false })
+      expect(stop).not.toHaveBeenCalled()
+      store.updateSettings({ claudeAutoSwitchEnabled: true }, { notifyListeners: true })
+      expect(start).toHaveBeenCalledTimes(4)
       const cleanup = cleanups.pop()
       expect(cleanup).toBeDefined()
       await cleanup?.({ failed: false })
-      expect(stop).toHaveBeenCalledTimes(2)
+      expect(stop).toHaveBeenCalledTimes(1)
       store.updateSettings({ claudeAutoSwitchEnabled: false }, { notifyListeners: true })
       store.updateSettings({ claudeSessionMover: 'move' }, { notifyListeners: true })
-      expect(start).toHaveBeenCalledTimes(2)
-      expect(stop).toHaveBeenCalledTimes(2)
+      expect(start).toHaveBeenCalledTimes(4)
+      expect(stop).toHaveBeenCalledTimes(1)
     } finally {
       start.mockRestore()
       stop.mockRestore()

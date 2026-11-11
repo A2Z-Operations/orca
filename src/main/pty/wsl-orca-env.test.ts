@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { isAbsolute } from 'node:path'
-import { getShellReadyWrapperRoot } from '../providers/local-pty-shell-ready-wrapper-root'
+import { getShellReadyWrapperRoot } from '../providers/local-pty/local-pty-shell-ready-wrapper-root'
 import {
   SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV,
   SETUP_AGENT_SEQUENCE_STARTUP_SCRIPT_ENV
-} from '../../shared/setup-agent-sequencing'
-import { addOrcaWslInteropEnv, stampWslOrchestrationCompatibilityHost } from './wsl-orca-env'
+} from '../../shared/agent-launch/startup/setup-agent-sequencing'
+import {
+  addOrcaWslInteropEnv,
+  stampWslOrchestrationCompatibilityHost
+} from './shell-startup/wsl-orca-env'
 import { CODEX_REMOTE_VIEWER_SSH_CONNECTION } from '../ipc/pty/host-env/remote-viewer-clipboard-env'
 
 describe('addOrcaWslInteropEnv', () => {
@@ -41,6 +44,7 @@ describe('addOrcaWslInteropEnv', () => {
     addOrcaWslInteropEnv(env)
 
     expect(env.ORCA_SHELL_READY_ROOT).toBe(getShellReadyWrapperRoot())
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the assertion above checked the variable is set.
     expect(isAbsolute(env.ORCA_SHELL_READY_ROOT as string)).toBe(true)
     // Translate the host wrapper path for guest access.
     expect(env.WSLENV?.split(':')).toContain('ORCA_SHELL_READY_ROOT/p')

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import type { ClaudeAccountLogEntry } from '../../shared/claude-account-log-types'
 import { listRotatedFiles } from '../observability/local-file-sink'
 import { CLAUDE_ACCOUNT_LOG_MAX_FILES, claudeAccountLogPath } from './claude-account-log'
@@ -40,9 +40,9 @@ function parseLines(raw: string): ClaudeAccountLogEntry[] {
 }
 
 /** Oldest first, at or after `since` and before `before`, the newest `limit` rows across the rotated files. */
-export function readClaudeAccountLog(
+export async function readClaudeAccountLog(
   options: { since?: number; before?: number; limit?: number; filePath?: string } = {}
-): { path: string; entries: ClaudeAccountLogEntry[] } {
+): Promise<{ path: string; entries: ClaudeAccountLogEntry[] }> {
   const path = options.filePath ?? claudeAccountLogPath()
   const limit = Math.min(
     Math.max(1, Math.floor(options.limit ?? CLAUDE_ACCOUNT_LOG_READ_DEFAULT_LIMIT)),
@@ -54,7 +54,7 @@ export function readClaudeAccountLog(
   for (const file of listRotatedFiles(path, CLAUDE_ACCOUNT_LOG_MAX_FILES)) {
     let raw: string
     try {
-      raw = readFileSync(file, 'utf8')
+      raw = await readFile(file, 'utf8')
     } catch {
       continue
     }

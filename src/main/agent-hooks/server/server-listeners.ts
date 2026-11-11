@@ -1,11 +1,11 @@
 import { cliWriterExecutionMatcher, type CliWriterExecutionMatches } from './cli-writer-observation'
-import { isTmuxInnerSubject } from '../../../shared/tmux-agent-hook-owner'
+import { isTmuxInnerSubject } from '../../../shared/tmux-selected-status'
 import type {
   AgentStatusClearIpcPayload,
   AgentStatusIpcPayload
-} from '../../../shared/agent-status-types'
+} from '../../../shared/agent-status/contracts/agent-status-ipc-payload'
 import type { ClaudeStatusLineRateLimits } from '../../../shared/claude-statusline-rate-limits'
-import type { HookTransportInterferenceReport } from '../../../shared/agent-hook-transport-interference'
+import type { HookTransportInterferenceReport } from '../../../shared/agent-hook-listener/transport/agent-hook-transport-interference'
 import {
   getLegacyStatusListingOrder,
   type HookListenerState
@@ -20,15 +20,19 @@ import type {
 } from './server-types'
 import { toAgentStatusIpcPayload } from './server-status-identity'
 import { AgentHookServerState } from './server-state'
-import { serializeAgentStatusSubject } from '../../../shared/agent-status-subject'
+import { serializeAgentStatusSubject } from '../../../shared/agent-status/contracts/agent-status-subject'
 import { structuredStatusLegacyEvent } from './server-structured-status-row'
 import { PaneTimers } from './program-status/pane-timers'
 import { ProgramStatusFacetStore } from './program-status/facet-store'
+import { parsePaneKey } from '../../../shared/workspace-layout/stable-pane-id'
+import { statusChangeWorkFields } from './server-status-change-work'
 
 // Unassigned rows sort after the listing counter, which starts at 1.
 const UNORDERED_STATUS_ROW = Number.MAX_SAFE_INTEGER
 
 export abstract class AgentHookServerListeners extends AgentHookServerState {
+  protected providerRowsByTab: Map<string, AgentStatusIpcPayload[]> | null = null
+  protected statusChangeNotificationVersion = 0
   protected cliWriterExecutionMatches: CliWriterExecutionMatches | null = null
 
   setCliWriterExecutionMatcher(...args: Parameters<typeof cliWriterExecutionMatcher>): void {
@@ -66,6 +70,11 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
 
   _resetCanonicalStatusForTests(): void {
     this.resetCanonicalStatus()
+  }
+
+  protected override resetCanonicalStatus(): void {
+    super.resetCanonicalStatus()
+    this.providerRowsByTab = null
   }
 
   private combinedStatusEntries(): EnrichedAgentHookEventPayload[] {
@@ -216,15 +225,28 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
     return this.combinedStatusEntries().map(toAgentStatusIpcPayload)
   }
 
+  /** Provider-source projection; status timestamps still use the uncached status getter. */
+  getProviderSessionSourceRowsForTab(tabId: string): AgentStatusIpcPayload[] {
+    // Media reads share the owner's snapshot until the next status mutation.
+    if (!this.providerRowsByTab) {
+      const byTab = new Map<string, AgentStatusIpcPayload[]>()
+      for (const entry of this.combinedStatusEntries()) {
+        const row = toAgentStatusIpcPayload(entry)
+        const owner = row.tabId ?? parsePaneKey(row.paneKey)?.tabId
+        if (owner) {
+          const rows = byTab.get(owner) ?? []
+          rows.push(row)
+          byTab.set(owner, rows)
+        }
+      }
+      this.providerRowsByTab = byTab
+    }
+    return [...(this.providerRowsByTab.get(tabId) ?? [])]
+  }
+
   /** Include metadata-only provider identities. */
   getProviderSessionIdentities(): AgentHookProviderSessionIdentity[] {
     return this.buildStatusChangeNotification().providerSessions
-  }
-
-  /** Shell, cron, or owed-task work the child list does not show. Absent when the pane has no row. */
-  getClaudeRunningNonAgentTask(paneKey: string): boolean | undefined {
-    const running = this.state.lastStatusByPaneKey.get(paneKey)?.claudeRunningNonAgentTask
-    return typeof running === 'boolean' ? running : undefined
   }
 
   getStatusSnapshotForPane(paneKey: string): AgentStatusIpcPayload[] {
@@ -242,6 +264,15 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
       }
     }
     return rows
+  }
+
+  /** The lead's full final reply for the finished turn `leadTurnKey` names, when this runtime admitted one. */
+  getAcceptedReply(paneKey: string, leadTurnKey: number): string | undefined {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Main admits enriched legacy rows; the shared view declares their base event type.
+    const row = this.state.lastStatusByPaneKey.get(paneKey) as
+      | EnrichedAgentHookEventPayload
+      | undefined
+    return row?.acceptedReply?.leadTurnKey === leadTurnKey ? row.acceptedReply.text : undefined
   }
 
   getHydratedAuthorityCommitments(): readonly AgentHookAuthorityEvidence[] {
@@ -273,18 +304,10 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
         })
       }
       if (!enriched.providerSessionOnly) {
-        // Monitoring is the folded shell/cron signal; the flag covers the same work before that fold.
-        const backgroundWork =
-          enriched.payload.workingMode === 'monitoring' ||
-          enriched.claudeRunningNonAgentTask === true
         statuses.push({
           paneKey,
           state: enriched.payload.state,
-          ...(enriched.payload.mainAgent
-            ? { mainAgentState: enriched.payload.mainAgent.state }
-            : {}),
-          ...(backgroundWork ? { backgroundWork: true } : {}),
-          ...(enriched.turnEndedAt !== undefined ? { turnEndedAt: enriched.turnEndedAt } : {}),
+          ...statusChangeWorkFields(enriched),
           receivedAt: enriched.receivedAt,
           observedInCurrentRuntime:
             Boolean(enriched.structuredHost) || this.runtimeObservedStatusPaneKeys.has(paneKey)
@@ -295,6 +318,8 @@ export abstract class AgentHookServerListeners extends AgentHookServerState {
   }
 
   protected notifyStatusChangeListeners(): void {
+    this.providerRowsByTab = null
+    this.statusChangeNotificationVersion++
     if (this.statusChangeListeners.size === 0 && this.providerSessionChangeListeners.size === 0) {
       return
     }

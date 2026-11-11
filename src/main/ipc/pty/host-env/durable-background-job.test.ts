@@ -44,6 +44,7 @@ describe('applyDurableBackgroundJobEnv', () => {
     const waiter = join(binDir, 'orca-durable-job')
     expect(lstatSync(waiter).isSymbolicLink()).toBe(true)
     expect(readlinkSync(waiter)).toContain('durable-background-job.mjs')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the plugin wrote this hooks.json shape a few lines above.
     const hooks = JSON.parse(
       readFileSync(join(env.ORCA_DURABLE_JOB_PLUGIN_DIR!, 'hooks', 'hooks.json'), 'utf8')
     ) as {
@@ -91,6 +92,7 @@ describe('applyDurableBackgroundJobEnv', () => {
       `/user/plugin${delimiter}${env.ORCA_DURABLE_JOB_PLUGIN_DIR}`
     )
     expect(env.PATH.split(delimiter)[0]).toBe(wslBin)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the plugin wrote this hooks.json shape a few lines above.
     const hooks = JSON.parse(
       readFileSync(join(env.ORCA_DURABLE_JOB_PLUGIN_DIR!, 'hooks', 'hooks.json'), 'utf8')
     ) as {

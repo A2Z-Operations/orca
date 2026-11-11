@@ -1,5 +1,5 @@
-import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
-import type { AgentStatusState } from '../../shared/agent-status-types'
+import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
+import type { AgentStatusState } from '../../shared/agent-status/contracts/agent-status-types'
 import type { ClaudeManagedAccountSummary } from '../../shared/managed-account-types'
 import type { InactiveAccountUsage, RateLimitState } from '../../shared/rate-limit-types'
 import type {

@@ -1,3 +1,4 @@
+import type { GlobalSettings } from '../../shared/global-settings-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
@@ -13,7 +14,7 @@ const {
     flushPendingOrThrowAsync: vi.fn(async () => {}),
     writeLatestProfileStateJsonExportAsync: vi.fn(async () => {}),
     getSettings: vi.fn(() => ({})),
-    onSettingsChanged: vi.fn((_listener: (updates: object) => void) => () => {}),
+    onSettingsChanged: vi.fn((_listener: (updates: Partial<GlobalSettings>) => void) => () => {}),
     getSshTargets: vi.fn(() => [{ id: 'ssh-1', reconnectOnLaunch: false }])
   }
   return {
@@ -61,16 +62,20 @@ vi.mock('../window/attach-main-window-services', () => ({
 vi.mock('../ipc/ssh/ssh-host-user-disconnect', () => ({
   holdLaunchReconnectOptOuts: holdLaunchReconnectOptOutsMock
 }))
-vi.mock('../macos-tcc-prompt-notice', () => ({ initTccPromptNotice: initTccPromptNoticeMock }))
-vi.mock('../updater', () => ({ resolveUpdateInstallMode: vi.fn(() => 'interactive') }))
+vi.mock('../macos-permissions/macos-tcc-prompt-notice', () => ({
+  initTccPromptNotice: initTccPromptNoticeMock
+}))
+vi.mock('../runtime/rpc/methods/updater/updater', () => ({
+  resolveUpdateInstallMode: vi.fn(() => 'interactive')
+}))
 vi.mock('./main-process-state', () => ({ mainProcessState: state }))
-vi.mock('../agent-auth-restart-preservation', () => ({
+vi.mock('../providers/accounts/agent-auth-restart-preservation', () => ({
   preserveAgentAuthBeforeRestart: preserveAgentAuthBeforeRestartMock
 }))
-vi.mock('../codex/codex-ai-vault-session-resume', () => ({
+vi.mock('../codex/history/resume/codex-ai-vault-session-resume', () => ({
   prepareCodexAiVaultSessionResume: vi.fn()
 }))
-vi.mock('../codex/codex-session-source-home', () => ({
+vi.mock('../codex/history/rollouts/codex-session-source-home', () => ({
   resolveHostCodexSessionSourceHome: vi.fn()
 }))
 vi.mock('./main-process-pty-startup', () => ({
@@ -197,11 +202,9 @@ describe('serve usage polling', () => {
 
   it('keeps the desktop focus gate when serve mode is off', () => {
     attach()
-    expect(start).toHaveBeenCalledTimes(1)
-    expect(start).toHaveBeenCalledWith({ fetchImmediately: false })
-    expect(info).toHaveBeenCalledWith(
-      '[claude-usage] polling switch: mode=desktop pollInactive=false pollWithoutWindow=false'
-    )
+    // The account services own the desktop poll timer; a window attach arms nothing headless.
+    expect(start).not.toHaveBeenCalled()
+    expect(info).not.toHaveBeenCalledWith(expect.stringContaining('mode=serve'))
   })
 
   it('starts inactive Claude polling from Electron serve when a usage feature is on', () => {
@@ -229,7 +232,7 @@ describe('serve usage polling', () => {
   it('does not poll when every usage feature is off, then starts when one turns on', () => {
     state.isServeMode = true
     store.getSettings.mockImplementation(() => usageOff)
-    let listener: ((updates: object) => void) | undefined
+    let listener: ((updates: Partial<GlobalSettings>) => void) | undefined
     store.onSettingsChanged.mockImplementation((callback) => {
       listener = callback
       return () => {

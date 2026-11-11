@@ -1,3 +1,4 @@
+import { toEphemeralVmRuntimeRecipeSnapshot } from '../../shared/ephemeral-vm-recipe-timeouts'
 import {
   getEphemeralVmRecipeResultConnection,
   type EphemeralVmRecipeResult
@@ -7,6 +8,13 @@ import {
   upsertEphemeralVmRuntime,
   upsertEphemeralVmRuntimeRollbackRecovery
 } from '../../shared/ephemeral-vm-runtime-store'
+import {
+  toCleanupLastErrorFields,
+  ephemeralVmFailure,
+  ephemeralVmFailureFromError,
+  pickEphemeralVmFailureCode,
+  type EphemeralVmFailure
+} from '../../shared/ephemeral-vm-failure-copy'
 import type { ProvisionEphemeralVmRuntimeArgs } from './runtime-service'
 import {
   runEphemeralVmRecipeCleanup,
@@ -16,6 +24,7 @@ import {
 type FailedStart = {
   context: EphemeralVmRecipeContext
   recipeResult: EphemeralVmRecipeResult
+  createdAt?: number
 }
 
 export async function cleanupFailedEphemeralVmStart(
@@ -32,8 +41,9 @@ export async function cleanupFailedEphemeralVmStart(
   const recovery: EphemeralVmRuntimeRecord = {
     id: start.context.instanceId ?? start.context.recipeId,
     recipeId: args.recipe.id,
-    recipe: args.recipe,
+    recipe: toEphemeralVmRuntimeRecipeSnapshot(args.recipe),
     ...(args.repoId ? { repoId: args.repoId } : {}),
+    ...(args.repoPath ? { repoPath: args.repoPath } : {}),
     ...(args.projectId ? { projectId: args.projectId } : {}),
     ...(args.workspaceId ? { workspaceId: args.workspaceId } : {}),
     ...(args.workspaceName ? { workspaceName: args.workspaceName } : {}),
@@ -42,8 +52,8 @@ export async function cleanupFailedEphemeralVmStart(
     cleanupStatus: args.recipe.destroyDisabled ? 'disabled' : 'failed',
     ...(args.recipe.destroyDisabled ? { cleanupDisabled: true } : {}),
     cleanupLastAttemptAt: now,
-    cleanupLastError: cleanupError,
-    createdAt: now,
+    ...toCleanupLastErrorFields(cleanupError),
+    createdAt: start.createdAt ?? now,
     updatedAt: now,
     recipeResult: start.recipeResult
   }
@@ -62,7 +72,7 @@ export async function cleanupFailedEphemeralVmStart(
 async function getCleanupError(
   args: ProvisionEphemeralVmRuntimeArgs,
   start: FailedStart
-): Promise<string | null> {
+): Promise<EphemeralVmFailure | null> {
   try {
     const cleanup = await runEphemeralVmRecipeCleanup({
       repoPath: args.repoPath,
@@ -76,10 +86,13 @@ async function getCleanupError(
     if (cleanup.ok && !cleanup.skipped) {
       return null
     }
-    return cleanup.ok
-      ? 'Destroy is disabled for this recipe.'
-      : (cleanup.error ?? 'Destroy failed.')
+    if (cleanup.ok) {
+      return ephemeralVmFailure('destroyDisabled')
+    }
+    return cleanup.error
+      ? { error: cleanup.error, ...pickEphemeralVmFailureCode(cleanup) }
+      : ephemeralVmFailure('destroyFailed')
   } catch (error) {
-    return error instanceof Error ? error.message : String(error)
+    return ephemeralVmFailureFromError(error)
   }
 }

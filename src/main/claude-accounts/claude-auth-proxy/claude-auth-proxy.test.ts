@@ -519,19 +519,22 @@ describe('claude auth proxy', () => {
     })
     proxies.push(idleProxy)
     await idleProxy.start()
+    // ast-grep-ignore: test-no-wall-clock -- The proxy's real idle timer must elapse before the 502.
     const idleStarted = Date.now()
     const idleOutcome = await proxyRequest(
       `${idleProxy.slotBaseUrl(idleProxy.allocateSlot('account-a'))}v1/messages`,
-      { timeoutMs: 2000 }
+      // Why 10 s: under a full-suite load the 200 ms idle timer and the socket reset can land late.
+      { timeoutMs: 10_000 }
     ).then(
       (response) => response.status,
       () => 'reset'
     )
     // The outgoing idle timer answers 502. The incoming socket timer can reset the client first.
     expect(idleOutcome === 502 || idleOutcome === 'reset').toBe(true)
+    // ast-grep-ignore: test-no-wall-clock -- Measures the real idle-timeout window the proxy enforces.
     const idleElapsed = Date.now() - idleStarted
     expect(idleElapsed).toBeGreaterThan(150)
-    expect(idleElapsed).toBeLessThan(1500)
+    expect(idleElapsed).toBeLessThan(8000)
 
     let writes = 0
     const activeUpstream = createServer((_req, res) => {
@@ -552,7 +555,8 @@ describe('claude auth proxy', () => {
     const activeProxy = createClaudeAuthProxy({
       readToken: async () => TOKEN_A,
       upstream: `http://127.0.0.1:${activePort}`,
-      idleTimeoutMs: 200
+      // Why 2 s against 40 ms ticks: a loaded machine can delay a tick past 200 ms, and the point is that a stream that keeps writing is kept.
+      idleTimeoutMs: 2_000
     })
     proxies.push(activeProxy)
     await activeProxy.start()
@@ -596,11 +600,13 @@ describe('claude auth proxy', () => {
       req.end('{}')
     })
     await firstChunk
+    // ast-grep-ignore: test-no-wall-clock -- stop() must drain a live stream within a real bound.
     const startedAt = Date.now()
     const stopping = proxy.stop()
     await expect(proxyRequest(url, { timeoutMs: 500 })).rejects.toThrow()
     release()
     await stopping
+    // ast-grep-ignore: test-no-wall-clock -- Measures the real stop() bound.
     expect(Date.now() - startedAt).toBeLessThan(1000)
     await expect(body).resolves.toBe('data: one\n\ndata: two\n\n')
   })

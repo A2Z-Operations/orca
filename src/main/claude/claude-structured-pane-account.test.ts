@@ -26,7 +26,7 @@ import {
 } from '../claude-accounts/claude-pane-account-registry'
 import { collectClaudeMoverSessions } from '../claude-accounts/claude-session-mover-sessions'
 import { formatAccountsBlock } from '../../cli/handlers/account-list-format'
-import { resolveClaudeStructuredLaunchHome } from './claude-structured-launch-home'
+import { resolveClaudeStructuredLaunchHome } from './structured/launch/claude-structured-launch-home'
 import { structuredClaudeSessionKey } from './claude-structured-session-key'
 
 const roots: string[] = []

@@ -1,5 +1,5 @@
-import { isTerminalLeafId } from '../../../../shared/stable-pane-id'
-import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
+import { isTerminalLeafId } from '../../../../shared/workspace-layout/stable-pane-id'
+import { isValidTerminalTabId } from '../../../../shared/workspace-layout/terminal-tab-id'
 import type { RuntimePtySpawnArgs, RuntimePtySpawnState } from './spawn-state'
 
 /**

@@ -41,7 +41,7 @@ const decision = (at: number, reason: string): ClaudeAccountLogEntry => ({
 })
 
 describe('claude account log', () => {
-  it('appends ndjson that the reader returns oldest first, filtered by since and limit', () => {
+  it('appends ndjson that the reader returns oldest first, filtered by since and limit', async () => {
     const path = logPath()
     openClaudeAccountLog(path)
     appendClaudeAccountLog(decision(3_000, 'under-line'))
@@ -49,30 +49,30 @@ describe('claude account log', () => {
     appendClaudeAccountLog(decision(2_000, 'cooldown'))
     closeClaudeAccountLog()
     expect(readFileSync(path, 'utf8').trim().split('\n')).toHaveLength(3)
-    expect(readClaudeAccountLog({ filePath: path }).entries.map((row) => row.at)).toEqual([
+    expect((await readClaudeAccountLog({ filePath: path })).entries.map((row) => row.at)).toEqual([
       1_000, 2_000, 3_000
     ])
-    expect(readClaudeAccountLog({ filePath: path, since: 2_000 }).entries).toHaveLength(2)
-    expect(readClaudeAccountLog({ filePath: path, limit: 1 }).entries[0]?.at).toBe(3_000)
+    expect((await readClaudeAccountLog({ filePath: path, since: 2_000 })).entries).toHaveLength(2)
+    expect((await readClaudeAccountLog({ filePath: path, limit: 1 })).entries[0]?.at).toBe(3_000)
   })
 
-  it('reads the rotated files and skips a line cut mid-write', () => {
+  it('reads the rotated files and skips a line cut mid-write', async () => {
     const path = logPath()
     writeFileSync(`${path}.1`, `${JSON.stringify(decision(1_000, 'off'))}\n{"type":"deci`)
     writeFileSync(path, `${JSON.stringify(decision(2_000, 'pinned'))}\nnot json\n`)
-    expect(readClaudeAccountLog({ filePath: path }).entries.map(reasonOf)).toEqual([
+    expect((await readClaudeAccountLog({ filePath: path })).entries.map(reasonOf)).toEqual([
       'off',
       'pinned'
     ])
   })
 
-  it('writes the file privately and drops appends while closed', () => {
+  it('writes the file privately and drops appends while closed', async () => {
     const path = logPath()
     appendClaudeAccountLog(decision(1_000, 'dropped'))
     openClaudeAccountLog(path)
     appendClaudeAccountLog(decision(2_000, 'kept'))
     closeClaudeAccountLog()
-    expect(readClaudeAccountLog({ filePath: path }).entries.map(reasonOf)).toEqual(['kept'])
+    expect((await readClaudeAccountLog({ filePath: path })).entries.map(reasonOf)).toEqual(['kept'])
     if (process.platform !== 'win32') {
       expect(statSync(path).mode & 0o777).toBe(0o600)
     }

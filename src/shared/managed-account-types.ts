@@ -1,6 +1,8 @@
 import type { ClaudeAuthProxyStatus } from './claude-auth-proxy-status'
 import type { ClaudeSessionMoverSetting } from './claude-account-switch-settings'
 
+import type { CodexAccountSelectionTarget } from './codex-selection-lane'
+
 export type ManagedDataAccountProvider = 'opencode' | 'devin'
 
 export type ManagedDataAccountSummary = {
@@ -273,6 +275,13 @@ export type ClaudeAutoSwitchedEvent = {
   ClaudeRateLimitAccountsState,
   'systemDefaultHome' | 'systemDefaultEmail' | 'systemDefaultOrganizationUuid' | 'paneAssignments'
 >
+
+/** A Claude switch made over runtime RPC, e.g. from the phone. */
+export type ClaudeAccountSelectionChange = {
+  target: CodexAccountSelectionTarget
+  before: { state: ClaudeRateLimitAccountsState; accountId: string | null }
+  after: { state: ClaudeRateLimitAccountsState; accountId: string | null }
+}
 
 export type ClaudeManagedAccountRuntimeSelection = {
   host: string | null

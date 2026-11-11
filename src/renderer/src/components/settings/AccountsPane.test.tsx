@@ -9,10 +9,10 @@ import type {
 } from '../../../../shared/managed-account-types'
 import { i18n } from '../../i18n/i18n'
 import { useAppStore } from '../../store'
-import { AccountsPane } from './AccountsPane'
-import { resolveSettingsHostScope } from './settings-host-scope'
-import { renderClaudeAccountsSection } from './accounts-pane-claude-section'
-import type { AccountsPaneSectionModel } from './accounts-pane-types'
+import { AccountsPane } from './accounts/AccountsPane'
+import { resolveSettingsHostScope } from './host-scope/settings-host-scope'
+import { renderClaudeAccountsSection } from './accounts/claude/accounts-pane-claude-section'
+import type { AccountsPaneSectionModel } from './accounts/accounts-pane-types'
 
 function renderPane(
   settings: GlobalSettings,
@@ -22,6 +22,7 @@ function renderPane(
     React.createElement(AccountsPane, {
       settings,
       updateSettings: vi.fn(),
+      updateSettingsOrThrow: vi.fn(),
       hostScope: resolveSettingsHostScope({
         choice: null,
         defaultEnvironmentId: settings.activeRuntimeEnvironmentId,
@@ -87,6 +88,7 @@ describe('AccountsPane', () => {
       if (originalOwnUserAgent) {
         Object.defineProperty(globalThis.navigator, 'userAgent', originalOwnUserAgent)
       } else {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test removes the one navigator field the pane reads.
         delete (globalThis.navigator as { userAgent?: string }).userAgent
       }
     }
@@ -145,6 +147,7 @@ describe('AccountsPane', () => {
   })
 
   it('omits the scope control on the web client, which cannot select Local desktop', () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the web-client marker is an own property the pane reads.
     const webGlobal = globalThis as { window?: { __ORCA_WEB_CLIENT__?: boolean } }
     const hadWindow = 'window' in webGlobal
     webGlobal.window = { ...webGlobal.window, __ORCA_WEB_CLIENT__: true }
@@ -220,6 +223,7 @@ function render(
   const accountRuntime = { runtime: 'host' as const, wslDistro: null, label: 'This device' }
   const model: AccountsPaneSectionModel = {
     updateSettings: vi.fn(),
+    updateSettingsOrThrow: vi.fn(),
     accountOwner: { kind: 'local' },
     searchQuery: '',
     recordFeatureInteraction: vi.fn(),

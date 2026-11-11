@@ -136,6 +136,7 @@ it('refreshes a 401 once and retries usage with the new access token', async () 
       error: null
     }
   })
+  // ast-grep-ignore: test-no-wall-clock -- The refresher stamps expiresAt from the real clock; the test bounds it from below.
   const before = Date.now()
   const result = await fetchActiveClaudeRateLimits(options)
   expect(result).toMatchObject({ status: 'ok', usageMetadata: { authProvenance: 'profile:acct' } })
@@ -222,7 +223,7 @@ it('leaves a 401 stale when this usage cycle did not reserve the account', async
       { id: 'capped', recentAt: 1 }
     ],
     liveIds: [],
-    now: Date.now(),
+    now: 1_000_000,
     mayRefresh: () => true
   })
   usage.mockRejectedValue(unauthorized())

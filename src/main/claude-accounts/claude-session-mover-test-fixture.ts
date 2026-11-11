@@ -1,9 +1,9 @@
-import type { AgentHookServer } from '../agent-hooks/server'
+import type { AgentHookServer } from '../agent-hooks/server/agent-hook-server'
 import { vi } from 'vitest'
 import type { ClaudeManagedAccountSummary } from '../../shared/managed-account-types'
 import type { ProviderRateLimits, RateLimitState } from '../../shared/rate-limit-types'
 import { createEmptyRateLimitState } from '../../shared/rate-limit-state-factory'
-import { makePaneKey } from '../../shared/stable-pane-id'
+import { makePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import type {
   AgentHookProviderSessionIdentity,
   AgentHookStatusChangeEntry

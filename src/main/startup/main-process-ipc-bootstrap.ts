@@ -12,7 +12,7 @@ import { resolveOsOpenedDocuments } from './os-opened-documents'
 import {
   onStructuredAgentSessionsHeldChanged,
   structuredAgentSessionsHeld
-} from '../native-chat/agent-session-wire/structured-agent-session-registry'
+} from '../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import { subscribeAgentSessionUploadRemoval } from '../native-chat/agent-session-attachments/agent-session-attachment-store-registry'
 
 export function registerMainProcessIpcHandlers(): void {
@@ -80,6 +80,7 @@ export function registerMainProcessIpcHandlers(): void {
     quitAfterRendererStoppedAllSessions(event.sender.id)
   )
   ipcMain.handle('ui:consumePendingSkillShare', () => state.skillShareDeepLinks.consume())
+  ipcMain.handle('ui:consumePendingPluginInstallLink', () => state.pluginInstallLinks.consume())
   // Pull delivers cold-start Open With and proves the listener is ready for later pushes.
   ipcMain.handle('ui:consumePendingMarkdownFileOpens', async () => {
     state.osDocumentOpenListenerReady = true

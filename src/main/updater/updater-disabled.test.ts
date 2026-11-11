@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveUpdaterDisabledReason } from './updater-disabled'
 
 const base = {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: an empty env is the case under test.
   env: {} as NodeJS.ProcessEnv,
   isPackaged: true,
   resourcesPath: '/App/Contents/Resources'

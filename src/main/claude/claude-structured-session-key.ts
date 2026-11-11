@@ -1,7 +1,7 @@
 import {
   structuredAgentSessionPaneKey,
   structuredAgentSessionTabId
-} from '../../shared/structured-agent-session-projection'
+} from '../../shared/agent-session/view/structured-agent-session-projection'
 
 /** Registry and hook-status key for one native-chat Claude session. */
 export function structuredClaudeSessionKey(sessionId: string): string {

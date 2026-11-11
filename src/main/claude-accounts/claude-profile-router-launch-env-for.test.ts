@@ -20,7 +20,7 @@ import {
   CLAUDE_PROFILE_SETUP_FAILED_MESSAGE
 } from '../../shared/claude-profile-routing'
 import { getPosixClaudeShellFunction } from '../../shared/claude-shell-function'
-import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
+import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/providers/structured-agent-session-adapter-errors'
 import type { ClaudeProfileSetupReport } from './claude-profile-setup'
 import { claudeProfileMarkerPath, describeClaudeProfile } from './claude-profile-paths'
 import { ClaudeProfileRouter, type ClaudeProfileRouterSettings } from './claude-profile-router'
@@ -58,7 +58,9 @@ function fixture(env: NodeJS.ProcessEnv = {}) {
   }
   // Why settable: one test lets setup hang, one refuses it, the rest finish at once.
   const setup = {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: widens an empty literal so the fixture can push later.
     calls: [] as string[],
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fixture reassigns the outcome the queue reports.
     outcome: 'prepared' as ClaudeProfileSetupReport['outcome'],
     hang: false
   }
@@ -98,6 +100,7 @@ function signIn(stateDir: string, email: string, organizationUuid?: string): voi
   // Why: equal-size fixture revisions must invalidate the real reader's mtime cache.
   const mtime = new Date(
     Math.max(
+      // ast-grep-ignore: test-no-wall-clock -- The reader compares the file's real mtime; a fixed stamp could sit in the past.
       Math.floor(Date.now() / 1000) * 1000,
       Math.floor(previousMtimeMs / 1000) * 1000 + 2_000
     )

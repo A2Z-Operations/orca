@@ -6,7 +6,10 @@ import {
   type ServerResponse
 } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
-import { bindHostIsNetworkExposed, ORCAD_LOOPBACK_BIND_HOST } from '../../orcad/orcad-bind-address'
+import {
+  bindHostIsNetworkExposed,
+  ORCAD_LOOPBACK_BIND_HOST
+} from '../../../shared/orcad-bind-address'
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
 import { forwardRequestHeaders, forwardResponseHeaders } from './claude-auth-proxy-headers'
 import {

@@ -1,7 +1,7 @@
 import type {
   PluginClaudeModelChangedPayload,
   PluginClaudeSessionMovedPayload
-} from '../../shared/plugins/plugin-claude-account-contract'
+} from '../../shared/plugins/workers/plugin-claude-account-contract'
 
 type Listener = (moved: PluginClaudeSessionMovedPayload) => void
 type ModelListener = (changed: PluginClaudeModelChangedPayload) => void

@@ -3,7 +3,7 @@ import type {
   ClaudeManagedAccountSummary,
   ClaudeSessionMoveSummary
 } from '../../shared/managed-account-types'
-import type { AgentHookServer } from '../agent-hooks/server'
+import type { AgentHookServer } from '../agent-hooks/server/agent-hook-server'
 import type { RateLimitService } from '../rate-limits/service'
 import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
 import type { ClaudeSessionMoveStrategy } from './claude-session-move-strategy'

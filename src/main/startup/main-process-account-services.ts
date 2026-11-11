@@ -1,24 +1,22 @@
 import { app } from 'electron'
 import { KeybindingService } from '../keybindings/keybinding-service'
-import { createProviderAccountServices } from '../provider-account-services'
-import { stopClaudeModelPolicyTicker } from '../provider-claude-session-mover'
-import { createCodexSessionMigrationScheduler } from '../codex/codex-session-migration-scheduler'
-import { startCodexSessionBackfillInBackground } from '../codex/codex-session-backfill'
-import { startCodexSessionIndexHealInBackground } from '../codex/codex-session-index-heal'
-import { startCodexStateDbBackfillRecoveryInBackground } from '../codex/codex-state-db-backfill-recovery'
-import { getOrcaManagedCodexHomePath } from '../codex/codex-home-paths'
+import { createProviderAccountServices } from '../providers/accounts/provider-account-services'
+import { createCodexSessionMigrationScheduler } from '../codex/history/backfill/codex-session-migration-scheduler'
+import { startCodexSessionBackfillInBackground } from '../codex/history/backfill/codex-session-backfill'
+import { startCodexSessionIndexHealInBackground } from '../codex/history/index/codex-session-index-heal'
+import { startCodexStateDbBackfillRecoveryInBackground } from '../codex/history/index/codex-state-db-backfill-recovery'
+import { getOrcaManagedCodexHomePath } from '../codex/configuration/homes/codex-home-paths'
+import { stopClaudeModelPolicyTicker } from '../providers/accounts/provider-claude-session-mover'
 import {
   hasOpenCodeGoApiKey,
   readOpenCodeGoApiKey,
   saveOpenCodeGoApiKey
 } from '../opencode/opencode-go-api-key-store'
-import { agentHookServer } from '../agent-hooks/server'
-import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
-import { browserManager } from '../browser/browser-manager'
-import { prewarmStructuredAgentModelCatalogs } from '../runtime/structured-agent-model-catalog-wiring'
-import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
-import { createAgentModelCatalogSettingsExpiry } from '../native-chat/agent-model-catalog/agent-model-catalog-account-expiry'
-import { getRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
+import { agentHookServer } from '../agent-hooks/server/agent-hook-server'
+import { resolveHostCodexSessionSourceHome } from '../codex/history/rollouts/codex-session-source-home'
+import { browserManager } from '../browser/guest-lifecycle/manager/browser-manager'
+import { prewarmStructuredAgentModelCatalogs } from '../runtime/agent-session/model-catalog/structured-agent-model-catalog-wiring'
+import { getRuntimeDesktopSurface } from '../runtime/construction/runtime-desktop-surface'
 import { translateMain } from '../i18n/main-i18n'
 import { dispatchClaudeRecentMoves } from '../claude-accounts/claude-session-move-mobile-notice'
 import type {
@@ -180,7 +178,7 @@ export function initializeMainProcessAccountServices(): void {
     services.sessionMover?.stop()
     stopClaudeModelPolicyTicker()
     void stopClaudeAuthProxy()
-    closeClaudeAccountLog()
+    void closeClaudeAccountLog()
   }
   state.rateLimits = services.rateLimits
   state.codexRuntimeHome = services.codexRuntimeHome
@@ -190,12 +188,7 @@ export function initializeMainProcessAccountServices(): void {
   void startCodexStateDbBackfillRecoveryInBackground(getOrcaManagedCodexHomePath())
   // Defer shared-home migration; compatibility launches re-arm non-destructive scans for new rollouts (#4444, #8612, #12480).
   state.codexSessionMigration.scheduleInitialRun()
-  const expireModelCatalogs = createAgentModelCatalogSettingsExpiry(
-    agentModelCatalogStore,
-    store.getSettings()
-  )
-  store.onSettingsChanged((updates, settings) => {
-    expireModelCatalogs(updates, settings)
+  store.onSettingsChanged((updates) => {
     // An account switch would otherwise leave the next chat's picker on a cold catalog.
     if (MODEL_CATALOG_ACCOUNT_SETTINGS.some((key) => key in updates)) {
       prewarmStructuredAgentModelCatalogs()
@@ -209,10 +202,11 @@ export function initializeMainProcessAccountServices(): void {
   state.keybindings = new KeybindingService({
     homePath: app.getPath('home'),
     getLegacyOverrides: () => store.getSettings().keybindings,
-    legacyTabSwitchSeed: {
-      isPending: () => store.getSettings().tabSwitchKeybindingSeed === 'pending',
-      markSeeded: () => store.updateSettings({ tabSwitchKeybindingSeed: 'done' })
-    }
+    legacyTabSwitchDefaults: store.getSettings().tabSwitchKeybindingSeed === 'legacy',
+    legacySearchDefaults:
+      (process.platform === 'darwin'
+        ? store.getSettings().searchKeybindingSeed
+        : store.getSettings().nonMacSearchKeybindingSeed) === 'legacy'
   })
   browserManager.setSettingsResolver(() => ({ keybindings: state.keybindings?.getOverrides() }))
 }

@@ -1,7 +1,8 @@
 import { detectUiLanguage, type UiLanguageDetection } from '../../shared/ui-locale'
 
-/** `null` means the host is not ready yet and the miss must not be cached. */
-export type SystemLanguageReader = () => readonly string[] | null
+/** The host's native language list. `settled: false` means the host is not ready yet: serve the read, cache nothing. */
+export type SystemLanguageRead = { preferences: readonly string[]; settled: boolean }
+export type SystemLanguageReader = () => SystemLanguageRead
 
 let reader: SystemLanguageReader | undefined
 let snapshot: UiLanguageDetection | null | undefined
@@ -21,11 +22,15 @@ export function getSystemLanguageDetection(
       snapshot = null
     } else {
       try {
-        const preferences = reader()
-        if (preferences === null) {
-          return null
+        const read = reader()
+        const detection = read.preferences.length
+          ? detectUiLanguage(read.preferences, 'native')
+          : null
+        if (!read.settled) {
+          // Pre-ready startup-failure dialogs still need a language; cache only the post-ready read.
+          return detection
         }
-        snapshot = preferences.length ? detectUiLanguage(preferences, 'native') : null
+        snapshot = detection
       } catch {
         snapshot = null
       }

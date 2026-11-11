@@ -72,7 +72,9 @@ describe('ClaudeProfileRouter auth proxy launch env', () => {
     await startClaudeAuthProxy()
     const { router, settings } = routerFor()
     delete settings.claudeAuthProxy
-    expect(router.launchEnv().ANTHROPIC_BASE_URL).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/p\/[0-9a-f]+\/$/)
+    expect(router.launchEnv().ANTHROPIC_BASE_URL).toMatch(
+      /^http:\/\/127\.0\.0\.1:\d+\/p\/[0-9a-f]+\/$/
+    )
   })
 
   it('leaves the launch env alone when the setting is off', async () => {

@@ -39,9 +39,21 @@ export function appendClaudeAccountLog(entry: ClaudeAccountLogEntry): void {
   sink?.push(entry)
 }
 
-export function closeClaudeAccountLog(): void {
-  sink?.close()
+/**
+ * Writes the queued lines now and resolves once the batch already on its way has landed, then
+ * closes. A caller that cannot wait (an exit handler) still gets the synchronous part.
+ */
+export function closeClaudeAccountLog(): Promise<void> {
+  const current = sink
   sink = null
+  if (!current) {
+    return Promise.resolve()
+  }
+  current.flush()
+  return current
+    .flushAsync()
+    .catch(() => {})
+    .then(() => current.close())
 }
 
 const PROXY_FOLD_WINDOW_MS = 60_000

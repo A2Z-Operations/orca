@@ -21,6 +21,16 @@ export function claudeAccountTokenRefreshEnabled(
   return settings?.claudeAccountTokenRefresh !== false
 }
 
+/** The fork's defaults: every usage-driven account feature on, Fable first. */
+export const CLAUDE_ACCOUNT_POLICY_DEFAULTS = {
+  claudeAutoSwitchEnabled: true,
+  claudeSessionMover: 'move',
+  claudeAuthProxy: true,
+  claudeAccountTokenRefresh: true,
+  claudeAccountPool: 'on',
+  claudeModelPolicy: { enabled: true, fableLine: 90, weeklyGuard: 91 }
+} as const
+
 export type ClaudeAccountSwitchSettings = {
   /** Absent means 'ask'. */
   claudeAccountSwitchRunningSessions?: ClaudeAccountSwitchRunningSessions

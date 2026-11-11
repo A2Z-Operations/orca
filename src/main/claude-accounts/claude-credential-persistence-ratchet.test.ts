@@ -40,7 +40,10 @@ const fsAllowances: Record<string, readonly string[]> = {
   ],
   // Stores Claude config folder paths only.
   'claude-accounts/claude-observed-config-dirs.ts': ['writeFileAtomically'],
-  'claude-accounts/claude-profile-paths.ts': ['mkdirSync', 'writeFileAtomically'],
+  // Drops a profile's setup marker when its home is gone (upstream v1.4.255). No credentials.
+  'claude-accounts/claude-profile-paths.ts': ['mkdirSync', 'unlinkSync', 'writeFileAtomically'],
+  // Copies settings.json (model, effort) into a managed profile (upstream v1.4.255). No credentials.
+  'claude-accounts/claude-profile-settings.ts': ['writeFileAtomically'],
   // Pane → account rows and the proxy port, for a reattach after a restart. No credentials.
   'claude-accounts/claude-pane-account-persistence.ts': ['mkdirSync', 'writeFileAtomically'],
   'claude-accounts/claude-profile-router.ts': ['mkdirSync', 'rmSync', 'writeFileAtomically'],

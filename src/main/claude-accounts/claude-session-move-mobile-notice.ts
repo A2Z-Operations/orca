@@ -1,5 +1,5 @@
 import { formatClaudeSessionMoveList } from '../../shared/claude-session-move-line'
-import type { MobileNotificationDispatchEvent } from '../runtime/runtime-mobile-notification-controller'
+import type { MobileNotificationDispatchEvent } from '../runtime/push/notifications/runtime-mobile-notification-controller'
 import type { ClaudeSessionMoveNotice } from './claude-session-mover-types'
 
 /** One stream item per update, so a burst of panes does not stack a banner per row. */

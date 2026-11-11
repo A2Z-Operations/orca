@@ -4,21 +4,24 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
-import { findClaudeSwitchSessions } from '@/lib/claude-session-account-move'
+import { findClaudeSwitchSessions } from '@/lib/agent-session/accounts/claude/claude-session-account-move'
 import {
   handleRunningClaudeSessionsAfterSwitch,
   resetClaudeAccountSwitchSessionsForTests
-} from '@/lib/claude-account-switch-sessions'
+} from '@/lib/provider-accounts/claude-account-switch-sessions'
 import ClaudeAccountSwitchDialog from './ClaudeAccountSwitchDialog'
-import type * as AccountMove from '@/lib/claude-session-account-move'
+import type * as AccountMove from '@/lib/agent-session/accounts/claude/claude-session-account-move'
 import type { ClaudeAutoSwitchedEvent } from '../../../shared/managed-account-types'
 
-vi.mock('@/lib/claude-session-account-move', async (importOriginal) => ({
-  ...(await importOriginal<typeof AccountMove>()),
-  findClaudeSwitchSessions: vi.fn(),
-  findQueuedClaudeRestartsOnAccount: () => [],
-  isClaudePaneMidTurn: () => false
-}))
+vi.mock(
+  '@/lib/agent-session/accounts/claude/claude-session-account-move',
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof AccountMove>()),
+    findClaudeSwitchSessions: vi.fn(),
+    findQueuedClaudeRestartsOnAccount: () => [],
+    isClaudePaneMidTurn: () => false
+  })
+)
 
 const LEAF = (n: number): string => `0195f2ce-1111-4000-8000-00000000000${n}`
 const candidate = (n: number) => ({

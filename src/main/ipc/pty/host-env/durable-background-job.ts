@@ -1,5 +1,5 @@
 import { delimiter } from 'node:path'
-import { getAgentLaunchExecutableName } from '../../../../shared/agent-command-line-intent'
+import { getAgentLaunchExecutableName } from '../../../../shared/agent-launch/startup/agent-command-line-intent'
 import {
   durableJobBinDir,
   durableJobWslBinDir,

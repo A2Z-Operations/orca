@@ -58,6 +58,7 @@ function runnerModuleUrl(): string {
 }
 
 async function loadJobs(): Promise<DurableJobApi> {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the runner is Orca's own bundled module; its exports are the DurableJobApi it ships with.
   return import(runnerModuleUrl()) as Promise<DurableJobApi>
 }
 

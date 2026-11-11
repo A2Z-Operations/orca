@@ -40,7 +40,7 @@ describe('applyClaudeModelFlip', () => {
     rmSync(directory, { recursive: true, force: true })
   })
 
-  it("records a proxy pane's flip as kind model, strategy proxy, in history and the log", () => {
+  it("records a proxy pane's flip as kind model, strategy proxy, in history and the log", async () => {
     const base = {
       accountId: 'a',
       configDir: null,
@@ -78,7 +78,7 @@ describe('applyClaudeModelFlip', () => {
     })
     expect(rows.find((row) => row.ptyId === 'pty-plain')?.strategy).toBeUndefined()
     closeClaudeAccountLog()
-    const logged = readClaudeAccountLog({ filePath: path }).entries
+    const logged = (await readClaudeAccountLog({ filePath: path })).entries
     expect(logged.find((row) => row.type === 'flip' && row.ptyId === 'pty-proxy')).toMatchObject({
       kind: 'model',
       strategy: 'proxy'

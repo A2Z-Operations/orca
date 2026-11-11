@@ -1,10 +1,10 @@
-import type { AgentProviderSessionMetadata } from '../../shared/agent-session-resume'
+import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
-import type { AgentStartupSettings } from '../../shared/agent-startup-plan-inputs'
-import { parsePaneKey } from '../../shared/stable-pane-id'
-import { buildAgentResumeStartupPlan } from '../../shared/tui-agent-resume-startup'
-import { resolveStartupShell } from '../../shared/tui-agent-startup-shell'
-import type { RuntimePtyController } from '../runtime/runtime-pty-controller-contract'
+import type { AgentStartupSettings } from '../../shared/agent-launch/startup/agent-startup-plan-inputs'
+import { parsePaneKey } from '../../shared/workspace-layout/stable-pane-id'
+import { buildAgentResumeStartupPlan } from '../../shared/agent-launch/startup/tui-agent-resume-startup'
+import { resolveStartupShell } from '../../shared/agent-launch/startup/tui-agent-startup-shell'
+import type { RuntimePtyController } from '../runtime/terminal/lifecycle/runtime-pty-controller-contract'
 import {
   deliverClaudeSessionMoveHandoff,
   type ClaudeSessionMoveHandoff

@@ -1,6 +1,6 @@
 import { getConnectionExecutionHostId } from '../../../../shared/execution-host'
 import { getProvider } from '../provider/registry'
-import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
 import { isClaudeLaunchCommand } from '../host-env/fresh-spawn-routing'
 import { resolveRuntimeClaudeAuth } from './spawn-claude-auth'
 import { beginRuntimePaneReplacement } from './spawn-replacement'
@@ -9,6 +9,7 @@ import { runPtySpawn, normalizePtySpawnSessionId } from '../spawn-operation'
 import { requireAcceptedSpawn } from '../spawn-outcome'
 import type { PtyRuntimeControllerDeps } from './controller-deps'
 import { prepareRuntimePtySpawn } from './spawn-preflight'
+import { applyAgentLaunchPluginHook } from '../spawn-agent-launch-plugin-hook'
 import { buildRuntimePtySpawnOptions } from './spawn-options'
 import { commitRuntimePtySpawn } from './spawn-commit'
 import { createRuntimePtySpawnState, type RuntimePtySpawnArgs } from './spawn-state'
@@ -38,6 +39,7 @@ export async function spawnPtyFromRuntimeController(
   const outcome = await runPtySpawn({
     state: ctx,
     prepare: async () => {
+      ctx.args = await applyAgentLaunchPluginHook(ctx.args, deps.runtime)
       await prepareRuntimePtySpawn(ctx)
       await buildRuntimePtySpawnOptions(ctx)
     },

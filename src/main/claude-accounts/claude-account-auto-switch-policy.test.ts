@@ -132,8 +132,10 @@ describe('pickClaudeAutoSwitchTarget', () => {
 // Each window has its own line — 5-hour 95 %, weekly 90 %, Fable weekly 90 %.
 const now = 1_800_000_000_000
 const win = (usedPercent: number) =>
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the policy reads only usedPercent and resetsAt of a window.
   ({ usedPercent, resetsAt: now + 3_600_000 }) as NonNullable<ProviderRateLimits['session']>
 const lines = (session: number, weekly: number, fable?: number): ProviderRateLimits =>
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the policy reads only the three windows and the status.
   ({
     status: 'ok',
     session: win(session),
@@ -141,6 +143,7 @@ const lines = (session: number, weekly: number, fable?: number): ProviderRateLim
     fableWeekly: fable === undefined ? null : win(fable)
   }) as ProviderRateLimits
 const cand = (accountId: string, l: ProviderRateLimits): InactiveAccountUsage =>
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the policy reads only accountId and rateLimits of a candidate.
   ({ accountId, rateLimits: l }) as InactiveAccountUsage
 
 describe('per-window lines', () => {

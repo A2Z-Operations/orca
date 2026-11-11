@@ -17,7 +17,7 @@ import {
   type PluginClaudeAccountView,
   type PluginClaudeUsageChangedPayload,
   type PluginClaudeUsageWindow
-} from '../../shared/plugins/plugin-claude-account-contract'
+} from '../../shared/plugins/workers/plugin-claude-account-contract'
 
 export type PluginClaudeAccountSource = {
   id: string
@@ -28,9 +28,8 @@ type PluginClaudeAccountRateLimits = Pick<RateLimitState, 'claude' | 'inactiveCl
 
 type PluginClaudeAccountPane = Pick<ClaudePaneAccountRecord, 'accountId' | 'assignedAccountId'>
 
-// SAFETY: claudeBillingAccountId reads only assignedAccountId and accountId.
 function billingAccountId(pane: PluginClaudeAccountPane): string {
-  return claudeBillingAccountId(pane as ClaudePaneAccountRecord)
+  return claudeBillingAccountId(pane)
 }
 
 function projectWindow(window: RateLimitWindow | null | undefined): PluginClaudeUsageWindow | null {

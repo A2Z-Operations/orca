@@ -8,6 +8,7 @@ import { JOB_HANDLERS } from './job'
 const roots: string[] = []
 
 function context(flags: Record<string, string>, json = false): HandlerContext {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a test context omits the fields the job handlers never read.
   return {
     flags: new Map(Object.entries(flags)),
     cwd: tmpdir(),
@@ -21,6 +22,7 @@ function context(flags: Record<string, string>, json = false): HandlerContext {
 async function capture(run: () => Promise<void>): Promise<string> {
   let output = ''
   const write = process.stdout.write
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the capture stub implements the one overload the handlers call.
   process.stdout.write = ((chunk: string | Uint8Array) => {
     output += String(chunk)
     return true
@@ -56,17 +58,20 @@ describe('job handlers', () => {
     const root = mkdtempSync(join(tmpdir(), 'orca-job-cli-'))
     roots.push(root)
     process.env.ORCA_DURABLE_JOB_ROOT = root
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler printed this JSON shape one line above.
     const started = JSON.parse(
       await capture(() =>
         JOB_HANDLERS['job start']!(context({ command: 'sleep 30', cwd: tmpdir() }))
       )
     ) as { id: string; state: string; pid: number }
     expect(started.state).toBe('running')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler printed this JSON shape one line above.
     const status = JSON.parse(
       await capture(() => JOB_HANDLERS['job status']!(context({ id: started.id })))
     ) as { id: string; pid: number }
     expect(status).toMatchObject({ id: started.id, pid: started.pid })
     const previous = process.exitCode
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler printed this JSON shape one line above.
     const stopped = JSON.parse(
       await capture(() => JOB_HANDLERS['job stop']!(context({ id: started.id })))
     ) as { stopped: boolean }

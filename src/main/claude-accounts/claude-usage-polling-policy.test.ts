@@ -45,7 +45,7 @@ describe('claude usage polling policy', () => {
     expect(shouldPollClaudeUsage({})).toBe(true)
   })
 
-  it('starts once, stops once, and ignores unrelated settings changes', () => {
+  it('arms once, returns to the baseline once, and ignores unrelated settings changes', () => {
     const rateLimits = { start: vi.fn(), stop: vi.fn() }
     let settings: {
       claudeAutoSwitchEnabled?: boolean
@@ -68,7 +68,7 @@ describe('claude usage polling policy', () => {
     })
 
     expect(polling.apply({ appFontFamily: 'unused' })).toBe(true)
-    expect(rateLimits.stop).not.toHaveBeenCalled()
+    expect(rateLimits.start).toHaveBeenCalledTimes(1)
 
     settings = {
       claudeSessionMover: 'off',
@@ -76,6 +76,8 @@ describe('claude usage polling policy', () => {
       claudeModelPolicy: { enabled: false }
     }
     expect(polling.apply({ claudeSessionMover: 'off' })).toBe(false)
-    expect(rateLimits.stop).toHaveBeenCalledTimes(1)
+    // Why not stop: the account services own the timer; off only drops the headless flags.
+    expect(rateLimits.start).toHaveBeenLastCalledWith({ fetchImmediately: false })
+    expect(rateLimits.stop).not.toHaveBeenCalled()
   })
 })

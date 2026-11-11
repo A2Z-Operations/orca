@@ -6,13 +6,13 @@ import {
 import {
   structuredAgentSessionPaneKey,
   structuredAgentSessionTabId
-} from '../../shared/structured-agent-session-projection'
-import { makeStructuredAgentStatusSubject } from '../../shared/agent-status-subject'
-import type { AgentSessionStatusSummary } from '../../shared/agent-session-wire'
+} from '../../shared/agent-session/view/structured-agent-session-projection'
+import { makeStructuredAgentStatusSubject } from '../../shared/agent-status/contracts/agent-status-subject'
+import type { AgentSessionStatusSummary } from '../../shared/agent-session/agent-session-wire'
 import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
-import { AgentHookServer } from '../agent-hooks/server'
-import { projectRuntimeMobileSessionTabs } from './runtime-mobile-session-projection'
-import type { RuntimeMobileSessionProjectionHost } from './runtime-mobile-session-projection-contract'
+import { AgentHookServer } from '../agent-hooks/server/agent-hook-server'
+import { projectRuntimeMobileSessionTabs } from './session-lifecycle/projection/runtime-mobile-session-projection'
+import type { RuntimeMobileSessionProjectionHost } from './session-lifecycle/projection/runtime-mobile-session-projection-contract'
 
 vi.mock('../telemetry/client', () => ({ track: vi.fn() }))
 vi.mock('../telemetry/cohort-classifier', () => ({
