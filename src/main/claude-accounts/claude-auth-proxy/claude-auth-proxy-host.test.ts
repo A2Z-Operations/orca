@@ -1,11 +1,25 @@
+import { request as httpRequest } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installClaudeProfileRouter } from '../claude-profile-installed-router'
+import {
+  installClaudePaneAccountPersistence,
+  type ClaudePaneAccountPersistence,
+  type PersistedClaudePaneAccount
+} from '../claude-pane-account-persistence'
 import { readClaudeOAuthCredentials } from '../../rate-limits/claude-oauth-credentials'
 import {
   bindClaudeAuthProxyAccountDir,
+  claudeAuthProxyStatus,
+  getClaudeAuthProxy,
+  noteClaudePaneReattached,
   readClaudeAuthProxyAccessToken,
+  startClaudeAuthProxy,
   stopClaudeAuthProxy
 } from './claude-auth-proxy-host'
+import {
+  adoptPersistedClaudeAuthProxySlots,
+  type PersistedSlotProxy
+} from './claude-auth-proxy-persisted-slots'
 
 vi.mock('../../rate-limits/claude-oauth-credentials', () => ({
   readClaudeOAuthCredentials: vi.fn()
@@ -40,5 +54,165 @@ describe('readClaudeAuthProxyAccessToken', () => {
     })
     bindClaudeAuthProxyAccountDir('acct', '/tmp/claude-home')
     await expect(readClaudeAuthProxyAccessToken('acct')).resolves.toBeNull()
+  })
+})
+
+const SLOT_A = 'a'.repeat(32)
+const SLOT_B = 'b'.repeat(32)
+
+function persistedRow(overrides: Partial<PersistedClaudePaneAccount> = {}): PersistedClaudePaneAccount {
+  return {
+    ptyId: 'pty-1',
+    paneKey: null,
+    accountId: 'acct-a',
+    assignedAccountId: 'acct-b',
+    configDir: null,
+    launchedAt: 1_000,
+    pinned: false,
+    source: 'spawn',
+    proxySlot: SLOT_A,
+    proxyPort: 4100,
+    ...overrides
+  }
+}
+
+function memoryPersistence(
+  rows: PersistedClaudePaneAccount[],
+  proxyPort: number | null = null
+): ClaudePaneAccountPersistence {
+  const panes = new Map(rows.map((row) => [row.ptyId, row]))
+  return {
+    save: (record) => {
+      panes.set(record.ptyId, { ...record })
+    },
+    forget: (ptyId) => {
+      panes.delete(ptyId)
+    },
+    read: (ptyId) => panes.get(ptyId) ?? null,
+    rows: () => [...panes.values()],
+    proxyPort: () => proxyPort,
+    setProxyPort: (port) => {
+      proxyPort = port
+    }
+  }
+}
+
+function fakeStartProxy(port: number | null): PersistedSlotProxy & { slots: Map<string, string> } {
+  const slots = new Map<string, string>()
+  return {
+    slots,
+    port: () => port,
+    adoptSlot: vi.fn((slot: string, accountId: string) => {
+      slots.set(slot, accountId)
+      return true
+    }),
+    endStartupGrace: vi.fn()
+  }
+}
+
+function statusOf(url: string): Promise<{ status: number; retryAfter: string | undefined }> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(url, { method: 'POST' }, (res) => {
+      res.resume()
+      res.on('end', () =>
+        resolve({
+          status: res.statusCode ?? 0,
+          retryAfter: Array.isArray(res.headers['retry-after'])
+            ? res.headers['retry-after'][0]
+            : res.headers['retry-after']
+        })
+      )
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.end('{"hi":1}')
+  })
+}
+
+describe('adoptPersistedClaudeAuthProxySlots', () => {
+  it('re-registers the slots minted on this port for their billed account and skips the rest', () => {
+    const proxy = fakeStartProxy(4100)
+    const adoption = adoptPersistedClaudeAuthProxySlots(proxy, [
+      persistedRow(),
+      persistedRow({ ptyId: 'pty-2', proxySlot: SLOT_B, proxyPort: 4200 }),
+      persistedRow({ ptyId: 'pty-3', proxySlot: undefined, proxyPort: undefined }),
+      persistedRow({ ptyId: 'pty-4', proxySlot: 'c'.repeat(32), assignedAccountId: undefined })
+    ])
+    expect(adoption.adopted).toEqual([SLOT_A, 'c'.repeat(32)])
+    expect([...proxy.slots.entries()]).toEqual([
+      [SLOT_A, 'acct-b'],
+      ['c'.repeat(32), 'acct-a']
+    ])
+    expect(adoption.pending()).toBe(4)
+  })
+
+  it('adopts nothing without a port and ends the grace once every persisted pane reattached', () => {
+    const proxy = fakeStartProxy(null)
+    const adoption = adoptPersistedClaudeAuthProxySlots(proxy, [
+      persistedRow(),
+      persistedRow({ ptyId: 'pty-2', proxySlot: undefined })
+    ])
+    expect(adoption.adopted).toEqual([])
+    expect(proxy.adoptSlot).not.toHaveBeenCalled()
+    adoption.reattached('pty-1')
+    adoption.reattached('pty-1')
+    adoption.reattached('unknown-pty')
+    expect(proxy.endStartupGrace).not.toHaveBeenCalled()
+    adoption.reattached('pty-2')
+    expect(proxy.endStartupGrace).toHaveBeenCalledTimes(1)
+    adoption.reattached('pty-2')
+    expect(proxy.endStartupGrace).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the grace to its cap when nothing was persisted', () => {
+    const proxy = fakeStartProxy(4100)
+    const adoption = adoptPersistedClaudeAuthProxySlots(proxy, [])
+    adoption.reattached('pty-1')
+    expect(proxy.endStartupGrace).not.toHaveBeenCalled()
+    expect(adoption.pending()).toBe(0)
+  })
+})
+
+describe('startClaudeAuthProxy', () => {
+  it('registers the persisted slots when the listener starts, before any reattach', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    try {
+      // A first listener, to learn a free port the "previous" listener would have persisted.
+      installClaudePaneAccountPersistence(memoryPersistence([]))
+      await startClaudeAuthProxy()
+      const port = getClaudeAuthProxy()?.port()
+      expect(port).not.toBeNull()
+      await stopClaudeAuthProxy()
+
+      installClaudePaneAccountPersistence(
+        memoryPersistence(
+          [
+            persistedRow({ proxyPort: port! }),
+            persistedRow({ ptyId: 'pty-2', proxySlot: SLOT_B, proxyPort: port! + 1 }),
+            persistedRow({ ptyId: 'pty-3', proxySlot: undefined, proxyPort: undefined })
+          ],
+          port
+        )
+      )
+      await startClaudeAuthProxy()
+      const proxy = getClaudeAuthProxy()
+      expect(proxy?.port()).toBe(port)
+      expect(proxy?.accountIdForSlot(SLOT_A)).toBe('acct-b')
+      expect(proxy?.accountIdForSlot(SLOT_B)).toBeNull()
+      expect(info.mock.calls.flat().join('\n')).toContain('re-registered 1 persisted slot')
+
+      // An unknown slot is refused, not forwarded: 503 during the grace, 502 once every pane is back.
+      const unknown = `http://127.0.0.1:${port}/p/${'d'.repeat(32)}/v1/messages`
+      expect(await statusOf(unknown)).toEqual({ status: 503, retryAfter: '2' })
+      noteClaudePaneReattached('pty-1')
+      noteClaudePaneReattached('pty-2')
+      expect(await statusOf(unknown)).toEqual({ status: 503, retryAfter: '2' })
+      noteClaudePaneReattached('pty-3')
+      expect(await statusOf(unknown)).toEqual({ status: 502, retryAfter: undefined })
+      expect(claudeAuthProxyStatus().unknownSlotRequests).toBe(1)
+      expect(claudeAuthProxyStatus().lastError).toBeNull()
+    } finally {
+      info.mockRestore()
+    }
   })
 })

@@ -8,6 +8,7 @@ import {
   type ClaudeAuthProxy,
   type ClaudeAuthProxyOptions
 } from './claude-auth-proxy'
+import { CLAUDE_AUTH_PROXY_STARTUP_GRACE_MS } from './claude-auth-proxy-unknown-slot'
 
 const TOKEN_A = 'token-alpha-do-not-log'
 const TOKEN_B = 'token-beta-do-not-log'
@@ -189,17 +190,81 @@ describe('claude auth proxy', () => {
     release()
   })
 
-  it('keeps the incoming Authorization for an unknown slot and does not read a token', async () => {
+  it('answers 503 with Retry-After for an unknown slot during the startup grace and never calls upstream', async () => {
+    const readToken = vi.fn(async () => TOKEN_A)
+    const { proxy, seen, lines } = await started(readToken)
+    const base = proxy.slotBaseUrl(proxy.allocateSlot('account-a'))
+    const port = new URL(base!).port
+    const response = await proxyRequest(`http://127.0.0.1:${port}/p/missing/v1/messages`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer from-claude', 'x-secret': 'HEADER_SENTINEL_9f3a' },
+      body: 'BODY_SENTINEL_9f3a'
+    })
+    expect(response.status).toBe(503)
+    expect(response.headers['retry-after']).toBe('2')
+    expect(response.chunks.join('')).toContain('slot not registered')
+    expect(seen).toEqual([])
+    expect(readToken).not.toHaveBeenCalled()
+    // The startup noise is expected: it is not the warning.
+    expect(proxy.status().unknownSlotRequests).toBe(0)
+    expect(proxy.status().lastError).toBeNull()
+    expect(lines).toEqual(['POST /v1/messages 503 -'])
+    expect(lines.join('\n')).not.toContain('BODY_SENTINEL_9f3a')
+    expect(lines.join('\n')).not.toContain('HEADER_SENTINEL_9f3a')
+    expect(lines.join('\n')).not.toContain('missing')
+  })
+
+  it('answers 502 "slot not registered" for an unknown slot after the grace and counts it', async () => {
+    let now = 0
+    const readToken = vi.fn(async () => TOKEN_A)
+    const { proxy, seen } = await started(readToken, { now: () => now })
+    const base = proxy.slotBaseUrl(proxy.allocateSlot('account-a'))
+    const port = new URL(base!).port
+    const url = `http://127.0.0.1:${port}/p/missing/v1/messages`
+    now = CLAUDE_AUTH_PROXY_STARTUP_GRACE_MS - 1
+    expect((await proxyRequest(url)).status).toBe(503)
+    now = CLAUDE_AUTH_PROXY_STARTUP_GRACE_MS
+    const response = await proxyRequest(url, {
+      method: 'POST',
+      headers: { authorization: 'Bearer from-claude' },
+      body: 'BODY_SENTINEL_9f3a'
+    })
+    expect(response.status).toBe(502)
+    expect(response.headers['retry-after']).toBeUndefined()
+    expect(response.chunks.join('')).toBe('slot not registered\n')
+    expect(seen).toEqual([])
+    expect(readToken).not.toHaveBeenCalled()
+    expect(proxy.status().unknownSlotRequests).toBe(1)
+    expect(proxy.status().lastError).toBeNull()
+    // A known slot still works after the grace.
+    expect((await proxyRequest(`${base}v1/messages`)).status).toBe(200)
+    expect(seen).toHaveLength(1)
+  })
+
+  it('ends the startup grace early once the host says every persisted slot is adopted', async () => {
+    const { proxy, seen } = await started(async () => TOKEN_A)
+    const base = proxy.slotBaseUrl(proxy.allocateSlot('account-a'))
+    const port = new URL(base!).port
+    const url = `http://127.0.0.1:${port}/p/missing/v1/messages`
+    expect((await proxyRequest(url)).status).toBe(503)
+    proxy.endStartupGrace()
+    expect((await proxyRequest(url)).status).toBe(502)
+    expect(seen).toEqual([])
+    expect(proxy.status().unknownSlotRequests).toBe(1)
+  })
+
+  it('forwards a request without a slot prefix as before', async () => {
     const readToken = vi.fn(async () => TOKEN_A)
     const { proxy, seen } = await started(readToken)
     const base = proxy.slotBaseUrl(proxy.allocateSlot('account-a'))
     const port = new URL(base!).port
-    const response = await proxyRequest(`http://127.0.0.1:${port}/p/missing/v1/messages`, {
+    const response = await proxyRequest(`http://127.0.0.1:${port}/v1/messages`, {
       headers: { authorization: 'Bearer from-claude' }
     })
     expect(response.status).toBe(200)
     expect(seen[0]?.authorization).toBe('Bearer from-claude')
     expect(readToken).not.toHaveBeenCalled()
+    expect(proxy.status().unknownSlotRequests).toBe(0)
   })
 
   it('keeps the incoming Authorization when the account has no token', async () => {
@@ -286,27 +351,6 @@ describe('claude auth proxy', () => {
       status: 503,
       accountId: 'account-a'
     })
-  })
-
-  it('counts an unknown slot and forwards its own Authorization', async () => {
-    const readToken = vi.fn(async () => TOKEN_A)
-    const { proxy, seen, lines } = await started(readToken)
-    const base = proxy.slotBaseUrl(proxy.allocateSlot('account-a'))
-    const port = new URL(base!).port
-    const response = await proxyRequest(`http://127.0.0.1:${port}/p/missing/v1/messages`, {
-      method: 'POST',
-      headers: { authorization: 'Bearer from-claude', 'x-secret': 'HEADER_SENTINEL_9f3a' },
-      body: 'BODY_SENTINEL_9f3a'
-    })
-    expect(response.status).toBe(200)
-    expect(seen[0]?.authorization).toBe('Bearer from-claude')
-    expect(seen[0]?.body).toBe('BODY_SENTINEL_9f3a')
-    expect(readToken).not.toHaveBeenCalled()
-    expect(proxy.status().unknownSlotRequests).toBe(1)
-    expect(lines[0]).toBe('POST /v1/messages 200 -')
-    expect(lines.join('\n')).not.toContain('BODY_SENTINEL_9f3a')
-    expect(lines.join('\n')).not.toContain('HEADER_SENTINEL_9f3a')
-    expect(lines.join('\n')).not.toContain('missing')
   })
 
   it('caches a token for 20s and drops it when that account is invalidated', async () => {
