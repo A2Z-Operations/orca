@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { ClaudeSessionMoveSummary } from '../../shared/managed-account-types'
 import { structuredClaudeSessionKey } from '../claude/claude-structured-session-key'
 import {
+  claudeListedChatSessions,
   claudeListedStructuredSessions,
+  setClaudeStructuredRecordsReader,
   type ClaudeListedStructuredRecord
 } from './claude-listed-structured-sessions'
 
@@ -115,5 +117,23 @@ describe('claudeListedStructuredSessions', () => {
       at: 7_000
     })
     expect(sessionMoves).toEqual([{ ...skipped, sessionId: 'claude_one' }, terminal])
+  })
+})
+
+describe('claudeListedChatSessions', () => {
+  afterEach(() => {
+    setClaudeStructuredRecordsReader(null)
+  })
+
+  it('leaves the field absent until the chat store opens, then lists [] like paneAccounts', () => {
+    expect(claudeListedChatSessions(ACCOUNTS, [])).not.toHaveProperty('structuredSessions')
+    let opened = false
+    setClaudeStructuredRecordsReader(() => (opened ? [] : null))
+    expect(claudeListedChatSessions(ACCOUNTS, [])).not.toHaveProperty('structuredSessions')
+    opened = true
+    expect(claudeListedChatSessions(ACCOUNTS, [])).toEqual({
+      structuredSessions: [],
+      sessionMoves: []
+    })
   })
 })

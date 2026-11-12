@@ -37,12 +37,18 @@ export function NativeChatAccountChip({
     nativeChat.sessionId
   )
   const running = live.get(key)
+  const chat = saved.get(key)
   if (running) {
+    // Main moves a pinned pane's model when a turn runs another (`/model`); a launch that
+    // recorded no model falls back to the record's.
     return (
-      <ClaudePaneAccountChip label={running.label} email={running.email} model={running.model} />
+      <ClaudePaneAccountChip
+        label={running.label}
+        email={running.email}
+        model={running.model ?? chat?.model}
+      />
     )
   }
-  const chat = saved.get(key)
   if (!chat) {
     return null
   }

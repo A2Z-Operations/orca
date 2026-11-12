@@ -20,16 +20,22 @@ export type ClaudeListedStructuredRecord = Pick<
   | 'updatedAt'
 >
 
-let readStructuredRecords: (() => readonly ClaudeListedStructuredRecord[]) | null = null
+/** Null while the chat store is not open: the host cannot say which chats exist. */
+type ClaudeStructuredRecordsReader = () => readonly ClaudeListedStructuredRecord[] | null
+
+let readStructuredRecords: ClaudeStructuredRecordsReader | null = null
 
 /** The chat host installs this, so the account list does not import the session store. */
 export function setClaudeStructuredRecordsReader(
-  reader: (() => readonly ClaudeListedStructuredRecord[]) | null
+  reader: ClaudeStructuredRecordsReader | null
 ): void {
   readStructuredRecords = reader
 }
 
-/** The list's moves and saved chats. Without a chat host the field is absent, not empty. */
+/**
+ * The list's moves and saved chats. Like `paneAccounts`, an open store with no chats lists `[]`;
+ * without a reader or before the store opens the field is absent, since nothing is known yet.
+ */
 export function claudeListedChatSessions(
   accounts: readonly { id: string; email: string }[],
   moves: readonly ClaudeSessionMoveSummary[]
@@ -37,7 +43,7 @@ export function claudeListedChatSessions(
   sessionMoves: ClaudeSessionMoveSummary[]
   structuredSessions?: ClaudeStructuredSessionSnapshot[]
 } {
-  const records = readStructuredRecords?.()
+  const records = readStructuredRecords?.() ?? null
   if (!records) {
     return { sessionMoves: [...moves] }
   }

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type {
@@ -32,6 +32,8 @@ function savedChat(
   }
 }
 
+let paneAssigned: ((event: ClaudePaneAssignedEvent) => void) | null = null
+
 function hostWith(
   structuredSessions: ClaudeStructuredSessionSnapshot[],
   paneAccounts: { ptyId: string; label: string; email: string; model?: string }[] = []
@@ -49,7 +51,12 @@ function hostWith(
             accountId: 'acct-a'
           }))
         })),
-        onPaneAssigned: (_listener: (event: ClaudePaneAssignedEvent) => void) => () => {}
+        onPaneAssigned: (listener: (event: ClaudePaneAssignedEvent) => void) => {
+          paneAssigned = listener
+          return () => {
+            paneAssigned = null
+          }
+        }
       }
     }
   })
@@ -87,4 +94,31 @@ it("prefers the running launch's account over the saved record", async () => {
   renderChip()
   expect(await screen.findByText('bob · opus')).toBeTruthy()
   expect(screen.queryByText('ada · claude-opus-5-5')).toBeNull()
+})
+
+it('follows a /model in the running chat', async () => {
+  hostWith(
+    [savedChat({})],
+    [{ ptyId: PANE_KEY, label: 'bob', email: 'bob@example.com', model: 'opus' }]
+  )
+  renderChip()
+  expect(await screen.findByText('bob · opus')).toBeTruthy()
+  act(() => {
+    paneAssigned?.({
+      ptyId: PANE_KEY,
+      paneKey: PANE_KEY,
+      accountId: 'acct-a',
+      label: 'bob',
+      email: 'bob@example.com',
+      model: 'sonnet'
+    })
+  })
+  expect(await screen.findByText('bob · sonnet')).toBeTruthy()
+  expect(screen.queryByText('bob · opus')).toBeNull()
+})
+
+it("shows the record's model when the running launch recorded none", async () => {
+  hostWith([savedChat({})], [{ ptyId: PANE_KEY, label: 'bob', email: 'bob@example.com' }])
+  renderChip()
+  expect(await screen.findByText('bob · claude-opus-5-5')).toBeTruthy()
 })

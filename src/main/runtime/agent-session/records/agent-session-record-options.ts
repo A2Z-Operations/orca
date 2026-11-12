@@ -47,7 +47,9 @@ export function pickAgentSessionOption(
   record: AgentSessionRecord,
   { key, value, models: _models, ...at }: AgentSessionOptionPick
 ): AgentSessionRecord {
-  return replaceAgentSessionRecordOptions(record, {
+  // A model pick is the person's choice even when it repeats the saved one, so it ends a `/model`.
+  const base = key === 'model' ? withoutCurrentModel(record) : record
+  return replaceAgentSessionRecordOptions(base, {
     ...at,
     options: { ...record.options, [key]: value }
   })

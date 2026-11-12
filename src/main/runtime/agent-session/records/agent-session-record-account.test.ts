@@ -119,6 +119,23 @@ describe('agent session record account', () => {
     })
     expect(picked.options?.model).toBe('claude-sonnet-5-5')
     expect(picked).not.toHaveProperty('currentModel')
+
+    const repicked = pickAgentSessionOption(switched, {
+      ...at,
+      key: 'model',
+      value: 'claude-fable-5-2',
+      now: 7_000
+    })
+    expect(repicked.options?.model).toBe('claude-fable-5-2')
+    expect(repicked).not.toHaveProperty('currentModel')
+
+    const effort = pickAgentSessionOption(switched, {
+      ...at,
+      key: 'effort',
+      value: 'low',
+      now: 7_000
+    })
+    expect(effort.currentModel).toBe('claude-opus-5-5')
   })
 
   it('ignores a stale owner reporting a different model', () => {
