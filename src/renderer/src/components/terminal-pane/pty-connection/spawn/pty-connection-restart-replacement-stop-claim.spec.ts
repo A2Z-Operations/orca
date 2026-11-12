@@ -383,9 +383,15 @@ export function registerPtyConnectionRestartReplacementDisposeTests(): void {
       // The pane reattaches the agent that kept running; no second resume spawn, nothing stopped.
       const reattached =
         remountTransport.attach.mock.calls.some(([opts]) => opts.existingPtyId === 'pty-live') ||
-        remountTransport.connect.mock.calls.some(
-          (call) => (call[0] as { sessionId?: string } | undefined)?.sessionId === 'pty-live'
-        )
+        remountTransport.connect.mock.calls.some((call) => {
+          const opts: unknown = call[0]
+          return (
+            typeof opts === 'object' &&
+            opts !== null &&
+            'sessionId' in opts &&
+            opts.sessionId === 'pty-live'
+          )
+        })
       expect(reattached).toBe(true)
       expect(spawn).toHaveBeenCalledTimes(1)
       expect(window.api.pty.kill).not.toHaveBeenCalled()
