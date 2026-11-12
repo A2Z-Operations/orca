@@ -26,7 +26,13 @@ import { heldAgentSessionSources } from '../pane/held-agent-session-sources'
 export async function runPtyIpcSpawn(deps: PtySpawnIpcDeps, request: PtySpawnIpcArgs) {
   const args = { ...request, sessionId: normalizePtySpawnSessionId(request.sessionId) }
   // Before anything is stopped: a refused resume leaves the replaced PTY running.
-  refuseResumeOfHeldAgentSession(args, heldAgentSessionSources(deps.runtime))
+  const heldSessionRefusal = refuseResumeOfHeldAgentSession(
+    args,
+    heldAgentSessionSources(deps.runtime, deps.store)
+  )
+  if (heldSessionRefusal) {
+    await heldSessionRefusal
+  }
   const ctx = createPtyIpcSpawnState(deps, args)
   const admit = () => {
     triggerPtySpawnPushTargetMaterialization(deps, args)

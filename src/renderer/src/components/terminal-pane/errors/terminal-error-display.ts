@@ -10,6 +10,11 @@ import { stripClientEnvironmentFooter } from '../../../../../shared/client-envir
 import { localizeTerminalSpawnHints } from './terminal-spawn-error-display'
 import { localizeWslDistroHoldText } from '../../../lib/wsl-distro-hold-copy'
 import {
+  humanizeAgentSessionHeldLines,
+  isAgentSessionHeldError,
+  type TerminalTitleOfPty
+} from './agent-session-held-error'
+import {
   describeSshSignInRequiredTerminalError,
   isSshSignInRequiredTerminalError
 } from './terminal-ssh-sign-in-error'
@@ -92,6 +97,9 @@ export function shouldOfferDaemonRestart(error: string): boolean {
 }
 
 export function isExplainedTerminalError(error: string): boolean {
+  if (isAgentSessionHeldError(error)) {
+    return true
+  }
   return error
     .split('\n')
     .some(
@@ -151,13 +159,18 @@ export function isFolderWorkspacePathOnlyError(error: string): boolean {
 export function humanizeTerminalError(
   error: string,
   agentId?: string | null,
-  t: Translate = translate
+  t: Translate = translate,
+  /** Names a held session's terminal by its live tab title. */
+  titleOfPty?: TerminalTitleOfPty
 ): string {
   if (isSshSignInRequiredTerminalError(error)) {
     return describeSshSignInRequiredTerminalError(error, t)
   }
   // Hosts send a held start as its code (older) or English sentence (newer); either reads in the user's language.
-  const unwrapped = localizeWslDistroHoldText(unwrapHostRefusalIpcLines(error, t), t)
+  const unwrapped = localizeWslDistroHoldText(
+    humanizeAgentSessionHeldLines(unwrapHostRefusalIpcLines(error, t), t, titleOfPty),
+    t
+  )
   let humanized = humanizeFolderWorkspacePathErrors(
     localizeTerminalSpawnHints(agentLaunchErrorText(unwrapped, agentId, t) ?? unwrapped, t)
   )

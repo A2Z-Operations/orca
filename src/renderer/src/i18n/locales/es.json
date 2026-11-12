@@ -3503,6 +3503,8 @@
             "e16012e31e": "El demonio de terminal propietario de esta sesión salió, por lo que no se pudo recuperar la sesión y su desplazamiento hacia atrás. Abra una nueva terminal para continuar.",
             "sessionUnavailable": "Orca no pudo volver a conectarse a la sesión de terminal de este panel en el host. Abra una nueva terminal para continuar.",
             "sourceRestoring": "Reconectando este terminal: se está restableciendo su salida. La sesión aún está en marcha.",
+            "agentSessionHeld": "Esta sesión del agente sigue ejecutándose en la terminal «{{value0}}». Cambia a esa terminal en lugar de reanudar la sesión otra vez.",
+            "agentSessionHeldNoTab": "Esta sesión del agente sigue ejecutándose en una terminal que ninguna pestaña muestra. Ejecuta `orca terminal list` para encontrarla y luego cambia a ella o detenla en lugar de reanudar la sesión otra vez.",
             "ownerHostMismatch": "La sesión guardada de este terminal pertenece a otra conexión de host, así que Orca no puede reconectarlo aquí. Abre un terminal nuevo para continuar."
           },
           "TerminalProcessExitOverlay": {

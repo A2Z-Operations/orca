@@ -18,6 +18,7 @@ import type { MemorySnapshot, StatsSummary } from '../../../shared/process-stats
 import { collectMemorySnapshot } from '../../memory/collector'
 import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
 import { isDeepStrictEqual } from 'node:util'
+import { isShellProcess } from '../../../shared/agent-status/process/shell-process-detection'
 import type {
   AgentListPublication,
   AgentPaneActivityChange
@@ -62,6 +63,12 @@ export abstract class OrcaRuntimeWithPtyForegroundProcessReads extends OrcaRunti
     options: { afterTitleObservation?: number } = {}
   ): Promise<boolean> {
     return this.ptyForegroundAgent.refresh(ptyId, options.afterTitleObservation ?? 0)
+  }
+
+  /** True only when the PTY's foreground process was read and is a bare shell: no agent runs there now. */
+  async ptyForegroundShowsBareShell(ptyId: string): Promise<boolean> {
+    const read = await this.ptyForegroundAgent.read(ptyId)
+    return Boolean(read?.available && read.process && isShellProcess(read.process))
   }
 
   // Compatibility seam for diagnostics/tests that inspect waiter ownership.

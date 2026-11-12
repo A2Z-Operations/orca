@@ -16465,6 +16465,8 @@
             "sourceRestoring": "Reconectando este terminal — sua saída está sendo restabelecida. A sessão ainda está em execução.",
             "remoteTerminalClosed": "O terminal remoto foi fechado.",
             "openNewTerminal": "Abrir novo terminal",
+            "agentSessionHeld": "Esta sessão do agente ainda está em execução no terminal \"{{value0}}\". Mude para esse terminal em vez de retomar a sessão novamente.",
+            "agentSessionHeldNoTab": "Esta sessão do agente ainda está em execução em um terminal que nenhuma aba mostra. Execute `orca terminal list` para encontrá-lo e depois mude para ele ou pare-o em vez de retomar a sessão novamente.",
             "ownerHostMismatch": "A sessão salva deste terminal pertence a outra conexão de host, então o Orca não pode reconectá-la aqui. Abra um novo terminal para continuar.",
             "ptyAllocationLimit": "Seu sistema não consegue alocar mais dispositivos pty. Feche alguns terminais que você não está usando, no Orca ou em outro programa, e tente novamente.",
             "terminalProcessLimit": "Seu sistema não consegue iniciar outro processo de terminal. Feche terminais ou processos sem uso e tente novamente.",

@@ -28,7 +28,13 @@ export async function spawnPtyFromRuntimeController(
 ) {
   const args = { ...request, sessionId: normalizePtySpawnSessionId(request.sessionId) }
   // Before anything is stopped: a refused resume leaves the replaced PTY running.
-  refuseResumeOfHeldAgentSession(args, heldAgentSessionSources(deps.runtime))
+  const heldSessionRefusal = refuseResumeOfHeldAgentSession(
+    args,
+    heldAgentSessionSources(deps.runtime, deps.store)
+  )
+  if (heldSessionRefusal) {
+    await heldSessionRefusal
+  }
   const ctx = createRuntimePtySpawnState(deps, args)
   if (args.replacesPtyId !== undefined) {
     getProvider(getConnectionExecutionHostId(args.connectionId))

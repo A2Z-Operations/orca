@@ -7,6 +7,7 @@ import {
   createPane,
   createManager,
   LEAF_1,
+  LEAF_2,
   type MockTransport
 } from '../test-fixtures/pty-connection-test-pane-fixtures'
 import {
@@ -69,7 +70,7 @@ export function registerPtyConnectionRestartReplacementDisposeTests(): void {
       const args = mockPanePtyArgs(createPane(2), createManager(1), deps)
       bindPaneAgentTitleMocks(args[2], agentTitleMocks6)
 
-      // Closing the tab (or parking it) disposes the pane before its deferred connect runs.
+      // Closing the tab disposes the pane before its deferred connect runs (a parked tab hands it back).
       connectPanePty(...args).dispose()
       await flushAsyncTicks()
 
@@ -174,6 +175,121 @@ export function registerPtyConnectionRestartReplacementDisposeTests(): void {
         tabId: 'tab-agent-resume',
         providerSession: { id: '5510c93a-0000-4000-8000-000000000000' }
       })
+    })
+
+    /** A two-pane tab whose second pane is restarting; `closed` is the user having closed that pane. */
+    function addRestartingSplitTab(tabId: string, options: { closed: boolean }): void {
+      mockStoreState.tabsByWorktree['wt-1'].push({ id: tabId, ptyId: 'pty-first' })
+      mockStoreState.terminalLayoutsByTabId = {
+        ...mockStoreState.terminalLayoutsByTabId,
+        [tabId]: {
+          root: options.closed
+            ? { type: 'leaf', leafId: LEAF_1 }
+            : {
+                type: 'split',
+                direction: 'vertical',
+                first: { type: 'leaf', leafId: LEAF_1 },
+                second: { type: 'leaf', leafId: LEAF_2 }
+              },
+          activeLeafId: LEAF_1,
+          expandedLeafId: null,
+          // The restart already dropped the second pane's binding.
+          ptyIdsByLeafId: { [LEAF_1]: 'pty-first' }
+        }
+      }
+    }
+
+    async function disposeUnsentSplitRestart(tabId: string) {
+      const { connectPanePty } = await import('../connect-pane-pty')
+      const agentTitleMocks =
+        await vi.importMock<PtyConnectionAgentTitleMocks>('@/lib/agent-status')
+      transportFactoryQueue.push(createMockTransport('pty-unsent'))
+      const deps = createDeps({
+        tabId,
+        startup: claudeRestartStartup('session-split'),
+        replacesPtyId: 'pty-second'
+      })
+      const args = mockPanePtyArgs(createPane(2), createManager(2), deps)
+      bindPaneAgentTitleMocks(args[2], agentTitleMocks)
+      connectPanePty(...args).dispose()
+      await flushAsyncTicks()
+      return deps
+    }
+
+    it('stops the agent of a split pane the user closed while its restart was unsent', async () => {
+      installRestartStoreActions()
+      addRestartingSplitTab('tab-split-closed', { closed: true })
+
+      const deps = await disposeUnsentSplitRestart('tab-split-closed')
+
+      expect(window.api.pty.kill).toHaveBeenCalledWith('pty-second')
+      expect(mockStoreState.queuePaneAccountRestarts).not.toHaveBeenCalled()
+      expect(deps.updateTabPtyId).not.toHaveBeenCalled()
+      // No binding is written for a pane the layout no longer has.
+      expect(mockStoreState.terminalLayoutsByTabId?.['tab-split-closed']?.ptyIdsByLeafId).toEqual({
+        [LEAF_1]: 'pty-first'
+      })
+    })
+
+    it('hands a split pane its live agent back while that pane is still in the layout', async () => {
+      installRestartStoreActions()
+      addRestartingSplitTab('tab-split-open', { closed: false })
+
+      const deps = await disposeUnsentSplitRestart('tab-split-open')
+
+      expect(window.api.pty.kill).not.toHaveBeenCalled()
+      expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-split-open', 'pty-second')
+      expect(mockStoreState.terminalLayoutsByTabId?.['tab-split-open']?.ptyIdsByLeafId).toEqual({
+        [LEAF_1]: 'pty-first',
+        [LEAF_2]: 'pty-second'
+      })
+      expect(mockStoreState.queuePaneAccountRestarts).toHaveBeenCalledWith(['pty-second'], 'claude')
+    })
+
+    it('leaves the old PTY of a refused mounted restart bound to its pane, with nothing queued again', async () => {
+      const { connectPanePty } = await import('../connect-pane-pty')
+      const agentTitleMocks =
+        await vi.importMock<PtyConnectionAgentTitleMocks>('@/lib/agent-status')
+      installRestartStoreActions()
+      addRestartingTab('tab-agent-refused')
+      const transport = createMockTransport(null)
+      // As the IPC transport: main refused the held session before stopping the claimed PTY.
+      transport.connect.mockImplementation(
+        async (opts: {
+          claimReplacedPtyId?: () => string | null
+          onReplacedPtyKept?: (ptyId: string) => void
+          callbacks: { onError?: (message: string) => void }
+        }) => {
+          const claimed = opts.claimReplacedPtyId?.()
+          if (claimed) {
+            opts.onReplacedPtyKept?.(claimed)
+          }
+          opts.callbacks.onError?.(
+            'agent_session_held_by_live_terminal: This agent session is still running in the terminal "Z8 Features" (pty pty-holder).'
+          )
+          return undefined
+        }
+      )
+      transportFactoryQueue.push(transport)
+      const deps = createDeps({
+        tabId: 'tab-agent-refused',
+        startup: claudeRestartStartup('session-refused'),
+        replacesPtyId: 'pty-live'
+      })
+      const args = mockPanePtyArgs(createPane(1), createManager(1), deps)
+      bindPaneAgentTitleMocks(args[2], agentTitleMocks)
+
+      connectPanePty(...args)
+      await flushAsyncTicks()
+
+      expect(transport.connect).toHaveBeenCalledTimes(1)
+      expect(window.api.pty.kill).not.toHaveBeenCalled()
+      expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-agent-refused', 'pty-live')
+      expect(
+        mockStoreState.terminalLayoutsByTabId?.['tab-agent-refused']?.ptyIdsByLeafId?.[LEAF_1]
+      ).toBe('pty-live')
+      // A refusal is final: the account restart is not queued to run into it again.
+      expect(mockStoreState.queuePaneAccountRestarts).not.toHaveBeenCalled()
     })
 
     it('stops the replaced PTY when another PTY has since taken the pane', async () => {

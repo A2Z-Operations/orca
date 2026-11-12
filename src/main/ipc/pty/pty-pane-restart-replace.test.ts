@@ -104,4 +104,42 @@ describe('pty:spawn replacing a pane owner', () => {
     expect(shutdown).not.toHaveBeenCalled()
     expect(providerSpawn).not.toHaveBeenCalled()
   })
+
+  it('names the live terminal holding a session before a mounted restart unbinds its pane', async () => {
+    const { store, runtime } = installRestartHarness()
+    recordClaudePaneAccount({
+      ptyId: 'pty-orphaned',
+      paneKey: null,
+      accountId: 'account-a',
+      configDir: null,
+      launchedAt: 1,
+      pinned: false,
+      source: 'spawn',
+      providerSessionId: 'bdd6f6d7-0000-4000-8000-000000000000'
+    })
+    registerWithFakes(mainWindow, runtime, store)
+    const resumeProviderSession = {
+      key: 'session_id',
+      id: 'bdd6f6d7-0000-4000-8000-000000000000'
+    }
+
+    await expect(
+      handlers.get('pty:findAgentSessionHolder')!(null, {
+        resumeProviderSession,
+        replacesPtyId: 'pty-old'
+      })
+    ).resolves.toEqual({
+      holderPtyId: 'pty-orphaned',
+      refusal: expect.stringContaining(
+        `${AGENT_SESSION_HELD_CODE}: This agent session is still running in a terminal that no tab shows (pty pty-orphaned`
+      )
+    })
+    // The restart may replace the very PTY that holds it.
+    await expect(
+      handlers.get('pty:findAgentSessionHolder')!(null, {
+        resumeProviderSession,
+        replacesPtyId: 'pty-orphaned'
+      })
+    ).resolves.toBeNull()
+  })
 })

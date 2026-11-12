@@ -4,6 +4,7 @@ import {
   createAgentSessionCreateOperation,
   type AgentSessionCreateOperation
 } from '../../../../runtime/hosted-terminals/creation/agent-launch/agent-session-create-operation'
+import { isAgentSessionHeldRefusal } from '../../../../../../shared/agent-session/lifecycle/held-agent-session-refusal'
 import { callRuntimeRpc } from '../../../../runtime/rpc/calls/runtime-rpc-call'
 import { toRuntimeTerminalWorktreeSelector } from '../../../../runtime/rpc/targets/runtime-worktree-selector'
 
@@ -101,7 +102,7 @@ export async function spawnIpcPty(
     resumesAgent && !admittedSessionId ? connectOptions.resumeSpawnIntent : undefined
   // Why: a reattach under an admitted session id must never stop the PTY it is reattaching.
   const replacesPtyId = admittedSessionId ? null : (connectOptions.claimReplacedPtyId?.() ?? null)
-  return window.api.pty.spawn({
+  const spawned = window.api.pty.spawn({
     cols: connectOptions.cols ?? 80,
     rows: connectOptions.rows ?? 24,
     cwd,
@@ -154,5 +155,16 @@ export async function spawnIpcPty(
     ...(terminalKittyKeyboardProtocol === true ? { terminalKittyKeyboardProtocol: true } : {}),
     ...(telemetry ? { telemetry } : {}),
     ...(agentLaunch && !admittedSessionId ? { agentLaunch } : {})
+  })
+  if (!replacesPtyId || !connectOptions.onReplacedPtyKept) {
+    return spawned
+  }
+  const onReplacedPtyKept = connectOptions.onReplacedPtyKept
+  return spawned.catch((error: unknown) => {
+    // Why: main refuses a held session before it stops the claimed PTY, which would otherwise run on unbound.
+    if (isAgentSessionHeldRefusal(error)) {
+      onReplacedPtyKept(replacesPtyId)
+    }
+    throw error
   })
 }
