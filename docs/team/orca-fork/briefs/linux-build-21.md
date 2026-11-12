@@ -84,28 +84,34 @@ At runtime a Linux host reads only its own `manifest.targets[<target>]`
 
 ### The harvest script
 
-`node config/scripts/orca-fork/harvest-orcad-prebuilds.mjs [--tag v1.4.255]`:
+`node config/scripts/orca-fork/harvest-orcad-prebuilds.mjs [--tag v1.4.255] [--work <dir under .build/>]`:
 
-1. Refuses unless every native input is byte-identical to the tag. `NATIVE_INPUTS` = `pnpm-lock.yaml`, `package.json`, `pnpm-workspace.yaml`, `config/patches`, `native`, `config/scripts/native-build`, `config/scripts/orcad-distribution/prebuilds`, `src/shared/node-runtime-pin.ts`. They are compared against `git diff <tag> HEAD` and the working tree. The script lives in `config/scripts/orca-fork/` so that it is not one of those inputs itself.
-2. Downloads `orca-ide_<ver>_amd64.deb` from the public `stablyai/orca` release (download only). Its sha256 must equal the digest GitHub publishes for the asset. For v1.4.255 that is `sha256:6df53f4f6c919fd1f10dfe3511940934acc940a7754eb1b0e896d2c62e4add5a`, 191 836 440 bytes.
-3. Extracts `./opt/Orca/resources/orcad-template` with a small ar reader plus `tar`. Every file it takes must match the sha256 in the release's own `orcad-template.json`.
-4. Writes `out/orcad-prebuilds/<slot>/` for the 8 targets plus `linux-x64-glibc217` (node-pty slot files, and the compat watcher addon), along with `manifest.json` (schema 2; `glibc: null`; `harvestedFrom`). It also writes `.build/windows-process-tree|windows-security|windows-cli-launcher/<arch>/` (untracked; `.build/windows-security/` is already gitignored).
+The trust root is `TAG_PINS` in the script, not anything read at run time. Only pinned tags are accepted (`--tag` must also match `^v\d+\.\d+\.\d+$`). For v1.4.255 the pin is commit `084ce0eebbdda3f665251984804f2238be666296` and asset `orca-ide_1.4.255_amd64.deb`, 191 836 440 bytes, sha256 `6df53f4f6c919fd1f10dfe3511940934acc940a7754eb1b0e896d2c62e4add5a`.
+
+1. Refuses unless `refs/tags/<tag>^{commit}` is the pinned commit, and every native input is byte-identical to that commit. `NATIVE_INPUTS` = `pnpm-lock.yaml`, `package.json`, `pnpm-workspace.yaml`, `config/patches`, `native`, `config/scripts/native-build`, `config/scripts/orcad-distribution/prebuilds`, `src/shared/node-runtime-pin.ts`, `resources/build/icon.ico` (compiled into the Windows `orca.exe`). They are compared against `git diff <pinned commit> HEAD` and the working tree. The script lives in `config/scripts/orca-fork/` so that it is not one of those inputs itself.
+2. Downloads the pinned `.deb` from the public `stablyai/orca` release (download only), into `.build/orcad-release-harvest/<tag>/` by default. GitHub's release record must agree with the pin (name, `browser_download_url` exactly `https://github.com/stablyai/orca/releases/download/<tag>/<asset>`, size, digest). Redirects are followed by hand, only to https `release-assets.githubusercontent.com` or `objects.githubusercontent.com`, and the body is capped at the pinned size. The bytes on disk must have the pinned size and sha256 before anything parses them; a cached copy that already matches is reused without the network. `--work` must resolve strictly inside the repo's `.build/`, through plain directories only.
+3. Extracts `./opt/Orca/resources/orcad-template` into a fresh `mkdtemp` directory (removed afterwards) with a small ar reader plus `tar --no-same-owner`. The ar reader accepts only the members `debian-binary`, `control.tar[.xz|.gz|.zst]` and `data.tar[.xz|.gz|.zst|.bz2]`, and fails on a short read or a size past the end. Every file it takes must be a regular file (no symlink) whose real path stays inside the extracted template, and must match the sha256 in the release's own `orcad-template.json`.
+4. Writes `out/orcad-prebuilds/<slot>/` for the 8 targets plus `linux-x64-glibc217` (node-pty slot files, and the compat watcher addon), along with `manifest.json` (schema 2; `glibc: null`; `harvestedFrom`). It also writes `.build/windows-process-tree|windows-security|windows-cli-launcher/<arch>/`. All three, and the download cache, are gitignored.
+
+Unit tests: `config/scripts/orca-fork/harvest-orcad-prebuilds.test.mjs` (offline: path containment, the ar reader, the pin checks, the tag-commit guard against a scratch git repo).
 
 Then `pnpm build:orcad-template` rebuilds every target's package from fork source with those slots.
 
 ## 3. Fleet hand step: build the Linux package on a native x86 host
 
-This is a single step, run once the Orca fork's CI tenant exists. It needs only `git` and Docker on an x86_64 Linux host
-(no emulation). Nothing is installed on the host and nothing is deployed. Output: `dist/orca-ide_1.4.256-blowzer.7-linux_amd64.deb`.
+This is a single step, run once the Orca fork's CI tenant exists. It needs `git`, Docker, Node 24 and `objdump` (binutils)
+on an x86_64 Linux host (no emulation). No package is installed on the host and nothing is deployed, but Docker pulls and
+builds images on the host, and the step-1 container runs as root, so it leaves root-owned files in the checkout (`out/`,
+`dist/`, `node_modules/`). Output: `dist/orca-ide_1.4.256-blowzer.7-linux_amd64.deb`.
 
 ```sh
 git clone https://github.com/A2Z-Operations/orca.git orca-fork && cd orca-fork
 git checkout <PR head of this brief, or blowzer/fork-only once merged>
 git fetch https://github.com/stablyai/orca.git tag v1.4.255 --no-tags    # read-only; the harvest compares against it
 
-# 0. Wayland helper. build-wayland-clipboard.mjs drives Docker itself; same paths inside and out, so its -v mounts resolve.
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "$PWD" docker:28-cli \
-  sh -ec 'apk add --no-cache nodejs >/dev/null && node config/scripts/native-build/linux/build-wayland-clipboard.mjs --arch x64'
+# 0. Wayland helper, with host Node: the script imports only node builtins and a local .cjs, and drives the host's
+#    Docker itself, so no container needs the Docker socket.
+node config/scripts/native-build/linux/build-wayland-clipboard.mjs --arch x64
 
 # 1. Everything else, in the repo's own build image.
 docker build --platform linux/amd64 -t orca-fork-linux-build \
@@ -142,8 +148,6 @@ The build's own gates still run inside the container: the glibc 2.31 floor, the 
 
 Toolchain the `orca-ci` tenant needs if it builds without the container (its current exit 127 is a missing binary):
 
-Toolchain the `orca-ci` tenant needs (its current exit 127 is a missing binary):
-
 - Node 24 (`engines.node: "24"`; the image uses 24.22.1), `corepack` with pnpm 12.14.0, git
 - `build-essential` (gcc, g++, make), `python3`, `pkg-config`, `libsecret-1-dev`
 - `npm i -g node-gyp@11.5.0` and `npm_config_node_gyp` exported
@@ -178,7 +182,8 @@ Installing the deb restarts `orca serve`, which ends every PTY the serve owns.
    `ls /opt/Orca/resources/app-update.yml` (stock has it).
 2. **Back up the stock install for rollback:** keep the stock deb (`orca-ide_1.4.256_amd64.deb`
    from the stablyai/orca v1.4.256 release, sha256 recorded beside it) in `~/orca-rollback/`, and
-   `sudo cp -a /opt/Orca /opt/Orca-1.4.256` (same disk, so the copy is fast).
+   `test ! -e /opt/Orca-1.4.256 && sudo cp -a /opt/Orca /opt/Orca-1.4.256` (same disk, so the copy is fast;
+   the `test` stops a second run from nesting the copy inside an existing backup).
 3. **Copy the artifact:** `scp` the fork deb to the Dell; `sha256sum` must match section 4.
 4. **Install:** `sudo systemctl stop orca-serve.service` → `sudo apt-get install -y ./orca-ide_1.4.256-blowzer.7-linux_amd64.deb`
    (dependencies as in stock) → `sudo systemctl start orca-serve.service`.
@@ -189,7 +194,8 @@ Installing the deb restarts `orca serve`, which ends every PTY the serve owns.
    `journalctl -u orca-serve.service --since -5min` shows no crash loop.
 6. **Rollback** if any read-back fails: `sudo systemctl stop orca-serve.service` →
    `sudo apt-get install -y --allow-downgrades ~/orca-rollback/orca-ide_1.4.256_amd64.deb`
-   (or `sudo rm -rf /opt/Orca && sudo mv /opt/Orca-1.4.256 /opt/Orca`) → start the service → repeat
+   (or `test -d /opt/Orca-1.4.256 && sudo rm -rf /opt/Orca && sudo mv /opt/Orca-1.4.256 /opt/Orca`, which
+   removes nothing unless the backup exists) → start the service → repeat
    the step-1 reads, expecting `1.4.256` and `app-update.yml` present.
 
 Refs #21. The issue closes when the Dells run the build.
