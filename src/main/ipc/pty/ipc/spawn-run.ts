@@ -20,9 +20,19 @@ import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switc
 import { refuseClosedPaneSpawn } from './closed-pane-spawn-refusal'
 import { resolveStablePaneOwner } from '../pane/stable-owner'
 import { excludeReplacedPaneOwner } from '../pane/replaced-pane-owner'
+import { refuseResumeOfHeldAgentSession } from '../pane/held-agent-session-resume'
+import { heldAgentSessionSources } from '../pane/held-agent-session-sources'
 
 export async function runPtyIpcSpawn(deps: PtySpawnIpcDeps, request: PtySpawnIpcArgs) {
   const args = { ...request, sessionId: normalizePtySpawnSessionId(request.sessionId) }
+  // Before anything is stopped: a refused resume leaves the replaced PTY running.
+  const heldSessionRefusal = refuseResumeOfHeldAgentSession(
+    args,
+    heldAgentSessionSources(deps.runtime, deps.store)
+  )
+  if (heldSessionRefusal) {
+    await heldSessionRefusal
+  }
   const ctx = createPtyIpcSpawnState(deps, args)
   const admit = () => {
     triggerPtySpawnPushTargetMaterialization(deps, args)

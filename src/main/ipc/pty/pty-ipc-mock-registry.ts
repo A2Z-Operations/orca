@@ -147,7 +147,8 @@ export const agentHookServerModuleMock = () => ({
     forgetRefusedPaneResume: forgetRefusedPaneResumeMock,
     recordLaunchResumeIdentity: () => {},
     readRestoredAgentStatus: async () => null,
-    clearPaneKeyAliasesForPty: clearPaneKeyAliasesForPtyMock
+    clearPaneKeyAliasesForPty: clearPaneKeyAliasesForPtyMock,
+    getProviderSessionIdentities: () => []
   }
 })
 

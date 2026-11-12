@@ -23,6 +23,8 @@ export function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     resetInputModes: () => {},
     kill: () => Promise.resolve(),
     killFenced: () => Promise.resolve({ outcome: 'refused', reason: 'unsupported' }),
+    // The web client's spawns are host-side; the host's own spawn guard refuses a held session.
+    findAgentSessionHolder: () => Promise.resolve(null),
     ackColdRestore: () => {},
     // Web panes never transit main's hidden-delivery gate, so there is no drop latch.
     ackHiddenOutputRestoreApplied: () => {},

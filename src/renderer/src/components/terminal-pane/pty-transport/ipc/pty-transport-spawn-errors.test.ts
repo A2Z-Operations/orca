@@ -88,6 +88,57 @@ describe('createIpcPtyTransport', () => {
     expect(onError).toHaveBeenCalledWith('ENOENT: spawn /bin/nope not found')
   })
 
+  it('gives a refused restart its claimed PTY back, since main refused before stopping it', async () => {
+    const { createIpcPtyTransport } = await import('./pty-transport')
+    const refusal = new Error(
+      `Error invoking remote method 'pty:spawn': Error: agent_session_held_by_live_terminal: This agent session is still running in a terminal that no tab shows (pty pty-holder; \`orca terminal list\` lists it).`
+    )
+    const spawnMock = vi
+      .fn()
+      .mockRejectedValueOnce(refusal)
+      .mockRejectedValueOnce(new Error('ENOENT'))
+    ;(globalThis as { window: typeof window }).window = {
+      ...originalWindow,
+      api: {
+        ...originalWindow?.api,
+        pty: {
+          ...originalWindow?.api?.pty,
+          spawn: spawnMock,
+          write: vi.fn(),
+          resize: vi.fn(),
+          kill: vi.fn(),
+          onData: vi.fn(() => () => {}),
+          onReplay: vi.fn(() => () => {}),
+          onExit: vi.fn(() => () => {})
+        }
+      }
+    } as unknown as typeof window
+
+    const onReplacedPtyKept = vi.fn()
+    const onError = vi.fn()
+    await createIpcPtyTransport().connect({
+      url: '',
+      claimReplacedPtyId: () => 'pty-old',
+      onReplacedPtyKept,
+      callbacks: { onError }
+    })
+
+    expect(spawnMock).toHaveBeenCalledWith(expect.objectContaining({ replacesPtyId: 'pty-old' }))
+    expect(onReplacedPtyKept).toHaveBeenCalledWith('pty-old')
+    expect(onError).toHaveBeenCalledWith(
+      expect.stringContaining('agent_session_held_by_live_terminal')
+    )
+
+    // Any other failure may have stopped the old PTY already: nothing is handed back.
+    await createIpcPtyTransport().connect({
+      url: '',
+      claimReplacedPtyId: () => 'pty-old-2',
+      onReplacedPtyKept,
+      callbacks: { onError }
+    })
+    expect(onReplacedPtyKept).toHaveBeenCalledTimes(1)
+  })
+
   it('surfaces the SSH-not-active toast for a regular SSH target with no PTY provider', async () => {
     const { createIpcPtyTransport } = await import('./pty-transport')
     const spawnMock = vi.fn().mockRejectedValue(new Error('No PTY provider for connection ssh-1'))

@@ -3,7 +3,11 @@ import { useAppStore } from '../../../store'
 import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
 import { connectPanePty } from '../pty-connection/connect-pane-pty'
 import { releasePaneTransportForRestart } from './pane-restart-transport-handoff'
-import { clearPaneTerminalError } from '../errors/terminal-error-accumulation'
+import {
+  appendPaneTerminalError,
+  clearPaneTerminalError
+} from '../errors/terminal-error-accumulation'
+import { restartUnlessSessionHeld } from './restart-unless-session-held'
 import type { PtyConnectionDeps } from '../pty-connection/pty-connection-deps'
 import type { TerminalPaneCloseController } from '../layout/close/use-terminal-pane-close-actions'
 
@@ -77,7 +81,7 @@ export function usePaneProcessRestart({
   | 'updateTabTitle'
   | 'worktreeId'
 >) {
-  const handleRestartPane = useCallback(
+  const restartPaneNow = useCallback(
     (paneId: number, startup: PtyConnectionDeps['startup'], options: { focus: boolean }) => {
       const manager = managerRef.current
       const pane = manager?.getPanes().find((candidate) => candidate.id === paneId)
@@ -174,6 +178,23 @@ export function usePaneProcessRestart({
       worktreeId,
       setTerminalErrorsByPaneId
     ]
+  )
+
+  const handleRestartPane = useCallback(
+    (paneId: number, startup: PtyConnectionDeps['startup'], options: { focus: boolean }) => {
+      const restartingPtyId = paneTransportsRef.current.get(paneId)?.getPtyId()
+      restartUnlessSessionHeld({
+        replacesPtyId: restartingPtyId,
+        resumeProviderSession: startup?.resumeProviderSession,
+        findHolder: window.api?.pty?.findAgentSessionHolder,
+        isStillCurrent: () => paneTransportsRef.current.get(paneId)?.getPtyId() === restartingPtyId,
+        restart: () => restartPaneNow(paneId, startup, options),
+        // The old PTY keeps its pane; the pane says why it did not restart.
+        refuse: (refusal) =>
+          setTerminalErrorsByPaneId((current) => appendPaneTerminalError(current, paneId, refusal))
+      })
+    },
+    [paneTransportsRef, restartPaneNow, setTerminalErrorsByPaneId]
   )
   return { handleRestartPane }
 }
