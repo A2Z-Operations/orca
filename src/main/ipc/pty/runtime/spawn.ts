@@ -4,6 +4,8 @@ import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
 import { isClaudeLaunchCommand } from '../host-env/fresh-spawn-routing'
 import { resolveRuntimeClaudeAuth } from './spawn-claude-auth'
 import { beginRuntimePaneReplacement } from './spawn-replacement'
+import { refuseResumeOfHeldAgentSession } from '../pane/held-agent-session-resume'
+import { heldAgentSessionSources } from '../pane/held-agent-session-sources'
 import { resolveRuntimeHostSessionBinding } from './spawn-host-binding'
 import { runPtySpawn, normalizePtySpawnSessionId } from '../spawn-operation'
 import { requireAcceptedSpawn } from '../spawn-outcome'
@@ -25,6 +27,8 @@ export async function spawnPtyFromRuntimeController(
   request: RuntimePtySpawnArgs
 ) {
   const args = { ...request, sessionId: normalizePtySpawnSessionId(request.sessionId) }
+  // Before anything is stopped: a refused resume leaves the replaced PTY running.
+  refuseResumeOfHeldAgentSession(args, heldAgentSessionSources(deps.runtime))
   const ctx = createRuntimePtySpawnState(deps, args)
   if (args.replacesPtyId !== undefined) {
     getProvider(getConnectionExecutionHostId(args.connectionId))

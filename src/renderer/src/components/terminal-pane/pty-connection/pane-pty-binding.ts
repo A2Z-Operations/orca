@@ -3,6 +3,7 @@ import type { resolveTerminalPaneOwnerContext } from '../host-state/terminal-pan
 import type { HasPty } from './lifecycle/terminal-dead-session-reconcile'
 import { useAppStore } from '@/store'
 import { consumeRestartReplacement } from './spawn/restart-replacement-on-show'
+import { settleUnsentRestartReplacement } from './spawn/unsent-restart-replacement'
 import { shouldReconcileMissingSession } from './lifecycle/terminal-dead-session-reconcile'
 import { cancelPendingSafeFitContinuations } from '@/lib/pane-manager/pane-fit-continuation-registry'
 import { PANE_PTY_RESIZE_HOLD_FLUSH_EVENT } from '@/lib/pane-manager/pane-pty-resize-hold'
@@ -182,10 +183,21 @@ export function createPanePtyBinding(session: ConnectPanePtySession): PanePtyBin
       session.startupTiming?.finish('disposed')
       const unsentReplacedPtyId: string | null = session.claimPendingReplacedPtyId()
       if (unsentReplacedPtyId) {
-        // Why: no spawn will carry this stop now, and the pane no longer references the PTY.
-        void Promise.resolve()
-          .then(() => window.api.pty.kill(unsentReplacedPtyId))
-          .catch((err: unknown) => console.warn('[terminal] failed to stop a replaced PTY:', err))
+        const restartAgent: string | undefined = session.paneStartup?.launchAgent
+        // Why deferred: a tab close removes the tab before its panes dispose; read the store after it.
+        void Promise.resolve().then(() =>
+          settleUnsentRestartReplacement({
+            ptyId: unsentReplacedPtyId,
+            tabId: session.deps.tabId,
+            worktreeId: session.deps.worktreeId,
+            leafId: session.pane.leafId,
+            restartAgent,
+            consumeSuppressedPtyExit: session.deps.consumeSuppressedPtyExit,
+            updateTabPtyId: session.deps.updateTabPtyId,
+            keepResumeHandle: () => session.keepUnrunResumeHandle?.(null),
+            stopPty: (ptyId) => window.api.pty.kill(ptyId)
+          })
+        )
       }
       // Successors may reuse numeric pane slots before disposal; leave their errors untouched.
       const currentPaneTransport = session.deps.paneTransportsRef.current.get(session.pane.id)
