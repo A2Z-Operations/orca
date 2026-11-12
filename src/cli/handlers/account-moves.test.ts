@@ -87,6 +87,41 @@ describe('account moves surface', () => {
     expect(logSpy).toHaveBeenCalledWith('No Claude session moves.')
   })
 
+  it('names a native chat by its session id and says why its move was skipped', async () => {
+    callMock.mockResolvedValue({
+      id: 'test',
+      ok: true,
+      result: {
+        claude: {
+          accounts: [],
+          activeAccountId: null,
+          sessionMoves: [
+            {
+              ptyId: 'structured-agent-session-claude_one:leaf',
+              paneKey: 'structured-agent-session-claude_one:leaf',
+              fromAccountId: 'acct-a',
+              toAccountId: null,
+              window: 'fableWeekly',
+              percent: 96,
+              line: 95,
+              reason: 'skipped',
+              detail: 'structured-needs-proxy',
+              at: Date.parse('2026-11-12T00:39:30.000Z'),
+              chat: true,
+              sessionId: 'claude_one'
+            }
+          ]
+        },
+        codex: { accounts: [], activeAccountId: null }
+      },
+      _meta: { runtimeId: 'test-runtime' }
+    })
+    await ACCOUNT_HANDLERS['account moves'](context([]))
+    expect(logSpy.mock.calls.map((call) => String(call[0]))).toEqual([
+      '2026-11-12T00:39:30.000Z  claude_one  acct-a → -  skipped (structured-needs-proxy)  -  chat'
+    ])
+  })
+
   it('rejects an agent other than claude', async () => {
     await expect(ACCOUNT_HANDLERS['account moves'](context([['agent', 'codex']]))).rejects.toThrow(
       'Only --agent claude'

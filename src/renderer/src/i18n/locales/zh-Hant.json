@@ -21433,6 +21433,7 @@
       "profileSwitching": "下次在任何分頁中啟動 Claude 時，就會套用這次切換。",
       "systemDefault": "系統預設",
       "unnamedAccount": "Claude 帳戶",
+      "unknownAccount": "未知帳戶",
       "systemDefaultNamed": "系統預設：{{value0}}",
       "systemDefaultIsSaved": "系統預設已登入為 {{value0}}，它同時也是一個已儲存的帳戶。較早版本的 Orca 可能已將那個登入資訊複製到那裡。如果它不是您自己的登入資訊，請選擇系統預設並執行 claude /login。",
       "systemDefaultIsSavedDismiss": "關閉",

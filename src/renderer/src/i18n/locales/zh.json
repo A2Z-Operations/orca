@@ -21377,6 +21377,7 @@
         "movedRestartlessBody": "{{from}} 已接近用量上限。会话在 {{to}} 上继续，无需重启。"
       },
       "unnamedAccount": "Claude 账户",
+      "unknownAccount": "未知账户",
       "systemDefaultNamed": "系统默认：{{value0}}",
       "systemDefaultIsSaved": "系统默认已登录为 {{value0}}，它同时也是一个已保存的账户。较早版本的 Orca 可能已将那个登录信息复制到那里。如果它不是您自己的登录信息，请选择系统默认并运行 claude /login。",
       "systemDefaultIsSavedDismiss": "关闭",

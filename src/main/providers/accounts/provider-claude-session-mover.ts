@@ -32,6 +32,8 @@ import { recordInferredClaudePaneAccount } from '../../ipc/pty/host-env/claude-p
 import { getPtyIdForPaneKey, ptyPaneKey } from '../../ipc/pty/pane/key-state'
 import { listRegisteredPtys } from '../../memory/pty-registry'
 import type { Store } from '../../persistence/loading-store/store'
+import { peekOpenedAgentSessionRecordStore } from '../../runtime/agent-session/records/agent-session-record-store-slot'
+import { setClaudeStructuredRecordsReader } from '../../claude-accounts/claude-listed-structured-sessions'
 import type { ProviderAccountServices } from './provider-account-services'
 
 export type StartedClaudeSessionMover = ClaudeSessionMover & { stop: () => void }
@@ -148,6 +150,7 @@ export function createProviderClaudeSessionMover(
     }
   })
   stopModelPolicyTicker = ticker.start()
+  setClaudeStructuredRecordsReader(() => peekOpenedAgentSessionRecordStore()?.listRecords() ?? [])
   claudeAccounts.setSessionMovesProvider(() => {
     const moves = sessionMover?.lastDecisions() ?? []
     return [...moves, ...claudeModelFlips()].sort((left, right) => right.at - left.at)

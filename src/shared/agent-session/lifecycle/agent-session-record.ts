@@ -119,12 +119,18 @@ export type AgentSessionRecord = {
   providerHandleChain: AgentSessionProviderHandleLink[]
   providerContextBoundary?: AgentSessionProviderContextBoundary
   accountHome: AgentSessionAccountHome
+  /** The managed account `accountHome` names, resolved at write and backfilled at read. Absent on
+   *  System default and on agents without managed accounts. */
+  accountId?: string
   /** Optional host-written construction observation; checked independently of record readability. */
   acquiredAccount?: unknown
   /** Initial launch directory in host path syntax. Floating sessions resume here; worktree/folder IDs resolve their durable location. */
   launchDirectory?: string
   /** Provider options the user chose, replayed whenever a new owner starts the session. */
   options?: Record<string, string>
+  /** The model the last turn ran when it differs from `options.model`, such as after a `/model`
+   *  inside the chat. A pick of the model clears it. */
+  currentModel?: string
   /** The permission mode the user chose; Orca's, so a provider's options answer never replaces it. */
   permissionMode?: string
   usageLimitContinueCancel?: { turnItemId: string; resetsAt: number }

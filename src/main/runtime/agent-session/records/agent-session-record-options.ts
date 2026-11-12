@@ -3,19 +3,32 @@ import type { AgentSessionOptionsReplacement } from '../../../../shared/agent-se
 import type { AgentSessionRecord } from '../../../../shared/agent-session/lifecycle/agent-session-record'
 import type { AgentSessionModelOption } from '../../../../shared/agent-session/agent-session-wire'
 
+function writesOptions(record: AgentSessionRecord, fence: number): boolean {
+  const { lease } = record
+  // At rest the host is the only writer: a pick is intent the next start replays.
+  const atRest = lease.claimStatus === 'released' && lease.ownerProcess === null
+  return lease.runtimeFence === fence && (lease.claimStatus === 'live' || atRest)
+}
+
+function withoutCurrentModel(record: AgentSessionRecord): AgentSessionRecord {
+  const { currentModel: _currentModel, ...rest } = record
+  return rest
+}
+
 export function replaceAgentSessionRecordOptions(
   record: AgentSessionRecord,
   replacement: AgentSessionOptionsReplacement
 ): AgentSessionRecord {
-  const { lease } = record
-  // At rest the host is the only writer: a pick is intent the next start replays.
-  const atRest = lease.claimStatus === 'released' && lease.ownerProcess === null
-  if (lease.runtimeFence !== replacement.fence || (lease.claimStatus !== 'live' && !atRest)) {
+  if (!writesOptions(record, replacement.fence)) {
     throw agentSessionRefusalError('agent_session_ownership_unknown', { reason: 'leaseMoved' })
   }
-  return 'options' in replacement
-    ? { ...record, options: { ...replacement.options }, updatedAt: replacement.now }
-    : { ...record, permissionMode: replacement.permissionMode, updatedAt: replacement.now }
+  if (!('options' in replacement)) {
+    return { ...record, permissionMode: replacement.permissionMode, updatedAt: replacement.now }
+  }
+  // A new model choice supersedes what the last turn reported running.
+  const base =
+    replacement.options.model !== record.options?.model ? withoutCurrentModel(record) : record
+  return { ...base, options: { ...replacement.options }, updatedAt: replacement.now }
 }
 
 /** Saved catalog only; missing model evidence permits options without starting discovery. */
@@ -55,16 +68,24 @@ export function recordAgentSessionRanOptions(
   { model, options, models: _models, ...at }: AgentSessionRanOptions
 ): AgentSessionRecord {
   const saved = record.options ?? {}
-  // These run options cannot follow a concurrent model change.
+  // The saved choice stays the intent a restart replays; the record notes the model that ran.
+  // A stale owner's report is dropped, like the options it cannot add.
+  const notes = writesOptions(record, at.fence)
   if (saved.model !== undefined && saved.model !== model) {
-    return record
+    return notes && record.currentModel !== model
+      ? { ...record, currentModel: model, updatedAt: at.now }
+      : record
   }
+  const ran =
+    notes && record.currentModel !== undefined
+      ? { ...withoutCurrentModel(record), updatedAt: at.now }
+      : record
   const added = Object.entries({ ...options, model }).filter(
     ([key]) => key !== 'interactionMode' && saved[key] === undefined
   )
   return added.length === 0
-    ? record
-    : replaceAgentSessionRecordOptions(record, {
+    ? ran
+    : replaceAgentSessionRecordOptions(ran, {
         ...at,
         options: { ...Object.fromEntries(added), ...saved }
       })

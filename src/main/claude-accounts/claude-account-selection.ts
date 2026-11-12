@@ -22,6 +22,7 @@ import {
 import type { ClaudeModelPolicyPatch } from './claude-model-policy'
 import { claudeListedPaneAccounts, listedPaneAssignments } from './claude-listed-pane-accounts'
 import { listClaudePaneAccounts } from './claude-pane-account-registry'
+import { claudeListedChatSessions } from './claude-listed-structured-sessions'
 import {
   getClaudeSelectionTargetForAccount,
   getClaudeWslSelectionKey,
@@ -169,7 +170,7 @@ export class ClaudeAccountSelection {
       ...(this.usageWindowsProvider ? { usageWindows: this.usageWindowsProvider(accounts) } : {}),
       assignedSessions,
       paneAccounts,
-      sessionMoves: this.sessionMovesProvider?.() ?? [],
+      ...claudeListedChatSessions(accounts, this.sessionMovesProvider?.() ?? []),
       ...(wslAuthProxy ? { wslAuthProxy } : {}),
       ...(paneAssignments.length > 0 ? { paneAssignments } : {}),
       ...(accounts.length > 0

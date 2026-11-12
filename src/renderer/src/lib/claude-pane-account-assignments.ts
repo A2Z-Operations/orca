@@ -1,7 +1,9 @@
 import type {
   ClaudePaneAssignedEvent,
-  ClaudeRateLimitAccountsState
+  ClaudeRateLimitAccountsState,
+  ClaudeStructuredSessionSnapshot
 } from '../../../shared/managed-account-types'
+import { structuredAgentSessionTabId } from '../../../shared/agent-session/view/structured-agent-session-projection'
 
 export type ClaudePaneAccountAssignment = {
   label: string
@@ -12,15 +14,58 @@ export type ClaudePaneAccountAssignment = {
 
 const listeners = new Set<() => void>()
 let snapshot: ReadonlyMap<string, ClaudePaneAccountAssignment> = new Map()
+/** Saved native chats by pane key, from the host's record of each chat's account home. */
+let savedChats: ReadonlyMap<string, ClaudeStructuredSessionSnapshot> = new Map()
+let savedChatsRefreshing = false
+let savedChatsRefreshQueued = false
 let subscribers = 0
 let stopEvents: (() => void) | null = null
 let startId = 0
 
-function emit(next: ReadonlyMap<string, ClaudePaneAccountAssignment>): void {
-  snapshot = next
+function notify(): void {
   for (const listener of listeners) {
     listener()
   }
+}
+
+function emit(next: ReadonlyMap<string, ClaudePaneAccountAssignment>): void {
+  snapshot = next
+  notify()
+}
+
+function emitSavedChats(state: ClaudeRateLimitAccountsState): void {
+  savedChats = new Map((state.structuredSessions ?? []).map((chat) => [chat.paneKey, chat]))
+  notify()
+}
+
+const STRUCTURED_PANE_KEY_PREFIX = structuredAgentSessionTabId('')
+
+/** A chat that starts, stops or flips model changes its saved row too. */
+function refreshSavedChats(id: number): void {
+  const api = window.api?.claudeAccounts
+  if (!api) {
+    return
+  }
+  if (savedChatsRefreshing) {
+    savedChatsRefreshQueued = true
+    return
+  }
+  savedChatsRefreshing = true
+  void api
+    .list()
+    .then((state) => {
+      if (id === startId) {
+        emitSavedChats(state)
+      }
+    })
+    .catch(() => {})
+    .finally(() => {
+      savedChatsRefreshing = false
+      if (savedChatsRefreshQueued && id === startId) {
+        savedChatsRefreshQueued = false
+        refreshSavedChats(id)
+      }
+    })
 }
 
 function applyEvent(
@@ -72,6 +117,9 @@ function start(): void {
       return
     }
     emit(applyEvent(snapshot, event))
+    if (event.ptyId.startsWith(STRUCTURED_PANE_KEY_PREFIX)) {
+      refreshSavedChats(id)
+    }
   })
   void api
     .list()
@@ -79,6 +127,7 @@ function start(): void {
       if (id !== startId) {
         return
       }
+      savedChats = new Map((state.structuredSessions ?? []).map((chat) => [chat.paneKey, chat]))
       let next = fromList(state)
       let applied = 0
       for (;;) {
@@ -138,4 +187,8 @@ export function subscribeClaudePaneAccounts(listener: () => void): () => void {
 
 export function getClaudePaneAccountSnapshot(): ReadonlyMap<string, ClaudePaneAccountAssignment> {
   return snapshot
+}
+
+export function getClaudeSavedChatSnapshot(): ReadonlyMap<string, ClaudeStructuredSessionSnapshot> {
+  return savedChats
 }

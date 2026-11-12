@@ -21377,6 +21377,7 @@
         "movedRestartlessBody": "{{from}} は使用量の上限に近づいています。セッションは再起動せず {{to}} で続行します。"
       },
       "unnamedAccount": "Claude アカウント",
+      "unknownAccount": "不明なアカウント",
       "systemDefaultNamed": "システムのデフォルト: {{value0}}",
       "systemDefaultIsSaved": "システムのデフォルトは {{value0}} としてサインインしており、これは保存済みのアカウントでもあります。以前のバージョンの Orca がそのログインをここにコピーした可能性があります。自分のログインでない場合は、システムのデフォルトを選択して claude /login を実行してください。",
       "systemDefaultIsSavedDismiss": "閉じる",
