@@ -4,6 +4,7 @@ import {
   agentSessionRecordFixture
 } from '../../../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
 import type { AgentSessionRecord } from '../../../../shared/agent-session/lifecycle/agent-session-record'
+import type { PersistedAgentSessionRecord } from '../../../../shared/agent-session/lifecycle/agent-session-legacy-handoff-lease'
 import { createRestTestRig } from '../../../native-chat/agent-session-wire/host/testing/structured-agent-session-rest-test-rig'
 import { foundAgentSessionRecord } from './agent-session-record-founding'
 import {
@@ -12,7 +13,8 @@ import {
 } from './agent-session-record-options'
 import {
   openTestAgentSessionRecordStore,
-  seedTestAgentSessionRecordStore
+  seedTestAgentSessionRecordStore,
+  storedTestAgentSessionRecord
 } from './agent-session-record-store-test-harness'
 
 const PROFILE_HOME =
@@ -61,20 +63,20 @@ describe('agent session record account', () => {
       ...fixture,
       accountHome: { variable: 'CLAUDE_CONFIG_DIR', path: PROFILE_HOME }
     }
-    const damaged = {
-      ...agentSessionRecordFixture(
-        agentSessionLeaseFixture({
-          sessionId: 'session-beta-22',
-          claimStatus: 'released',
-          ownerProcess: null
-        })
+    const damaged: PersistedAgentSessionRecord = {
+      ...storedTestAgentSessionRecord(
+        agentSessionRecordFixture(
+          agentSessionLeaseFixture({
+            sessionId: 'session-beta-22',
+            claimStatus: 'released',
+            ownerProcess: null
+          })
+        )
       ),
       accountId: 42,
       currentModel: ''
     }
-    await seedTestAgentSessionRecordStore(rig.root, {
-      records: [legacy, damaged as unknown as AgentSessionRecord]
-    })
+    await seedTestAgentSessionRecordStore(rig.root, { records: [legacy, damaged] })
     const store = await openTestAgentSessionRecordStore(rig.root)
     expect(store.getRecord(legacy.sessionId)?.accountId).toBe(
       '9c633061-4a24-40ad-ab31-7cebe5ab8e58'
