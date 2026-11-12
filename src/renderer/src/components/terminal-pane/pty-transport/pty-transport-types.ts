@@ -201,6 +201,8 @@ export type PtyTransport = {
     startupCommandDelivery?: StartupCommandDelivery
     /** Consume only at fresh spawn dispatch; main stops the returned predecessor before resolving ownership. Reattach leaves retirement with the caller. */
     claimReplacedPtyId?: () => string | null
+    /** Main refused the spawn before stopping the claimed PTY (its session is held elsewhere); the PTY still runs. */
+    onReplacedPtyKept?: (ptyId: string) => void
     /** Reject a stale pane after any pre-spawn test gate but before creating a PTY. */
     shouldContinue?: () => boolean
     callbacks: PtyCallbacks

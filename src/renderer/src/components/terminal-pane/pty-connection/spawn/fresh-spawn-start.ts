@@ -8,6 +8,7 @@ import { hasPtySerializer } from '../../snapshots/pty-buffer-serializer'
 import { writeTerminalOutput } from '@/lib/pane-manager/pane-terminal-output-scheduler'
 
 import { settleSpawnThatLeftPaneUnbound } from './unbound-pane-spawn-recovery'
+import { restartReplacementClaim } from './unsent-restart-replacement'
 import { STARTUP_CWD_FALLBACK_NOTICE } from '../../../../../../shared/startup-cwd-fallback'
 import { pendingSpawnByPaneKey, pendingSpawnGenerationByPaneKey } from './pending-pane-spawn'
 import { shouldWritePtyOutputForeground } from '../output/foreground-output-visibility'
@@ -111,7 +112,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
       // Why: a restart swaps one live session for one, and main stops the old PTY before admission.
       resumeSpawnIntent:
         visibleAtSpawn || session.userRestart ? 'user-resume' : 'automatic-restore',
-      ...(session.userRestart ? { claimReplacedPtyId: session.claimPendingReplacedPtyId } : {}),
+      ...(session.userRestart ? restartReplacementClaim(session) : {}),
       shouldContinue: () =>
         !session.disposed &&
         (findTerminalTabForPane(useAppStore.getState(), session.deps.worktreeId, session.deps.tabId)

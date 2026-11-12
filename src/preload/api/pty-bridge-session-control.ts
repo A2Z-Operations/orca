@@ -183,6 +183,11 @@ export const ptySessionControlApi = {
   publishTerminalViewAttributes: (attributes: TerminalViewAttributes): void => {
     ipcRenderer.send('pty:terminalViewAttributes', attributes)
   },
+  findAgentSessionHolder: (args: {
+    resumeProviderSession: AgentProviderSessionMetadata
+    replacesPtyId?: string
+  }): Promise<{ holderPtyId: string; refusal: string } | null> =>
+    ipcRenderer.invoke('pty:findAgentSessionHolder', args),
   killFenced: (request: PtyFencedTerminationRequest): Promise<PtyFencedTerminationOutcome> =>
     ipcRenderer.invoke('pty:killFenced', request),
   kill: (id: string, opts?: { keepHistory?: boolean }): Promise<void> =>

@@ -18,6 +18,8 @@ import {
 } from './terminal-spawn-error-display'
 import { isWslDistroHoldText } from '@/lib/wsl-distro-hold-copy'
 import { isSshSignInRequiredTerminalError } from './terminal-ssh-sign-in-error'
+import { terminalTabTitleOfPty } from './agent-session-held-error'
+import { useAppStore } from '@/store'
 
 export function TerminalErrorToast({
   error,
@@ -60,7 +62,9 @@ export function TerminalErrorToast({
     !isExplainedTerminalError(error) &&
     !isFolderWorkspacePathOnlyError(error) &&
     !isWslDistroHoldText(error)
-  const humanizedError = humanizeTerminalError(error, agentId, t)
+  const humanizedError = humanizeTerminalError(error, agentId, t, (ptyId) =>
+    terminalTabTitleOfPty(useAppStore.getState(), ptyId)
+  )
   // Why: the toast appends its own linked request, so the host's plain-text one would repeat it.
   const displayError = showIssueLink
     ? withoutTerminalSpawnIssueRequest(humanizedError)

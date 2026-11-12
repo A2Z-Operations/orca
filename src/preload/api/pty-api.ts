@@ -133,6 +133,11 @@ export type PtyApi = {
   signal: (id: string, signal: string) => void
   clearBuffer: (id: string) => void
   resetInputModes: (id: string) => void
+  /** The live PTY, other than `replacesPtyId`, still running the session this spawn would resume; null when none. */
+  findAgentSessionHolder: (args: {
+    resumeProviderSession: AgentProviderSessionMetadata
+    replacesPtyId?: string
+  }) => Promise<{ holderPtyId: string; refusal: string } | null>
   killFenced: (request: PtyFencedTerminationRequest) => Promise<PtyFencedTerminationOutcome>
   kill: (id: string, opts?: { keepHistory?: boolean }) => Promise<void>
   /** Acknowledge the pane that actually painted the restored frame. */
