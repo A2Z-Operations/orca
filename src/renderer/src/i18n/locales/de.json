@@ -21759,6 +21759,7 @@
       "profileSwitching": "Der Wechsel gilt für den nächsten Start von Claude in einem beliebigen Tab.",
       "systemDefault": "Systemstandard",
       "unnamedAccount": "Claude-Konto",
+      "unknownAccount": "unbekanntes Konto",
       "systemDefaultNamed": "Systemstandard: {{value0}}",
       "systemDefaultIsSaved": "Der Systemstandard ist als {{value0}} angemeldet; dieses Konto ist auch gespeichert. Eine frühere Orca-Version hat diese Anmeldung möglicherweise dorthin kopiert. Falls dies nicht die eigene Anmeldung ist, „Systemstandard“ auswählen und claude /login ausführen.",
       "systemDefaultIsSavedDismiss": "Ausblenden",

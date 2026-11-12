@@ -54,7 +54,8 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         : view.record.surface === 'chat'
           ? {}
           : { strategy: 'resume' as const }),
-      ...(view.record.surface === 'chat' ? { chat: true as const } : {})
+      ...(view.record.surface === 'chat' ? { chat: true as const } : {}),
+      ...(detail ? { detail } : {})
     }
     // Why once per reason: the service publishes every 15 s; a repeated "stay" is not news.
     // A settled move (detail present) is always news, even when it repeats the last reason.

@@ -8,6 +8,7 @@ import {
   type AgentSessionRecord
 } from '../../../../shared/agent-session/lifecycle/agent-session-record'
 import { normalizeAgentSessionConversationName } from '../../../../shared/agent-session/agent-session-conversation-name'
+import { agentSessionManagedAccountId } from '../../../../shared/agent-session/lifecycle/agent-session-account-id'
 
 export type AgentSessionRecordIdentity = Pick<
   AgentSessionRecord,
@@ -30,12 +31,14 @@ export function agentSessionRecordIdentityFields(
   const { [AGENT_CHAT_PERMISSION_MODE_OPTION_ID]: permissionMode, ...options } =
     identity.options ?? {}
   const conversationName = normalizeAgentSessionConversationName(identity.conversationName)
+  const accountId = agentSessionManagedAccountId(identity.provider, identity.accountHome)
   return {
     schemaVersion: AGENT_SESSION_RECORD_SCHEMA_VERSION,
     sessionId: identity.sessionId,
     location: identity.location,
     provider: identity.provider,
     accountHome: identity.accountHome,
+    ...(accountId ? { accountId } : {}),
     ...(identity.forkedFrom ? { forkedFrom: identity.forkedFrom } : {}),
     ...(Object.keys(options).length > 0 ? { options } : {}),
     ...(permissionMode ? { permissionMode } : {}),

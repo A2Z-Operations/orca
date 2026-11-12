@@ -92,7 +92,11 @@ describe('createClaudeSessionMover', () => {
     await vi.runAllTimersAsync()
     expect(move).not.toHaveBeenCalled()
     expect(notices[0]).toMatchObject({ kind: 'skipped', detail: 'structured-needs-proxy' })
-    expect(mover.lastDecisions()[0]).toMatchObject({ reason: 'skipped', chat: true })
+    expect(mover.lastDecisions()[0]).toMatchObject({
+      reason: 'skipped',
+      detail: 'structured-needs-proxy',
+      chat: true
+    })
   })
 
   it('proxy-moves a native chat during a turn and keeps its key', async () => {

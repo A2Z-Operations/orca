@@ -10,6 +10,7 @@ import type { NativeChatTabSession } from '../../../tab-bar/tab-session-history-
 import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
 import { useStructuredChatPaneActions } from './use-structured-chat-pane-actions'
 import { NativeChatResumeInCliButton } from './NativeChatResumeInCliButton'
+import { NativeChatAccountChip } from './NativeChatAccountChip'
 import { NativeChatSettingsButton } from '../../appearance/NativeChatSettingsButton'
 import type { NativeChatStructuredViewProps } from '../../native-chat-view-types'
 import type { NativeChatHandOff } from './use-native-chat-hand-off'
@@ -56,6 +57,7 @@ export function NativeChatPaneHeader({
       style={HEADER_STYLE}
     >
       <div className="pane-title-actions ml-auto flex shrink-0 items-center gap-0">
+        <NativeChatAccountChip nativeChat={nativeChat} />
         {handOff && focused ? (
           <Tooltip>
             <TooltipTrigger asChild>

@@ -21387,6 +21387,7 @@
         "movedRestartlessBody": "{{from}} está cerca de su límite de uso. La sesión continúa en {{to}} sin reiniciar."
       },
       "unnamedAccount": "Cuenta de Claude",
+      "unknownAccount": "cuenta desconocida",
       "systemDefaultNamed": "Predeterminado del sistema: {{value0}}",
       "systemDefaultIsSaved": "Predeterminado del sistema ha iniciado sesión como {{value0}}, que también es una cuenta guardada. Puede que una versión anterior de Orca haya copiado ese inicio de sesión allí. Si no es tu propio inicio de sesión, selecciona Predeterminado del sistema y ejecuta claude /login.",
       "systemDefaultIsSavedDismiss": "Descartar",

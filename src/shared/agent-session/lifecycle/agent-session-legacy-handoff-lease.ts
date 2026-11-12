@@ -25,11 +25,13 @@ export type PersistedAgentSessionLease = Omit<AgentSessionLease, 'runtimeKind' |
 /** A record as a row stores it. Decode through `decodePersistedAgentSessionRecord`. */
 export type PersistedAgentSessionRecord = Omit<
   AgentSessionRecord,
-  'lease' | 'providerHandleChain' | 'sleptAt' | 'lastTurn'
+  'lease' | 'providerHandleChain' | 'sleptAt' | 'lastTurn' | 'accountId' | 'currentModel'
 > & {
   lease: PersistedAgentSessionLease
   sleptAt?: unknown
   lastTurn?: unknown
+  accountId?: unknown
+  currentModel?: unknown
   providerHandleChain: PersistedAgentSessionProviderHandleLink[]
 }
 

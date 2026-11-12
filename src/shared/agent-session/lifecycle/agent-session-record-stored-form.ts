@@ -13,10 +13,13 @@ import {
 import { isAgentSessionLastTurn } from './agent-session-last-turn'
 import type { AgentSessionDeathEvidence } from './agent-session-death-evidence'
 import type { AgentSessionRecord } from './agent-session-record'
+import { agentSessionManagedAccountId } from './agent-session-account-id'
 
 // Older builds accept only exit-observed, pid-absent and identity-mismatch and set aside any other
 // row, so a delivered kill is stored as the absent pid their restart probe would itself record.
 const KILL_DELIVERY_MARKER = 'kill'
+// Same bound as an option value: a model the record cannot store as an option is not one.
+const MAX_STORED_MODEL_LENGTH = 512
 
 type PersistedDeathEvidence = AgentSessionDeathEvidence & { delivery?: unknown }
 
@@ -41,6 +44,10 @@ function decodeDeathEvidence(
     : rest
 }
 
+function isStoredModel(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_STORED_MODEL_LENGTH
+}
+
 /** Report decode changes needing writeback; handle encoding alone is unchanged across builds and needs none. */
 export function decodePersistedAgentSessionRecord<L extends PersistedAgentSessionObservationLease>(
   record: Omit<PersistedAgentSessionRecord, 'lease'> & { lease: L }
@@ -51,12 +58,16 @@ export function decodePersistedAgentSessionRecord<L extends PersistedAgentSessio
   if (!providerHandleChain) {
     throw new Error('agent_session_provider_handle_invalid')
   }
-  const { sleptAt, lastTurn, ...rest } = record
+  const { sleptAt, lastTurn, accountId: _storedAccountId, currentModel, ...rest } = record
   const validSleep = typeof sleptAt === 'number' && Number.isFinite(sleptAt) && sleptAt > 0
   const lease = normalizeLegacyHandoffLease(record.lease)
+  // Why from the home: rows written before the field have none, and the home is what the chat runs on.
+  const accountId = agentSessionManagedAccountId(record.provider, record.accountHome)
   return {
     record: {
       ...rest,
+      ...(accountId ? { accountId } : {}),
+      ...(isStoredModel(currentModel) ? { currentModel } : {}),
       ...(validSleep ? { sleptAt } : {}),
       ...(isAgentSessionLastTurn(lastTurn) ? { lastTurn } : {}),
       providerHandleChain,

@@ -180,6 +180,8 @@ export type ClaudeRateLimitAccountsState = {
   paneAssignments?: { ptyId: string; accountId: string }[]
   /** The mover's last decision per live session, newest first. */
   sessionMoves?: ClaudeSessionMoveSummary[]
+  /** Every saved native Claude chat and the account its home names. Absent from older hosts. */
+  structuredSessions?: ClaudeStructuredSessionSnapshot[]
   /** Weekly and Fable percents. Absent from older hosts. Null means that window was not readable. `unavailable` names why. */
   usageWindows?: {
     accountId: string
@@ -233,6 +235,24 @@ export type ClaudePaneAccountSnapshot = {
   model?: string
 }
 
+/** One saved native Claude chat. `account` is `system` for System default and `unknown` when its
+ *  managed account was removed; only `managed` carries a label and email. */
+export type ClaudeStructuredSessionSnapshot = {
+  sessionId: string
+  /** The registry and tab-badge key for this chat. */
+  paneKey: string
+  account: 'managed' | 'system' | 'unknown'
+  accountId: string | null
+  label?: string
+  email?: string
+  /** The model the last turn ran, else the saved choice. */
+  model?: string
+  workspaceId: string
+  lastActivityAt: number
+  /** The mover's last decision for this chat while it runs. */
+  lastMove?: Pick<ClaudeSessionMoveSummary, 'reason' | 'detail' | 'toAccountId' | 'at'>
+}
+
 /** Pushed when a pane's billed account changes, including when the pane is gone (`accountId` null). */
 export type ClaudePaneAssignedEvent = {
   ptyId: string
@@ -258,6 +278,10 @@ export type ClaudeSessionMoveSummary = {
   strategy?: 'resume' | 'proxy'
   /** Native chat. Absent on terminal sessions and older hosts. */
   chat?: true
+  /** The native chat's Orca session id. Absent on terminal sessions and older hosts. */
+  sessionId?: string
+  /** Why a settled decision ended as it did, such as `structured-needs-proxy` on a skip. */
+  detail?: string
   /** `model` is a mid-session model flip. Absent on account moves and older hosts. */
   kind?: 'model'
   modelFrom?: string

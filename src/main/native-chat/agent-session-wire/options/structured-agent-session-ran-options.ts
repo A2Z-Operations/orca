@@ -9,6 +9,7 @@ import type {
 } from '../host/structured-agent-session-host-types'
 import { structuredAgentSessionOptionOverridesRefusal } from './structured-agent-session-option-intent'
 import { recordAgentSessionRanOptions } from '../../../runtime/agent-session/records/agent-session-record-options'
+import { noteStructuredClaudeRanModel } from '../../../claude/claude-structured-launch-model'
 
 type RanOptionsContext = {
   deps: Pick<StructuredAgentSessionHostDeps, 'store' | 'logger' | 'agents' | 'modelCatalog'>
@@ -183,6 +184,14 @@ export async function recordStructuredAgentSessionRanOptions(
       options: ran,
       models: undefined,
       now: context.now()
+    })
+    .then((revised) => {
+      if (revised.provider === 'claude') {
+        noteStructuredClaudeRanModel(
+          sessionId,
+          revised.currentModel ?? revised.options?.model ?? model
+        )
+      }
     })
     .catch((error: unknown) =>
       logger.warn('recording the options a turn ran failed', {

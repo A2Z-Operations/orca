@@ -21740,6 +21740,7 @@
       "profileSwitching": "Hesap değişikliği, herhangi bir sekmede başlatacağınız bir sonraki Claude için geçerli olur.",
       "systemDefault": "Sistem varsayılanı",
       "unnamedAccount": "Claude hesabı",
+      "unknownAccount": "bilinmeyen hesap",
       "systemDefaultNamed": "Sistem varsayılanı: {{value0}}",
       "systemDefaultIsSaved": "Sistem varsayılanında, kayıtlı hesaplarınız arasında da bulunan {{value0}} ile oturum açılmış. Önceki bir Orca sürümü bu oturumu oraya kopyalamış olabilir. Bu sizin hesabınız değilse Sistem varsayılanı seçeneğini seçip claude /login komutunu çalıştırın.",
       "systemDefaultIsSavedDismiss": "Kapat",
