@@ -167,10 +167,9 @@ export function registerPtyConnectionRestartReplacementDisposeTests(): void {
       connectPanePty(...args).dispose()
       await flushAsyncTicks()
 
-      const record = mockStoreState.sleepingAgentSessionsByPaneKey[`tab-agent-resume:${LEAF_1}`] as
-        | { agent: string; providerSession: { id: string }; tabId: string }
-        | undefined
-      expect(record).toMatchObject({
+      expect(
+        mockStoreState.sleepingAgentSessionsByPaneKey[`tab-agent-resume:${LEAF_1}`]
+      ).toMatchObject({
         agent: 'claude',
         tabId: 'tab-agent-resume',
         providerSession: { id: '5510c93a-0000-4000-8000-000000000000' }
