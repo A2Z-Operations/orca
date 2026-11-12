@@ -32,6 +32,17 @@ describe('held agent session refusal copy', () => {
     )
   })
 
+  it('keeps the remote-pane note when an SSH or WSL holder could not be confirmed', () => {
+    expect(
+      humanizeTerminalError(ipcWrapped(formatAgentSessionHeldRefusal('pty-ssh', 'box', 'ssh')))
+    ).toBe(
+      'This agent session is still running in the terminal "box". Switch to that terminal instead of resuming the session again. That is a remote pane (SSH), so Orca cannot confirm its agent is still running; if it has exited, close that terminal and resume again.'
+    )
+    expect(humanizeTerminalError(formatAgentSessionHeldRefusal('pty-wsl', null, 'wsl'))).toContain(
+      'That is a remote pane (WSL), so Orca cannot confirm'
+    )
+  })
+
   it('finds the tab whose tab or split leaf names the PTY', () => {
     const state = {
       tabsByWorktree: {

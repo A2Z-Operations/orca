@@ -4,9 +4,11 @@ import { runPtyIpcSpawn } from './spawn-run'
 import type { PtySpawnIpcArgs, PtySpawnIpcDeps } from './spawn-types'
 import { getConnectionExecutionHostId } from '../../../../shared/execution-host'
 import { attachOnlyViewOf, attachViewAfterHiddenStart } from '../pane/attach-only-view'
-import { findHolderOfResumedSession } from '../pane/held-agent-session-resume'
+import {
+  agentSessionHeldRefusal,
+  findHolderOfResumedSession
+} from '../pane/held-agent-session-resume'
 import { heldAgentSessionSources } from '../pane/held-agent-session-sources'
-import { formatAgentSessionHeldRefusal } from '../../../../shared/agent-session/lifecycle/held-agent-session-refusal'
 
 export function installPtySpawnIpcHandler(deps: PtySpawnIpcDeps): void {
   const ipcMain = getPtyIpc()
@@ -23,18 +25,15 @@ export function installPtySpawnIpcHandler(deps: PtySpawnIpcDeps): void {
       args: { resumeProviderSession?: unknown; replacesPtyId?: string } | undefined
     ): Promise<{ holderPtyId: string; refusal: string } | null> => {
       const sources = heldAgentSessionSources(deps.runtime, deps.store)
-      const holderPtyId = await findHolderOfResumedSession(
+      const holder = await findHolderOfResumedSession(
         {
           resumeProviderSession: args?.resumeProviderSession,
           ...(typeof args?.replacesPtyId === 'string' ? { replacesPtyId: args.replacesPtyId } : {})
         },
         sources
       )
-      return holderPtyId
-        ? {
-            holderPtyId,
-            refusal: formatAgentSessionHeldRefusal(holderPtyId, sources.holderTitle(holderPtyId))
-          }
+      return holder
+        ? { holderPtyId: holder.ptyId, refusal: agentSessionHeldRefusal(holder, sources) }
         : null
     }
   )

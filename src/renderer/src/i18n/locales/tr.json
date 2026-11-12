@@ -3948,6 +3948,7 @@
             "sessionUnavailable": "Orca, bu bölmenin terminal oturumuna ana bilgisayarda yeniden bağlanamadı. Devam etmek için yeni bir terminal açın.",
             "agentSessionHeld": "Bu ajan oturumu hâlâ \"{{value0}}\" terminalinde çalışıyor. Oturumu yeniden sürdürmek yerine o terminale geçin.",
             "agentSessionHeldNoTab": "Bu ajan oturumu hâlâ hiçbir sekmenin göstermediği bir terminalde çalışıyor. Bulmak için `orca terminal list` çalıştırın, ardından oturumu yeniden sürdürmek yerine o terminale geçin ya da onu durdurun.",
+            "agentSessionHeldRemoteUnconfirmed": "Bu uzak bir bölme ({{value0}}); Orca ajanının hâlâ çalıştığını doğrulayamıyor. Ajan çıktıysa o terminali kapatıp yeniden sürdürün.",
             "ownerHostMismatch": "Bu terminalin kayıtlı oturumu başka bir ana makine bağlantısına ait olduğundan Orca burada yeniden bağlanamıyor. Devam etmek için yeni bir terminal açın.",
             "sourceRestoring": "Bu terminale yeniden bağlanılıyor, çıktısı yeniden oluşturuluyor. Oturum hâlâ çalışıyor.",
             "remoteTerminalClosed": "Uzak terminal kapatıldı.",

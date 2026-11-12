@@ -3897,6 +3897,7 @@
             "sessionUnavailable": "Orca 無法重新連線到主機上此窗格的終端機工作階段。請開啟新的終端機以繼續。",
             "agentSessionHeld": "此代理工作階段仍在終端機「{{value0}}」中執行。請切換到該終端機，而不要再次恢復此工作階段。",
             "agentSessionHeldNoTab": "此代理工作階段仍在一個沒有任何分頁顯示的終端機中執行。執行 `orca terminal list` 找到它，然後切換到該終端機或將其停止，而不要再次恢復此工作階段。",
+            "agentSessionHeldRemoteUnconfirmed": "這是遠端窗格（{{value0}}），Orca 無法確認其代理是否仍在執行；若已結束，請關閉該終端機後再次恢復。",
             "ownerHostMismatch": "此終端機儲存的工作階段屬於另一個主機連線，因此 Orca 無法在此重新附加它。請開啟新終端機以繼續。",
             "sourceRestoring": "重新連線該終端機 — 正在重新建立其輸出。工作階段仍在進行中。",
             "remoteTerminalClosed": "遠端終端機已關閉。",

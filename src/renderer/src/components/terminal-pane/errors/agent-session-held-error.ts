@@ -30,7 +30,7 @@ export function humanizeAgentSessionHeldLines(
       }
       // Why the live title first: main's saved title can lag a rename by one save.
       const title = titleOfPty?.(held.holderPtyId) ?? held.holderTitle
-      return title
+      const sentence = title
         ? t(
             'auto.components.terminal.pane.TerminalErrorToast.agentSessionHeld',
             'This agent session is still running in the terminal "{{value0}}". Switch to that terminal instead of resuming the session again.',
@@ -40,6 +40,14 @@ export function humanizeAgentSessionHeldLines(
             'auto.components.terminal.pane.TerminalErrorToast.agentSessionHeldNoTab',
             'This agent session is still running in a terminal that no tab shows. Run `orca terminal list` to find it, then switch to it or stop it instead of resuming the session again.'
           )
+      // Why: an SSH/WSL pane's foreground could not be read, so its agent may have exited already.
+      return held.unconfirmed
+        ? `${sentence} ${t(
+            'auto.components.terminal.pane.TerminalErrorToast.agentSessionHeldRemoteUnconfirmed',
+            'That is a remote pane ({{value0}}), so Orca cannot confirm its agent is still running; if it has exited, close that terminal and resume again.',
+            { value0: held.unconfirmed === 'ssh' ? 'SSH' : 'WSL' }
+          )}`
+        : sentence
     })
     .join('\n')
 }

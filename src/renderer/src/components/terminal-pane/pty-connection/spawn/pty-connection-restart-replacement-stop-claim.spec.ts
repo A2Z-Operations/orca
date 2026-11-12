@@ -17,6 +17,7 @@ import {
 } from '../test-fixtures/pty-connection-test-deps'
 import { createInitialStoreState } from '../test-fixtures/pty-connection-test-store-fixtures'
 import type { StoreState } from '../test-fixtures/pty-connection-test-store-state'
+import { formatAgentSessionHeldRefusal } from '../../../../../../shared/agent-session/lifecycle/held-agent-session-refusal'
 
 import {
   installTerminalTestGlobals,
@@ -290,6 +291,104 @@ export function registerPtyConnectionRestartReplacementDisposeTests(): void {
       ).toBe('pty-live')
       // A refusal is final: the account restart is not queued to run into it again.
       expect(mockStoreState.queuePaneAccountRestarts).not.toHaveBeenCalled()
+    })
+
+    it('runs the refused-anyway chain end to end: pre-check clear, spawn refused, PTY kept, remount reattaches it', async () => {
+      const { connectPanePty } = await import('../connect-pane-pty')
+      const { restartUnlessSessionHeld } =
+        await import('../../process-exit/restart-unless-session-held')
+      const ipcTransportModule = await import('../../pty-transport/ipc/pty-transport')
+      const realIpcTransport = await vi.importActual<typeof ipcTransportModule>(
+        '../../pty-transport/ipc/pty-transport'
+      )
+      const agentTitleMocks =
+        await vi.importMock<PtyConnectionAgentTitleMocks>('@/lib/agent-status')
+      installRestartStoreActions()
+      addRestartingTab('tab-agent-race')
+      const sessionId = '7a1c0de5-0000-4000-8000-000000000000'
+      // Main's wire format: another terminal took the session after the pre-check answered.
+      const refusal = formatAgentSessionHeldRefusal('pty-holder', 'Z8 Features')
+      const spawn = vi
+        .fn()
+        .mockRejectedValueOnce(
+          new Error(`Error invoking remote method 'pty:spawn': Error: ${refusal}`)
+        )
+      Object.assign(window.api.pty, {
+        spawn,
+        onData: vi.fn(() => () => {}),
+        onReplay: vi.fn(() => () => {}),
+        onExit: vi.fn(() => () => {})
+      })
+      // The real IPC transport, so the refusal travels through its spawn request.
+      vi.mocked(ipcTransportModule.createIpcPtyTransport).mockImplementationOnce((options) =>
+        realIpcTransport.createIpcPtyTransport(options)
+      )
+      const deps = createDeps({
+        tabId: 'tab-agent-race',
+        startup: claudeRestartStartup(sessionId),
+        replacesPtyId: 'pty-live'
+      })
+      let connection: ReturnType<typeof connectPanePty> | null = null
+      const findHolder = vi.fn(async () => null)
+      const refuse = vi.fn()
+
+      restartUnlessSessionHeld({
+        replacesPtyId: 'pty-live',
+        resumeProviderSession: { key: 'session_id', id: sessionId },
+        findHolder,
+        isStillCurrent: () => true,
+        restart: () => {
+          const args = mockPanePtyArgs(createPane(1), createManager(1), deps)
+          bindPaneAgentTitleMocks(args[2], agentTitleMocks)
+          connection = connectPanePty(...args)
+        },
+        refuse
+      })
+      await flushAsyncTicks()
+      await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(1))
+      await flushAsyncTicks()
+
+      // The pre-check saw no holder, so the restart ran; main refused before stopping anything.
+      expect(findHolder).toHaveBeenCalledWith({
+        resumeProviderSession: { key: 'session_id', id: sessionId },
+        replacesPtyId: 'pty-live'
+      })
+      expect(refuse).not.toHaveBeenCalled()
+      expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ replacesPtyId: 'pty-live' }))
+      // The kept PTY is bound to its pane again and nothing stops it or queues the restart again.
+      expect(window.api.pty.kill).not.toHaveBeenCalled()
+      expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-agent-race', 'pty-live')
+      expect(
+        mockStoreState.terminalLayoutsByTabId?.['tab-agent-race']?.ptyIdsByLeafId?.[LEAF_1]
+      ).toBe('pty-live')
+      expect(mockStoreState.queuePaneAccountRestarts).not.toHaveBeenCalled()
+
+      // Remount (a tab switch): the old connection's dispose finds no unsent claim left to stop.
+      connection!.dispose()
+      await flushAsyncTicks()
+      expect(window.api.pty.kill).not.toHaveBeenCalled()
+
+      const remountTransport = createMockTransport(null)
+      transportFactoryQueue.push(remountTransport)
+      const remountDeps = createDeps({
+        tabId: 'tab-agent-race',
+        restoredLeafId: LEAF_1,
+        restoredPtyIdByLeafId: { [LEAF_1]: 'pty-live' }
+      })
+      const remountArgs = mockPanePtyArgs(createPane(1), createManager(1), remountDeps)
+      bindPaneAgentTitleMocks(remountArgs[2], agentTitleMocks)
+      connectPanePty(...remountArgs)
+      await flushAsyncTicks()
+
+      // The pane reattaches the agent that kept running; no second resume spawn, nothing stopped.
+      const reattached =
+        remountTransport.attach.mock.calls.some(([opts]) => opts.existingPtyId === 'pty-live') ||
+        remountTransport.connect.mock.calls.some(
+          (call) => (call[0] as { sessionId?: string } | undefined)?.sessionId === 'pty-live'
+        )
+      expect(reattached).toBe(true)
+      expect(spawn).toHaveBeenCalledTimes(1)
+      expect(window.api.pty.kill).not.toHaveBeenCalled()
     })
 
     it('stops the replaced PTY when another PTY has since taken the pane', async () => {

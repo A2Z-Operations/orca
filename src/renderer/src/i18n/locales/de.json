@@ -3973,6 +3973,7 @@
             "ownerHostMismatch": "Die gespeicherte Sitzung dieses Terminals gehört zu einer anderen Host-Verbindung. Daher kann Orca sie hier nicht erneut anbinden. Zum Fortfahren ein neues Terminal öffnen.",
             "agentSessionHeld": "Diese Agent-Sitzung läuft noch im Terminal „{{value0}}“. Zu diesem Terminal wechseln, statt die Sitzung erneut fortzusetzen.",
             "agentSessionHeldNoTab": "Diese Agent-Sitzung läuft noch in einem Terminal, das kein Tab anzeigt. Mit `orca terminal list` finden, dann dorthin wechseln oder es beenden, statt die Sitzung erneut fortzusetzen.",
+            "agentSessionHeldRemoteUnconfirmed": "Das ist ein Remote-Bereich ({{value0}}), daher kann Orca nicht bestätigen, dass sein Agent noch läuft; falls er beendet ist, dieses Terminal schließen und erneut fortsetzen.",
             "sourceRestoring": "Dieses Terminal wird erneut verbunden — seine Ausgabe wird wiederhergestellt. Die Sitzung läuft weiterhin.",
             "remoteTerminalClosed": "Das entfernte Terminal wurde geschlossen.",
             "ptyAllocationLimit": "Das System kann keine weiteren pty-Geräte zuweisen. Einige ungenutzte Terminals in Orca oder einem anderen Programm schließen und anschließend erneut versuchen.",

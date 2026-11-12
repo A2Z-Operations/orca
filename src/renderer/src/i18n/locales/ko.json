@@ -3447,6 +3447,7 @@
             "hostTerminalCap": "호스트에서 이미 Orca가 허용하는 최대 개수의 터미널이 실행 중입니다. 더 이상 필요 없는 터미널을 닫은 후 다시 시도하세요.",
             "agentSessionHeld": "이 에이전트 세션은 아직 \"{{value0}}\" 터미널에서 실행 중입니다. 세션을 다시 재개하지 말고 해당 터미널로 전환하세요.",
             "agentSessionHeldNoTab": "이 에이전트 세션은 아직 어떤 탭에도 표시되지 않는 터미널에서 실행 중입니다. `orca terminal list`로 찾은 다음, 세션을 다시 재개하지 말고 해당 터미널로 전환하거나 중지하세요.",
+            "agentSessionHeldRemoteUnconfirmed": "원격 창({{value0}})이라 Orca가 해당 에이전트가 아직 실행 중인지 확인할 수 없습니다. 종료되었다면 그 터미널을 닫고 다시 재개하세요.",
             "ownerHostMismatch": "이 터미널의 저장된 세션은 다른 호스트 연결에 속해 있어 Orca가 여기에서 다시 연결할 수 없습니다. 계속하려면 새 터미널을 여세요."
           },
           "TerminalProcessExitOverlay": {
