@@ -34,6 +34,10 @@ native/windows-registry/bin/
 native/windows-security/build/
 native/windows-security/bin/
 .build/windows-security/
+# Fork (#21): harvest-orcad-prebuilds.mjs outputs (upstream release binaries) and its download cache.
+.build/windows-process-tree/
+.build/windows-cli-launcher/
+.build/orcad-release-harvest/
 
 .pnpm-store/
 package-lock.json
