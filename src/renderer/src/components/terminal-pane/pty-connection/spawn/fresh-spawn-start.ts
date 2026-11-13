@@ -310,8 +310,8 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
           session.settlePaneAttachAttempt?.('failed')
           return
         }
-        if (session.deferredSpawn) {
-          // Why no remount: the host would defer the remount's restore again, in a loop.
+        if (session.deferredSpawn || session.deps.hasPendingRestart?.()) {
+          // Deferred spawns and queued restarts already own the next attempt.
           return
         }
         settleSpawnThatLeftPaneUnbound(session)

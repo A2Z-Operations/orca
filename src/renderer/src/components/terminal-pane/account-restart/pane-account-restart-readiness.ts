@@ -1,3 +1,4 @@
+import { getTabRestartQueues } from '../process-exit/pane-restart-queue'
 import type { AppState } from '@/store/types'
 import { isClaudePaneMidTurn } from '@/lib/agent-session/accounts/claude/claude-session-account-move'
 import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
@@ -10,6 +11,16 @@ export function selectReadyAccountRestartPtyIds(state: AppState, tabId: string):
   for (const [leafId, ptyId] of Object.entries(ptyIdsByLeafId)) {
     if (pending[ptyId] === 'claude' && !isClaudePaneMidTurn(state, makePaneKey(tabId, leafId))) {
       ready.push(ptyId)
+    }
+  }
+  for (const queue of getTabRestartQueues(tabId)) {
+    if (isClaudePaneMidTurn(state, makePaneKey(tabId, queue.leafId))) {
+      continue
+    }
+    for (const ptyId of queue.ptyIds) {
+      if (pending[ptyId] === 'claude' && !ready.includes(ptyId)) {
+        ready.push(ptyId)
+      }
     }
   }
   return ready
