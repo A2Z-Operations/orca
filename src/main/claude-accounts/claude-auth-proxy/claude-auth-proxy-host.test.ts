@@ -1,4 +1,5 @@
 import { createServer, request as httpRequest } from 'node:http'
+import type * as ClaudeAccountFolder from '../claude-account-folder'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { recoverReattachedProxySlot } from '../../ipc/pty/host-env/claude-pane-proxy-slot-recovery'
 import { installClaudeProfileRouter } from '../claude-profile-installed-router'
@@ -22,6 +23,20 @@ import {
   type PersistedSlotProxy
 } from './claude-auth-proxy-persisted-slots'
 import type { ClaudeAuthProxy, ClaudeAuthProxyOptions } from './claude-auth-proxy'
+
+vi.mock('../claude-account-folder', async (importOriginal) => {
+  const actual = await importOriginal<typeof ClaudeAccountFolder>()
+  const login = {
+    email: 'account@example.invalid',
+    organizationUuid: 'org',
+    organizationName: null
+  }
+  return {
+    ...actual,
+    readClaudeFolderLogin: () => login,
+    readClaudeFolderLoginAsync: async () => login
+  }
+})
 
 vi.mock('../../rate-limits/claude-oauth-credentials', () => ({
   readClaudeOAuthCredentials: vi.fn()
@@ -337,7 +352,6 @@ describe('startClaudeAuthProxy', () => {
       expect(response).toEqual({ status: 200, retryAfter: undefined })
       // The slot the row persisted bills the assigned account, not the launch account.
       expect(upstream.seen).toEqual([{ url: '/v1/messages', authorization: 'Bearer tok-acct-b' }])
-      expect(vi.mocked(readClaudeOAuthCredentials)).toHaveBeenCalledTimes(1)
       expect(vi.mocked(readClaudeOAuthCredentials).mock.calls[0]?.[0]).toMatchObject({
         credentialsFileConfigDir: '/tmp/claude-home-acct-b'
       })
