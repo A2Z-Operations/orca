@@ -1,5 +1,6 @@
 import { createServer, request as httpRequest } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { recoverReattachedProxySlot } from '../../ipc/pty/host-env/claude-pane-proxy-slot-recovery'
 import { installClaudeProfileRouter } from '../claude-profile-installed-router'
 import {
   installClaudePaneAccountPersistence,
@@ -274,6 +275,44 @@ describe('startClaudeAuthProxy', () => {
       info.mockRestore()
     }
   })
+
+  it.each(['startup', 'reattach'])(
+    'refuses a removed billed account recovered through %s before contacting upstream',
+    async (recovery) => {
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+      const upstream = await listenFakeUpstream()
+      fakeUpstream.url = upstream.url
+      try {
+        const port = await restartWithPersistedRows()
+        const proxy = getClaudeAuthProxy()!
+        bindClaudeAuthProxyAccountDir('acct-a', '/tmp/claude-home-acct-a')
+        if (recovery === 'reattach') {
+          proxy.releaseSlot(SLOT_A)
+          expect(
+            recoverReattachedProxySlot({
+              recovered: { slot: SLOT_A, port },
+              accountId: 'acct-b',
+              proxy
+            })
+          ).toBe(SLOT_A)
+        }
+        const url = `http://127.0.0.1:${port}/p/${SLOT_A}/v1/messages`
+        expect(await statusOf(url)).toEqual({ status: 401, retryAfter: undefined })
+        proxy.endStartupGrace()
+        expect(await statusOf(url)).toEqual({ status: 401, retryAfter: undefined })
+        expect(upstream.seen).toEqual([])
+        expect(claudeAuthProxyStatus().lastError).toMatchObject({
+          accountId: 'acct-b',
+          status: 401
+        })
+        expect(info.mock.calls.flat().join('\n')).toContain('quarantined')
+      } finally {
+        info.mockRestore()
+        await stopClaudeAuthProxy()
+        await upstream.close()
+      }
+    }
+  )
 
   it('forwards a request on a re-registered slot with the billed account bearer, before any reattach', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {})

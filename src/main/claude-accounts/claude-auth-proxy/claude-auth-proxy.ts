@@ -9,13 +9,13 @@ import {
   bindHostIsNetworkExposed,
   ORCAD_LOOPBACK_BIND_HOST
 } from '../../../shared/orcad-bind-address'
-import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
+import type { ClaudeAuthProxy, ClaudeAuthProxyOptions } from './claude-auth-proxy-types'
+export type { ClaudeAuthProxy, ClaudeAuthProxyOptions } from './claude-auth-proxy-types'
 import { forwardRequestHeaders, forwardResponseHeaders } from './claude-auth-proxy-headers'
 import {
   claudeProxyShouldRewriteModel,
   readIncomingMessageBody,
-  rewriteClaudeProxyBody,
-  type ClaudeProxySlotModel
+  rewriteClaudeProxyBody
 } from './claude-auth-proxy-model-body'
 import { createClaudeAuthProxyRequestLog } from './claude-auth-proxy-request-log'
 import { createClaudeAuthProxyTokenCache } from './claude-auth-proxy-token-cache'
@@ -27,7 +27,8 @@ import {
 import {
   createClaudeAuthProxyStartupGrace,
   refuseClaudeAuthProxyUnknownSlot,
-  refuseClaudeAuthProxyWithoutSlot
+  refuseClaudeAuthProxyWithoutSlot,
+  refuseClaudeAuthProxyMissingCredentials
 } from './claude-auth-proxy-unknown-slot'
 import { CLAUDE_MODEL_REWRITE_BUFFER_CAP } from '../claude-model-body-rewrite'
 import {
@@ -53,64 +54,13 @@ export const CLAUDE_AUTH_PROXY_IDLE_TIMEOUT_MS = 10 * 60 * 1000
  */
 export const CLAUDE_AUTH_PROXY_TOKEN_TTL_MS = 20_000
 
-export type ClaudeAuthProxy = {
-  start: () => Promise<void>
-  /** Stops accepting. In-flight responses finish; idle keep-alives close. */
-  stop: () => Promise<void>
-  port: () => number | null
-  allocateSlot: (accountId: string) => string
-  assignSlot: (slot: string, accountId: string) => boolean
-  /** Re-registers a slot a reattached PTY still carries. False for a malformed id. */
-  adoptSlot: (slot: string, accountId: string) => boolean
-  accountIdForSlot: (slot: string) => string | null
-  /** Trailing slash so Claude's `/v1/...` join keeps the `/p/<slot>/` prefix. */
-  slotBaseUrl: (slot: string) => string | null
-  releaseSlot: (slot: string) => void
-  /** Drops one account, or every account when `accountId` is omitted. */
-  invalidateToken: (accountId?: string) => void
-  /**
-   * Closes the startup grace before its cap: every persisted slot is adopted, so an unknown slot
-   * is stale from here on and gets 502 instead of 503.
-   */
-  endStartupGrace: () => void
-  status: () => ClaudeAuthProxyStatus
-}
-
-export type ClaudeAuthProxyOptions = {
-  readToken: (accountId: string) => Promise<string | null>
-  /** Defaults to https://api.anthropic.com. Tests inject a loopback upstream. */
-  upstream?: string
-  log?: (line: string) => void
-  /** Literal loopback IP. Anything routable is refused. */
-  bindHost?: string
-  /** Defaults to {@link CLAUDE_AUTH_PROXY_TOKEN_TTL_MS}. `0` re-reads every request. */
-  tokenTtlMs?: number
-  /** Socket inactivity budget. Defaults to Claude's 10 minutes. */
-  idleTimeoutMs?: number
-  now?: () => number
-  /** Effective model for a slot. A pinned model is not rewritten. */
-  modelForSlot?: (slot: string) => ClaudeProxySlotModel | null
-  /** Bodies over this size swap the model string instead of parsing. Tests set a small cap. */
-  modelRewriteBufferCap?: number
-  /**
-   * On an upstream 401, refresh the slot's account and replay the buffered body once.
-   * A body over the rewrite cap is not replayed; the refresh still runs for the next request.
-   */
-  refreshAccessToken?: (accountId: string) => Promise<string | null>
-  /** Port of the previous listener. Taken or absent means an ephemeral port. */
-  preferredPort?: number | null
-  /** Cap on the startup grace. Defaults to 60 s (claude-auth-proxy-unknown-slot.ts). */
-  startupGraceMs?: number
-  /** Each request's method, path, status, account, and whether its slot was unknown. A path without a slot is a 404 row. */
-  onRequest?: Parameters<typeof createClaudeAuthProxyRequestLog>[2]
-}
-
 export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAuthProxy {
   const bindHost = options.bindHost ?? ORCAD_LOOPBACK_BIND_HOST
   if (bindHostIsNetworkExposed(bindHost)) {
     throw new Error('claude auth proxy only binds to loopback')
   }
   const slots = new Map<string, string>()
+  const quarantinedSlots = new Set<string>()
   const upstream = options.upstream ?? UPSTREAM_ORIGIN
   const log = options.log ?? (() => {})
   const now = options.now ?? Date.now
@@ -166,6 +116,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     const finish = (): void => {
       tokens.invalidate()
       slots.clear()
+      quarantinedSlots.clear()
       httpAgent.destroy()
       httpsAgent.destroy()
     }
@@ -225,11 +176,19 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
       return
     }
     // Read before opening upstream so a slot flip during this body cannot change it.
-    const token = accountId ? await tokens.tokenFor(accountId) : null
-    const headers = forwardRequestHeaders(req.headers)
-    if (token) {
-      headers.authorization = `Bearer ${token}`
+    const token = quarantinedSlots.has(slot) ? null : await tokens.tokenFor(accountId)
+    if (!token) {
+      // Retain the account for repeat refusals; assignment or adoption clears quarantine.
+      if (slots.get(slot) === accountId && !quarantinedSlots.has(slot)) {
+        quarantinedSlots.add(slot)
+        log(`quarantined slot for account ${accountId}: credentials unavailable`)
+      }
+      const status = refuseClaudeAuthProxyMissingCredentials(req, res, accountId)
+      requests.observe(method, upstreamPath, status, accountId)
+      return
     }
+    const headers = forwardRequestHeaders(req.headers)
+    headers.authorization = `Bearer ${token}`
     const contentTypeHeader = req.headers['content-type']
     const contentType = Array.isArray(contentTypeHeader) ? contentTypeHeader[0] : contentTypeHeader
     const slotModel = options.modelForSlot?.(slot) ?? null
@@ -310,6 +269,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
         return false
       }
       slots.set(slot, accountId)
+      quarantinedSlots.delete(slot)
       return true
     },
     adoptSlot(slot, accountId) {
@@ -317,6 +277,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
         return false
       }
       slots.set(slot, accountId)
+      quarantinedSlots.delete(slot)
       return true
     },
     accountIdForSlot(slot) {
@@ -331,6 +292,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     },
     releaseSlot(slot) {
       slots.delete(slot)
+      quarantinedSlots.delete(slot)
     },
     invalidateToken(accountId) {
       tokens.invalidate(accountId)
