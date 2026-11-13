@@ -48,6 +48,56 @@ describe('session mover writes the durable account log', () => {
     })
   })
 
+  it('retains completed and failed move rows after their PTYs leave the registry', async () => {
+    const f = setup()
+    f.session('pty-1', PANE_1, 'b')
+    f.mover.start()
+    f.publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    f.records.splice(0)
+    f.mover.evaluate()
+    expect(f.mover.lastDecisions()).toEqual([
+      expect.objectContaining({ ptyId: 'pty-new', reason: 'moved', toAccountId: 'c' })
+    ])
+    f.session('pty-failed', PANE_1, 'b')
+    f.move.mockImplementationOnce(async () => {
+      f.records.splice(0)
+      throw new Error('replacement exited')
+    })
+    vi.setSystemTime(Date.now() + 20 * 60_000)
+    f.publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    f.mover.evaluate()
+    expect(f.mover.lastDecisions().map((row) => row.reason)).toEqual(['failed', 'moved'])
+    expect(f.notices[1]?.moves).toEqual(f.mover.lastDecisions())
+    vi.useRealTimers()
+    await closeClaudeAccountLog()
+    const rows = (await readClaudeAccountLog({ filePath: path })).entries
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'decision', reason: 'moved', ptyId: 'pty-new' }),
+        expect.objectContaining({ type: 'decision', reason: 'failed', ptyId: 'pty-failed' })
+      ])
+    )
+  })
+
+  it('retries a wait without a failure cooldown or a target reservation', async () => {
+    const f = setup()
+    f.session('pty-1', PANE_1, 'b')
+    f.move.mockResolvedValueOnce({ kind: 'wait', reason: 'no-transcript' })
+    f.mover.start()
+    f.publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    expect(f.mover.lastDecisions()).toEqual([
+      expect.objectContaining({ ptyId: 'pty-1', reason: 'wait:no-transcript' })
+    ])
+    f.mover.evaluate()
+    await vi.runAllTimersAsync()
+    expect(f.mover.lastDecisions()).toEqual([
+      expect.objectContaining({ ptyId: 'pty-new', reason: 'moved', toAccountId: 'c' })
+    ])
+  })
+
   it('stay and wait reasons are the decision reasons, never a bare "stay"', async () => {
     const f = setup()
     f.session('pty-1', PANE_1, 'b', 'done')

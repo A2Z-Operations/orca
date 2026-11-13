@@ -169,6 +169,17 @@ export function evaluateClaudeMoverSessions(
       .then((outcome) => {
         if (outcome.kind === 'moved') {
           settled('moved', outcome.newPtyId)
+        } else if (outcome.kind === 'wait') {
+          const claim = targetClaims.get(to.id)
+          if (claim?.at === now) {
+            const debit = claim.debit - CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT
+            if (debit > 0) {
+              targetClaims.set(to.id, { ...claim, debit })
+            } else {
+              targetClaims.delete(to.id)
+            }
+          }
+          remember(view, from, null, `wait:${outcome.reason}`, own?.rateLimits ?? null, Date.now())
         } else if (outcome.kind === 'skipped') {
           settled('skipped', outcome.reason)
         } else {

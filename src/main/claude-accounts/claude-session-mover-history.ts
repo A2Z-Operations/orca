@@ -23,6 +23,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
   const lastFailureAt = new Map<string, number>()
   const lastAskAt = new Map<string, number>()
   const backgroundWaitAt = new Map<string, number>()
+  const settledMoves: ClaudeSessionMoveSummary[] = []
   const lastDecision = new Map<string, ClaudeSessionMoveSummary>()
   const targetClaims = new Map<string, ClaudeTargetClaim>()
   const inflight = new Set<string>()
@@ -37,7 +38,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
     usage: ProviderRateLimits | null,
     now: number,
     detail?: string
-  ): void => {
+  ): ClaudeSessionMoveSummary => {
     const window = worstClaudeWindow(usage, now)
     const record: ClaudeSessionMoveSummary = {
       ptyId: view.record.ptyId,
@@ -80,6 +81,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
       })
     }
     lastDecision.set(view.record.ptyId, record)
+    return record
   }
 
   const settle =
@@ -106,7 +108,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
       } else {
         lastFailureAt.set(view.record.ptyId, now)
       }
-      remember(
+      const record = remember(
         kind === 'moved' ? { ...view, record: { ...view.record, ptyId: detail } } : view,
         from,
         kind === 'moved' ? to : null,
@@ -116,6 +118,8 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
         detail
       )
       if (kind === 'moved' || kind === 'failed') {
+        settledMoves.unshift(record)
+        settledMoves.length = Math.min(settledMoves.length, 50)
         noteClaudeSessionMoveStat({
           strategy: view.record.proxySlot ? 'proxy' : 'resume',
           rebalance: kind === 'moved' && balance,
@@ -135,6 +139,7 @@ export function createClaudeMoverHistory(deps: ClaudeSessionMoverDeps) {
     }
 
   return {
+    settledMoves,
     lastMoveAt,
     lastFailureAt,
     lastAskAt,

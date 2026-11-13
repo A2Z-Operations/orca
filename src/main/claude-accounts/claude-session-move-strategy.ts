@@ -1,3 +1,4 @@
+import { wslGatedStat } from '../native-chat/wsl-transcript-fs-access'
 import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
 import type { AgentStartupSettings } from '../../shared/agent-launch/startup/agent-startup-plan-inputs'
@@ -33,6 +34,7 @@ export type ClaudeSessionMoveOutcome =
       endedWork?: ClaudeSessionMoveEndedWork
       handoffNote?: 'sent' | 'unsent'
     }
+  | { kind: 'wait'; reason: 'no-cwd' | 'no-transcript' }
   | { kind: 'skipped'; reason: 'no-controller' | 'no-resume-plan' | 'no-pane' }
   | { kind: 'failed'; reason: 'owner-changed' | 'spawn-failed'; error: string }
 
@@ -112,7 +114,18 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
         return { kind: 'skipped', reason: 'no-pane' }
       }
       const settings = deps.getSettings()
-      const cwd = (await controller.getCwd?.(request.ptyId)) ?? undefined
+      const observedCwd = await controller.getCwd?.(request.ptyId).catch(() => null)
+      const cwd = observedCwd || request.providerSession.cwd
+      if (!cwd?.trim()) {
+        return { kind: 'wait', reason: 'no-cwd' }
+      }
+      const transcriptPath = request.providerSession.transcriptPath
+      const transcript = transcriptPath
+        ? await wslGatedStat(transcriptPath, 'exact').catch(() => null)
+        : null
+      if (!transcript?.isFile() || transcript.size === 0) {
+        return { kind: 'wait', reason: 'no-transcript' }
+      }
       // Why no defaults: a hand-started Claude must not come back with configured args such as a permission bypass.
       const plan = buildAgentResumeStartupPlan({
         agent: 'claude',
@@ -134,7 +147,7 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
       try {
         const result = await controller.spawn({
           ...size,
-          ...(cwd ? { cwd } : {}),
+          cwd,
           command: plan.launchCommand,
           launchAgent: 'claude',
           commandDelivery: 'provider',

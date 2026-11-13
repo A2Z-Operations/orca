@@ -18,6 +18,8 @@ export type ClaudeSessionMoveReason =
   | 'read-usage'
   | 'wait:mid-turn'
   | 'wait:no-status'
+  | 'wait:no-cwd'
+  | 'wait:no-transcript'
   | 'wait:background-work'
   | 'moving'
   | 'moved'
@@ -91,6 +93,6 @@ export type ClaudeSessionMoverDeps = {
 export type ClaudeSessionMover = {
   start: () => () => void
   evaluate: () => void
-  /** The last decision per live session, newest first. */
+  /** Recent settled moves and the last decision per live session, newest first. */
   lastDecisions: () => ClaudeSessionMoveSummary[]
 }

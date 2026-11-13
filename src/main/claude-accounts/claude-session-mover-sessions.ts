@@ -94,11 +94,12 @@ export function collectClaudeMoverSessions(args: {
       paneBackgroundWork: moverPaneBackgroundWork(status),
       ...(status?.turnEndedAt !== undefined ? { turnEndedAt: status.turnEndedAt } : {}),
       providerSession: identity
-        ? (args.resolveProviderSession(identity.paneKey, identity.sessionId) ?? {
+        ? {
             key: 'session_id',
             id: identity.sessionId,
-            ...(identity.transcriptPath ? { transcriptPath: identity.transcriptPath } : {})
-          })
+            ...(identity.transcriptPath ? { transcriptPath: identity.transcriptPath } : {}),
+            ...args.resolveProviderSession(identity.paneKey, identity.sessionId)
+          }
         : record.providerSessionId
           ? { key: 'session_id', id: record.providerSessionId }
           : null,

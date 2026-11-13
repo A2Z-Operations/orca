@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../shared/constants'
 import { makePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import type { RuntimePtyController } from '../runtime/terminal/lifecycle/runtime-pty-controller-contract'
@@ -19,6 +22,16 @@ import {
 
 type Controller = Pick<RuntimePtyController, 'spawn' | 'getCwd' | 'getSize'>
 
+let transcript: string
+let directory: string
+
+beforeEach(() => {
+  directory = mkdtempSync(join(tmpdir(), 'claude-move-'))
+  transcript = join(directory, 'sess-abc.jsonl')
+  writeFileSync(transcript, '{"type":"user"}\n')
+})
+afterEach(() => rmSync(directory, { recursive: true, force: true }))
+
 function request(): ClaudeSessionMoveRequest {
   return {
     ptyId: 'pty-old',
@@ -29,7 +42,7 @@ function request(): ClaudeSessionMoveRequest {
     providerSession: {
       key: 'session_id',
       id: 'sess-abc',
-      transcriptPath: '/profiles/b/home/projects/x/sess-abc.jsonl'
+      transcriptPath: transcript
     }
   }
 }
@@ -106,6 +119,72 @@ describe('createResumeMoveStrategy', () => {
     const opts = spawn.mock.calls[0]![0]
     expect(opts.command).toMatch(/'--effort' 'high' '--resume' 'sess-abc'$/)
     expect(opts.resumeProviderSession?.effort).toBe('high')
+  })
+
+  it('uses the recorded run folder when the old PTY cwd cannot be read', async () => {
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const strategy = createResumeMoveStrategy({
+      getController: () => ({ ...controller(spawn), getCwd: async () => null }),
+      getSettings: () => getDefaultSettings('/tmp'),
+      platform: 'darwin'
+    })
+    await expect(
+      strategy.move({
+        ...request(),
+        providerSession: { ...request().providerSession, cwd: '/fixture/recorded run' }
+      })
+    ).resolves.toMatchObject({ kind: 'moved' })
+    expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/fixture/recorded run' }))
+    spawn.mockClear()
+    await expect(strategy.move(request())).resolves.toEqual({ kind: 'wait', reason: 'no-cwd' })
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('waits when reading the old PTY cwd fails and no recorded folder exists', async () => {
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const strategy = createResumeMoveStrategy({
+      getController: () => ({
+        ...controller(spawn),
+        getCwd: async () => {
+          throw new Error('owner gone')
+        }
+      }),
+      getSettings: () => getDefaultSettings('/tmp'),
+      platform: 'linux'
+    })
+    await expect(strategy.move(request())).resolves.toEqual({ kind: 'wait', reason: 'no-cwd' })
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('waits for a transcript file before replacing the old pane', async () => {
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const strategy = createResumeMoveStrategy({
+      getController: () => controller(spawn),
+      getSettings: () => getDefaultSettings('/tmp'),
+      platform: 'darwin'
+    })
+    const unknown = request()
+    delete unknown.providerSession.transcriptPath
+    await expect(strategy.move(unknown)).resolves.toEqual({ kind: 'wait', reason: 'no-transcript' })
+    writeFileSync(transcript, '')
+    await expect(strategy.move(request())).resolves.toEqual({
+      kind: 'wait',
+      reason: 'no-transcript'
+    })
+    rmSync(transcript)
+    await expect(strategy.move(request())).resolves.toEqual({
+      kind: 'wait',
+      reason: 'no-transcript'
+    })
+    mkdirSync(transcript)
+    await expect(strategy.move(request())).resolves.toEqual({
+      kind: 'wait',
+      reason: 'no-transcript'
+    })
+    expect(spawn).not.toHaveBeenCalled()
+    rmSync(transcript, { recursive: true })
+    writeFileSync(transcript, '{"type":"user"}\n')
+    await expect(strategy.move(request())).resolves.toEqual({ kind: 'moved', newPtyId: 'pty-new' })
   })
 
   it('reports an owner change as a failure without touching anything else', async () => {
