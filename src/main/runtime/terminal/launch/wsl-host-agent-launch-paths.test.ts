@@ -10,6 +10,11 @@ import type { MobileTerminalCommand } from './mobile-terminal-startup'
 import type { SleepingAgentLaunchConfig } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
 import '../../../../shared/execution-host'
 
+// PATH and HOME isolation still leaves the host's system-wide CLI installs discoverable.
+vi.mock('../../../../shared/system-cli-install-dirs', () => ({
+  getSystemCliInstallDirectories: () => []
+}))
+
 let root: string
 let windowsBin: string
 let nativeBin: string
