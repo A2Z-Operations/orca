@@ -19,6 +19,7 @@ import {
 } from './claude-auth-proxy-model-body'
 import { createClaudeAuthProxyRequestLog } from './claude-auth-proxy-request-log'
 import { createClaudeAuthProxyTokenCache } from './claude-auth-proxy-token-cache'
+import { createClaudeAuthProxySlotCredentials } from './claude-auth-proxy-slot-credentials'
 import {
   allocateClaudeAuthProxySlot,
   CLAUDE_AUTH_PROXY_SLOT_ID,
@@ -60,7 +61,6 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     throw new Error('claude auth proxy only binds to loopback')
   }
   const slots = new Map<string, string>()
-  const quarantinedSlots = new Set<string>()
   const upstream = options.upstream ?? UPSTREAM_ORIGIN
   const log = options.log ?? (() => {})
   const now = options.now ?? Date.now
@@ -69,6 +69,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     now,
     readToken: options.readToken
   })
+  const slotCredentials = createClaudeAuthProxySlotCredentials({ slots, tokens, now, log })
   const requests = createClaudeAuthProxyRequestLog(now, log, options.onRequest)
   const idleTimeoutMs = options.idleTimeoutMs ?? CLAUDE_AUTH_PROXY_IDLE_TIMEOUT_MS
   const httpAgent = new HttpAgent({ keepAlive: true })
@@ -116,7 +117,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     const finish = (): void => {
       tokens.invalidate()
       slots.clear()
-      quarantinedSlots.clear()
+      slotCredentials.clear()
       httpAgent.destroy()
       httpsAgent.destroy()
     }
@@ -176,13 +177,8 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
       return
     }
     // Read before opening upstream so a slot flip during this body cannot change it.
-    const token = quarantinedSlots.has(slot) ? null : await tokens.tokenFor(accountId)
+    const token = await slotCredentials.tokenForSlot(slot, accountId)
     if (!token) {
-      // Retain the account for repeat refusals; assignment or adoption clears quarantine.
-      if (slots.get(slot) === accountId && !quarantinedSlots.has(slot)) {
-        quarantinedSlots.add(slot)
-        log(`quarantined slot for account ${accountId}: credentials unavailable`)
-      }
       const status = refuseClaudeAuthProxyMissingCredentials(req, res, accountId)
       requests.observe(method, upstreamPath, status, accountId)
       return
@@ -269,7 +265,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
         return false
       }
       slots.set(slot, accountId)
-      quarantinedSlots.delete(slot)
+      slotCredentials.forgetSlot(slot)
       return true
     },
     adoptSlot(slot, accountId) {
@@ -277,7 +273,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
         return false
       }
       slots.set(slot, accountId)
-      quarantinedSlots.delete(slot)
+      slotCredentials.forgetSlot(slot)
       return true
     },
     accountIdForSlot(slot) {
@@ -292,7 +288,7 @@ export function createClaudeAuthProxy(options: ClaudeAuthProxyOptions): ClaudeAu
     },
     releaseSlot(slot) {
       slots.delete(slot)
-      quarantinedSlots.delete(slot)
+      slotCredentials.forgetSlot(slot)
     },
     invalidateToken(accountId) {
       tokens.invalidate(accountId)

@@ -18,7 +18,7 @@ describe('Claude auth proxy missing credentials', () => {
     }
   })
 
-  async function started(readToken: (accountId: string) => Promise<string | null>) {
+  async function started(readToken: (accountId: string) => Promise<string | null>, now = Date.now) {
     const seen: { authorization: string | undefined }[] = []
     const lines: string[] = []
     upstream = createServer((req, res) => {
@@ -34,6 +34,7 @@ describe('Claude auth proxy missing credentials', () => {
     }
     proxy = createClaudeAuthProxy({
       readToken,
+      now,
       upstream: `http://127.0.0.1:${address.port}`,
       log: (line) => {
         lines.push(line)
@@ -81,7 +82,68 @@ describe('Claude auth proxy missing credentials', () => {
     }
   )
 
-  it('keeps missing credentials quarantined until adoption and forgets quarantine on release', async () => {
+  it.each(['missing', 'unreadable'])(
+    'recovers %s credentials after the same account signs in',
+    async (state) => {
+      let at = 0
+      let signedIn = false
+      const { proxy, seen, lines } = await started(
+        async () => {
+          if (signedIn) {
+            return TOKEN_B
+          }
+          if (state === 'unreadable') {
+            throw new Error(TOKEN_A)
+          }
+          return null
+        },
+        () => at
+      )
+      const slot = proxy.allocateSlot('account-a')
+      const url = `${proxy.slotBaseUrl(slot)}v1/messages`
+      expect((await fetch(url)).status).toBe(401)
+      signedIn = true
+      at = 5_000
+      expect((await fetch(url)).status).toBe(200)
+      expect((await fetch(url)).status).toBe(200)
+      expect(seen.map((entry) => entry.authorization)).toEqual([
+        `Bearer ${TOKEN_B}`,
+        `Bearer ${TOKEN_B}`
+      ])
+      expect(lines.join('\n')).toContain('lifted slot quarantine')
+      expect(lines.join('\n')).not.toContain(TOKEN_A)
+      expect(lines.join('\n')).not.toContain(TOKEN_B)
+    }
+  )
+
+  it('rate-limits recovery reads while credentials remain unavailable', async () => {
+    let at = 0
+    let reads = 0
+    const { proxy, seen } = await started(
+      async () => {
+        reads += 1
+        return null
+      },
+      () => at
+    )
+    const slot = proxy.allocateSlot('account-a')
+    const url = `${proxy.slotBaseUrl(slot)}v1/messages`
+    expect((await fetch(url)).status).toBe(401)
+    at = 4_999
+    expect((await fetch(url)).status).toBe(401)
+    expect(reads).toBe(1)
+    at = 5_000
+    expect((await fetch(url)).status).toBe(401)
+    at = 9_999
+    expect((await fetch(url)).status).toBe(401)
+    expect(reads).toBe(2)
+    at = 10_000
+    expect((await fetch(url)).status).toBe(401)
+    expect(reads).toBe(3)
+    expect(seen).toEqual([])
+  })
+
+  it('allows adoption during quarantine and forgets quarantine on release', async () => {
     let token: string | null = null
     const { proxy, seen } = await started(async () => token)
     const slot = proxy.allocateSlot('account-a')
