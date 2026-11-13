@@ -129,7 +129,8 @@ describe('createIpcPtyTransport', () => {
       expect.stringContaining('agent_session_held_by_live_terminal')
     )
 
-    // Any other failure may have stopped the old PTY already: nothing is handed back.
+    // Confirmed retirement must not restore the old binding.
+    window.api.pty.hasPty = vi.fn().mockResolvedValue(false)
     await createIpcPtyTransport().connect({
       url: '',
       claimReplacedPtyId: () => 'pty-old-2',
@@ -138,6 +139,27 @@ describe('createIpcPtyTransport', () => {
     })
     expect(onReplacedPtyKept).toHaveBeenCalledTimes(1)
   })
+
+  it.each([true, null])(
+    'keeps the old PTY discoverable after a refusal when liveness is %s',
+    async (live) => {
+      const { createIpcPtyTransport } = await import('./pty-transport')
+      vi.mocked(window.api.pty.spawn).mockRejectedValueOnce(new Error('replacement denied'))
+      window.api.pty.hasPty = vi.fn().mockResolvedValue(live)
+      const onReplacedPtyKept = vi.fn()
+      const onError = vi.fn()
+
+      await createIpcPtyTransport().connect({
+        url: '',
+        claimReplacedPtyId: () => 'pty-old',
+        onReplacedPtyKept,
+        callbacks: { onError }
+      })
+
+      expect(onReplacedPtyKept).toHaveBeenCalledWith('pty-old')
+      expect(onError).toHaveBeenCalledWith('replacement denied')
+    }
+  )
 
   it('surfaces the SSH-not-active toast for a regular SSH target with no PTY provider', async () => {
     const { createIpcPtyTransport } = await import('./pty-transport')

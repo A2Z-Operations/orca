@@ -8,7 +8,7 @@ import { hasPtySerializer } from '../../snapshots/pty-buffer-serializer'
 import { writeTerminalOutput } from '@/lib/pane-manager/pane-terminal-output-scheduler'
 
 import { settleSpawnThatLeftPaneUnbound } from './unbound-pane-spawn-recovery'
-import { restartReplacementClaim } from './unsent-restart-replacement'
+import { restartReplacementClaim, settleRestart } from './unsent-restart-replacement'
 import { STARTUP_CWD_FALLBACK_NOTICE } from '../../../../../../shared/startup-cwd-fallback'
 import { pendingSpawnByPaneKey, pendingSpawnGenerationByPaneKey } from './pending-pane-spawn'
 import { shouldWritePtyOutputForeground } from '../output/foreground-output-visibility'
@@ -79,6 +79,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
       })
     }
 
+    session.restartReplacementStopped = false
     session.transportConnectInFlightSince = Date.now()
     session.pendingSpawnDeferral = null
     const visibleAtSpawn = session.deps.isVisibleRef.current === true
@@ -254,13 +255,11 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
         }
         const gen = await preSignalPromise
         // Bound PTYs own their serializer even after rejected declaration; generation only settles pending declaration state.
-        if (resolvedPtyId) {
-          if (!isRemoteRuntimePtyId(resolvedPtyId) || !hasPtySerializer(resolvedPtyId)) {
-            session.registerPaneSerializerFor(resolvedPtyId)
-          }
-          if (typeof gen === 'number') {
-            void window.api.pty.settlePaneSerializer(session.cacheKey, gen).catch(() => {})
-          }
+        if (!isRemoteRuntimePtyId(resolvedPtyId) || !hasPtySerializer(resolvedPtyId)) {
+          session.registerPaneSerializerFor(resolvedPtyId)
+        }
+        if (typeof gen === 'number') {
+          void window.api.pty.settlePaneSerializer(session.cacheKey, gen).catch(() => {})
         }
         session.finishReattachLiveDataDeferral(Boolean(resolvedPtyId), outputCallbacks.generation)
         return resolvedPtyId
@@ -282,6 +281,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
         return null
       })
       .finally(() => {
+        settleRestart(session)
         if (pendingSpawnByPaneKey.get(session.pendingSpawnKey) === trackedPromise) {
           pendingSpawnByPaneKey.delete(session.pendingSpawnKey)
           pendingSpawnGenerationByPaneKey.delete(session.pendingSpawnKey)
@@ -296,6 +296,7 @@ export function bindStartFreshSpawn(session: ConnectPanePtySession): void {
       queueMicrotask(() => {
         if (
           session.disposed ||
+          session.restartReplacementStopped ||
           outputCallbacks.generation !== session.transportStreamGeneration ||
           session.transport.getPtyId() ||
           pendingSpawnByPaneKey.has(session.pendingSpawnKey)

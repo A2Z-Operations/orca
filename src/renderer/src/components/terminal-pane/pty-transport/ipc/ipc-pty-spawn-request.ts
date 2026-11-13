@@ -156,14 +156,22 @@ export async function spawnIpcPty(
     ...(telemetry ? { telemetry } : {}),
     ...(agentLaunch && !admittedSessionId ? { agentLaunch } : {})
   })
-  if (!replacesPtyId || !connectOptions.onReplacedPtyKept) {
+  if (
+    !replacesPtyId ||
+    (!connectOptions.onReplacedPtyKept && !connectOptions.onReplacedPtyStopped)
+  ) {
     return spawned
   }
   const onReplacedPtyKept = connectOptions.onReplacedPtyKept
-  return spawned.catch((error: unknown) => {
-    // Why: main refuses a held session before it stops the claimed PTY, which would otherwise run on unbound.
-    if (isAgentSessionHeldRefusal(error)) {
-      onReplacedPtyKept(replacesPtyId)
+  return spawned.catch(async (error: unknown) => {
+    // Other failures may precede retirement too; only confirmed absence releases the saved owner.
+    const kept =
+      isAgentSessionHeldRefusal(error) ||
+      (await window.api.pty.hasPty(replacesPtyId).catch(() => null)) !== false
+    if (kept) {
+      onReplacedPtyKept?.(replacesPtyId)
+    } else {
+      connectOptions.onReplacedPtyStopped?.(replacesPtyId)
     }
     throw error
   })

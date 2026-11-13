@@ -5,11 +5,7 @@ type SessionHolderLookup = (args: {
   replacesPtyId: string
 }) => Promise<{ holderPtyId: string; refusal: string } | null>
 
-/**
- * A restart that resumes a session unbinds its pane before the spawn, so a refusal at the spawn
- * would leave the old PTY live with no pane. Ask main first: when another live terminal holds the
- * session, the restart never starts, the old PTY stays bound, and the pane shows the refusal.
- */
+/** Refuse known duplicate resumes before detaching the live transport; main repeats the check at spawn. */
 export function restartUnlessSessionHeld(args: {
   /** The PTY the restart replaces; without one there is nothing to strand, and main's own refusal suffices. */
   replacesPtyId: string | null | undefined

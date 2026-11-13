@@ -30,8 +30,7 @@ export function settleUnsentRestartReplacement(args: {
   )
   const layout = state.terminalLayoutsByTabId[args.tabId]
   const boundPtyId = layout?.ptyIdsByLeafId?.[args.leafId]
-  // Why the layout check: a restart already dropped the leaf's binding, so only the layout shows
-  // whether the user closed this split pane while the rest of its tab stays open.
+  // The tab can stay open after its restarting split pane closes.
   const leafPresent = tabPresent && layoutContainsLeafId(layout?.root ?? null, args.leafId)
   // Why stop: a closed tab or pane, or a pane another PTY has since taken, has no surface left to show it.
   if (!leafPresent || (boundPtyId !== undefined && boundPtyId !== args.ptyId)) {
@@ -57,13 +56,27 @@ function accountRestartAgentOf(agent: string | undefined): AccountRestartAgent |
   return agent === 'claude' || agent === 'codex' ? agent : null
 }
 
-/** The restart spawn's claim on its replaced PTY, and its return when main refuses the spawn first. */
+/** The restart spawn's retirement claim, and its return when a failed spawn leaves the PTY alive or unconfirmed. */
 export function restartReplacementClaim(session: ConnectPanePtySession): {
   claimReplacedPtyId: () => string | null
   onReplacedPtyKept: (ptyId: string) => void
+  onReplacedPtyStopped: (ptyId: string) => void
 } {
   return {
     claimReplacedPtyId: session.claimPendingReplacedPtyId,
+    onReplacedPtyStopped: (ptyId) => {
+      if (
+        session.disposed ||
+        session.deps.paneTransportsRef.current.get(session.pane.id) !== session.transport
+      ) {
+        return
+      }
+      session.restartReplacementStopped = true
+      session.clearExitedPanePtyLayoutBinding(ptyId)
+      session.deps.clearTabPtyId(session.deps.tabId, ptyId)
+      session.deps.consumeSuppressedPtyExit(ptyId)
+      session.reportError('The previous process ended and its replacement failed to start.')
+    },
     // A refused restart is final: the old PTY returns to its pane, and nothing is queued again.
     onReplacedPtyKept: (ptyId) => {
       settleUnsentRestartReplacement({
@@ -79,4 +92,10 @@ export function restartReplacementClaim(session: ConnectPanePtySession): {
       })
     }
   }
+}
+
+export function settleRestart(session: ConnectPanePtySession): void {
+  const onRestartSettled = session.deps.onRestartSettled
+  session.deps.onRestartSettled = undefined
+  onRestartSettled?.()
 }
