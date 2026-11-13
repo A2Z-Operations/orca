@@ -8,6 +8,7 @@ import { shouldIgnoreStalePanePtyLayoutBinding } from '../reattach/pane-pty-layo
 import type { ConnectPanePtySession } from '../connect-pane-pty-session'
 
 export function installActivePanePtyBinding(session: ConnectPanePtySession): void {
+  const restartSourcePtyId: string | null = session.pendingReplacedPtyId
   session.observeTerminalGitHubPRLink = createTerminalGitHubPRLinkDetector()
   session.reportPanePtyVisibility = (ptyId: string | null | undefined, visible: boolean): void => {
     if (!ptyId || isRemoteRuntimePtyId(ptyId)) {
@@ -39,7 +40,9 @@ export function installActivePanePtyBinding(session: ConnectPanePtySession): voi
       .find((tab) => tab.id === session.deps.tabId)?.ptyId
     // Remounted mirrored panes may fresh-spawn while the tab names an old host handle; replace it atomically instead of retaining both identities.
     const inferredReplacementPtyId =
-      existingPtyId && existingPtyId !== ptyId && tabPtyId === existingPtyId
+      existingPtyId &&
+      existingPtyId !== ptyId &&
+      (tabPtyId === existingPtyId || restartSourcePtyId === existingPtyId)
         ? existingPtyId
         : undefined
     const replacementPtyId = options.replacePtyId ?? inferredReplacementPtyId

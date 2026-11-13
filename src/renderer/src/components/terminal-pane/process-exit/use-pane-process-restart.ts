@@ -94,12 +94,17 @@ export function usePaneProcessRestart({
       if (existingPtyId) {
         suppressPtyExit(existingPtyId)
         clearCodexRestartNotice(existingPtyId)
-        clearTabPtyId(tabId, existingPtyId)
       }
       panePtyBinding?.dispose()
       panePtyBindingsRef.current.delete(paneId)
-      syncPanePtyLayoutBinding(paneId, null)
       const replacesPtyId = releasePaneTransportForRestart(transport)
+      // A pending local replacement must remain discoverable in the quit checkpoint.
+      if (!replacesPtyId) {
+        if (existingPtyId) {
+          clearTabPtyId(tabId, existingPtyId)
+        }
+        syncPanePtyLayoutBinding(paneId, null)
+      }
       paneTransportsRef.current.delete(paneId)
       setCacheTimerStartedAt(makePaneKey(tabId, pane.leafId), null)
       setTerminalError(null)
