@@ -38,6 +38,8 @@ export type PtyConnectionDeps = {
   replacesPtyId?: string
   /** Releases the per-pane restart fence after connection settlement or disposal. */
   onRestartSettled?: () => void
+  /** A successor restart owns recovery while its asynchronous holder lookup is pending. */
+  hasPendingRestart?: () => boolean
   restoredLeafId?: string | null
   restoredPtyIdByLeafId?: Record<string, string>
   /** Render-time park intent survives watcher disposal and is consumed once after layout replay. */

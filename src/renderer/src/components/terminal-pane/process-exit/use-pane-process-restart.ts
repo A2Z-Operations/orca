@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { useAppStore } from '../../../store'
 import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
 import { connectPanePty } from '../pty-connection/connect-pane-pty'
@@ -7,6 +7,13 @@ import {
   appendPaneTerminalError,
   clearPaneTerminalError
 } from '../errors/terminal-error-accumulation'
+import {
+  getPaneRestartQueue,
+  getTabRestartQueues,
+  settlePaneRestart,
+  type PaneRestartAttempt
+} from './pane-restart-queue'
+import { usePaneRestartQueueLifecycle } from './use-pane-restart-queue-lifecycle'
 import { restartUnlessSessionHeld } from './restart-unless-session-held'
 import type { PtyConnectionDeps } from '../pty-connection/pty-connection-deps'
 import type { TerminalPaneCloseController } from '../layout/close/use-terminal-pane-close-actions'
@@ -81,18 +88,7 @@ export function usePaneProcessRestart({
   | 'updateTabTitle'
   | 'worktreeId'
 >) {
-  const restartingPanesRef = useRef(new Set<number>())
-  const pendingRestartsRef = useRef(new Map<number, () => void>())
-  useEffect(() => () => pendingRestartsRef.current.clear(), [])
-  const settlePaneRestart = useCallback((paneId: number) => {
-    // Let the previous spawn finish binding and remove its pending-spawn entry first.
-    queueMicrotask(() => {
-      restartingPanesRef.current.delete(paneId)
-      const pending = pendingRestartsRef.current.get(paneId)
-      pendingRestartsRef.current.delete(paneId)
-      pending?.()
-    })
-  }, [])
+  const owner = useRef(true)
   const getRestartPtyId = useCallback(
     (paneId: number) => {
       const pane = managerRef.current?.getPanes().find((candidate) => candidate.id === paneId)
@@ -106,14 +102,14 @@ export function usePaneProcessRestart({
     [managerRef, paneTransportsRef, tabId]
   )
   const restartPaneNow = useCallback(
-    (paneId: number, startup: PtyConnectionDeps['startup'], options: { focus: boolean }) => {
+    (paneId: number, attempt: PaneRestartAttempt) => {
+      const { startup, options } = attempt
       const manager = managerRef.current
       const pane = manager?.getPanes().find((candidate) => candidate.id === paneId)
       if (!manager || !pane) {
-        restartingPanesRef.current.delete(paneId)
-        pendingRestartsRef.current.delete(paneId)
         return
       }
+      attempt.started = true
       const transport = paneTransportsRef.current.get(paneId)
       const panePtyBinding = panePtyBindingsRef.current.get(paneId)
       const existingPtyId = getRestartPtyId(paneId)
@@ -141,7 +137,11 @@ export function usePaneProcessRestart({
         cwd,
         startup,
         ...(replacesPtyId ? { replacesPtyId } : {}),
-        onRestartSettled: () => settlePaneRestart(paneId),
+        onRestartSettled: () => settlePaneRestart(tabId, pane.leafId, attempt),
+        hasPendingRestart: () => {
+          const queue = getTabRestartQueues(tabId).find((entry) => entry.leafId === pane.leafId)
+          return Boolean(queue?.pending || (queue?.active && queue.active !== attempt))
+        },
         mountFollowsTerminalPark: false,
         paneTransportsRef,
         paneMode2031Ref,
@@ -202,7 +202,6 @@ export function usePaneProcessRestart({
       setCacheTimerStartedAt,
       setRuntimePaneTitle,
       setTerminalError,
-      settlePaneRestart,
       showRestoredSessionBanner,
       suppressPtyExit,
       syncPanePtyLayoutBinding,
@@ -220,9 +219,16 @@ export function usePaneProcessRestart({
       startup: PtyConnectionDeps['startup'],
       options: { focus: boolean; queueIfRestarting?: boolean }
     ): void {
-      if (restartingPanesRef.current.has(paneId)) {
+      const manager = managerRef.current
+      const pane = manager?.getPanes().find((candidate) => candidate.id === paneId)
+      if (!owner.current || !manager || !pane) {
+        console.warn('[terminal] discarded pending pane restart: pane removed', { tabId, paneId })
+        return
+      }
+      const queue = getPaneRestartQueue(tabId, worktreeId, pane.leafId)
+      if (queue.active) {
         if (options.queueIfRestarting) {
-          pendingRestartsRef.current.set(paneId, () => restartPane(paneId, startup, options))
+          queue.pending = { startup, options }
           return
         }
         setTerminalErrorsByPaneId((current) =>
@@ -234,28 +240,63 @@ export function usePaneProcessRestart({
         )
         return
       }
-      restartingPanesRef.current.add(paneId)
+      if (options.queueIfRestarting) {
+        queue.pending = undefined
+      }
+      const attempt: PaneRestartAttempt = { startup, options, owner, started: false }
+      queue.active = attempt
       const restartingPtyId = getRestartPtyId(paneId)
+      if (restartingPtyId) {
+        queue.ptyIds.add(restartingPtyId)
+      }
       restartUnlessSessionHeld({
         replacesPtyId: restartingPtyId,
         resumeProviderSession: startup?.resumeProviderSession,
         findHolder: window.api?.pty?.findAgentSessionHolder,
         isStillCurrent: () => {
+          if (queue.active !== attempt) {
+            return false
+          }
+          const samePane =
+            owner.current &&
+            managerRef.current === manager &&
+            manager
+              .getPanes()
+              .some((candidate) => candidate.id === paneId && candidate.leafId === pane.leafId)
+          if (!samePane) {
+            if (!queue.pending) {
+              queue.pending = { startup, options }
+            }
+            settlePaneRestart(tabId, pane.leafId, attempt)
+            return false
+          }
           const current = getRestartPtyId(paneId) === restartingPtyId
           if (!current) {
-            settlePaneRestart(paneId)
+            if (!queue.pending) {
+              queue.pending = { startup, options }
+            }
+            settlePaneRestart(tabId, pane.leafId, attempt)
           }
           return current
         },
-        restart: () => restartPaneNow(paneId, startup, options),
+        restart: () => restartPaneNow(paneId, attempt),
         // The old PTY keeps its pane; the pane says why it did not restart.
         refuse: (refusal) => {
-          settlePaneRestart(paneId)
+          settlePaneRestart(tabId, pane.leafId, attempt)
           setTerminalErrorsByPaneId((current) => appendPaneTerminalError(current, paneId, refusal))
         }
       })
     },
-    [getRestartPtyId, restartPaneNow, setTerminalErrorsByPaneId, settlePaneRestart]
+    [
+      getRestartPtyId,
+      restartPaneNow,
+      setTerminalErrorsByPaneId,
+      managerRef,
+      owner,
+      tabId,
+      worktreeId
+    ]
   )
+  usePaneRestartQueueLifecycle({ tabId, cwd, managerRef, ownerRef: owner, handleRestartPane })
   return { handleRestartPane }
 }

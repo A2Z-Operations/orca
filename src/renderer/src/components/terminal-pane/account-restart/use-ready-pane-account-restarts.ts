@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { getRestartingPanePtyIds } from '../process-exit/pane-restart-queue'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../../../store'
 import {
@@ -37,8 +38,11 @@ export function useReadyPaneAccountRestarts({
       return
     }
     for (const pane of manager.getPanes()) {
-      const ptyId =
-        paneTransportsRef.current.get(pane.id)?.getPtyId() ?? panePtyLayoutBindings?.[pane.leafId]
+      const ptyId = [
+        paneTransportsRef.current.get(pane.id)?.getPtyId(),
+        panePtyLayoutBindings?.[pane.leafId],
+        ...getRestartingPanePtyIds(tabId, pane.leafId)
+      ].find((id) => id && readyRestartPtyIds.includes(id))
       if (
         !ptyId ||
         !readyRestartPtyIds.includes(ptyId) ||
@@ -53,6 +57,11 @@ export function useReadyPaneAccountRestarts({
         handleRestartPane(pane.id, startup, {
           focus: agent === 'codex',
           queueIfRestarting: true
+        })
+      } else if (agent) {
+        console.warn('[terminal] discarded account switch: startup unavailable', {
+          tabId,
+          leafId: pane.leafId
         })
       }
     }
