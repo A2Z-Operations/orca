@@ -38,6 +38,7 @@ describe('session mover lifecycle and metadata', () => {
       key: 'session_id' as const,
       id: 'sess-pty-1',
       cwd: '/recorded/run',
+      transcriptPath: '/stale/status.jsonl',
       effort: 'high' as const
     }
     const f = setup({
@@ -263,7 +264,7 @@ function handoffRig(screen: () => string | null) {
     const data = screen()
     return data === null ? null : { data, cols: 80, rows: 24 }
   })
-  const spawn = vi.fn(async () => ({ id: 'pty-new' as const }))
+  const spawn = vi.fn(async () => ({ id: 'pty-new' as const, confirmedStartupCwd: '/fixture' }))
   const strategy = createResumeMoveStrategy({
     getController: () => ({
       spawn,
@@ -394,6 +395,13 @@ describe('session mover handoff note', () => {
     })
     f.setNonAgentTask(PANE_1, true)
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     await f.move.mock.results[0]!.value
@@ -441,7 +449,7 @@ describe('session mover handoff note', () => {
     const rig = handoffRig(() => '$ ')
     rig.spawn.mockImplementation(async () => {
       rig.snapshots[0] = hookRow(Date.now() + 1)
-      return { id: 'pty-new' }
+      return { id: 'pty-new', confirmedStartupCwd: '/fixture' }
     })
     rig.snapshots.push(hookRow(Date.now()))
     const f = setup({
@@ -449,6 +457,13 @@ describe('session mover handoff note', () => {
       getStatusSnapshotForPane: () => rig.snapshots
     })
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     await expect(f.move.mock.results[0]!.value).resolves.toMatchObject({
@@ -466,6 +481,13 @@ describe('session mover handoff note', () => {
       getStatusSnapshotForPane: () => rig.snapshots
     })
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     const pending = f.move.mock.results[0]!.value
@@ -483,6 +505,13 @@ describe('session mover handoff note', () => {
       getStatusSnapshotForPane: () => rig.snapshots
     })
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     const pending = f.move.mock.results[0]!.value

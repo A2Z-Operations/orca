@@ -1,3 +1,8 @@
+import {
+  RequiredStartupCwdError,
+  matchesRequiredStartupCwd
+} from '../../shared/shell/launch/required-startup-cwd'
+import { resolvePtyExecutionHost } from '../ipc/pty/provider/registry'
 import { wslGatedStat } from '../native-chat/wsl-transcript-fs-access'
 import type { AgentProviderSessionMetadata } from '../../shared/agent-session/lifecycle/agent-session-resume'
 import type { ClaudePaneAccountRecord } from './claude-pane-account-registry'
@@ -34,7 +39,15 @@ export type ClaudeSessionMoveOutcome =
       endedWork?: ClaudeSessionMoveEndedWork
       handoffNote?: 'sent' | 'unsent'
     }
-  | { kind: 'wait'; reason: 'no-cwd' | 'no-transcript' }
+  | {
+      kind: 'wait'
+      reason:
+        | 'no-cwd'
+        | 'cwd-missing'
+        | 'cwd-unconfirmed'
+        | 'no-transcript'
+        | 'remote-resume-unsupported'
+    }
   | { kind: 'skipped'; reason: 'no-controller' | 'no-resume-plan' | 'no-pane' }
   | { kind: 'failed'; reason: 'owner-changed' | 'spawn-failed'; error: string }
 
@@ -113,8 +126,15 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
       if (!pane) {
         return { kind: 'skipped', reason: 'no-pane' }
       }
+      if (
+        request.connectionId ||
+        resolvePtyExecutionHost(request.ptyId) !== 'local' ||
+        request.providerSession.transcriptPath?.startsWith('orca-ssh-transcript:')
+      ) {
+        return { kind: 'wait', reason: 'remote-resume-unsupported' }
+      }
       const settings = deps.getSettings()
-      const observedCwd = await controller.getCwd?.(request.ptyId).catch(() => null)
+      const observedCwd = await controller.getCwd?.(request.ptyId)?.catch(() => null)
       const cwd = observedCwd || request.providerSession.cwd
       if (!cwd?.trim()) {
         return { kind: 'wait', reason: 'no-cwd' }
@@ -131,6 +151,7 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
         agent: 'claude',
         providerSession: request.providerSession,
         launchCwd: cwd,
+        resumeInLaunchCwd: true,
         cmdOverrides: settings.agentCmdOverrides ?? {},
         agentArgs: null,
         agentEnv: null,
@@ -148,6 +169,7 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
         const result = await controller.spawn({
           ...size,
           cwd,
+          requiredCwd: cwd,
           command: plan.launchCommand,
           launchAgent: 'claude',
           commandDelivery: 'provider',
@@ -168,6 +190,12 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
           initiallyHidden: true,
           persistHostSessionBinding: true
         })
+        if (
+          result.startupCwdFallback ||
+          !matchesRequiredStartupCwd(result.confirmedStartupCwd, cwd)
+        ) {
+          return { kind: 'wait', reason: 'cwd-unconfirmed' }
+        }
         const handoffNote = await deliverHandoffNote(
           deps,
           controller,
@@ -183,6 +211,9 @@ export function createResumeMoveStrategy(deps: ResumeMoveStrategyDeps): ClaudeSe
             : {})
         }
       } catch (error) {
+        if (error instanceof RequiredStartupCwdError) {
+          return { kind: 'wait', reason: error.reason }
+        }
         const message = error instanceof Error ? error.message : String(error)
         return {
           kind: 'failed',

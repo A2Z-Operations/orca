@@ -119,6 +119,7 @@ export type RuntimePtySpawnArgs = {
   cols: number
   rows: number
   cwd?: string
+  requiredCwd?: string
   command?: string
   launchAgent?: TuiAgent
   trustWorktreeId?: string

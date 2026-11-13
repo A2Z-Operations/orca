@@ -75,28 +75,7 @@ export async function prepareRuntimePtySpawn(
     ctx.isDaemonHostSpawn &&
     (ctx.callerRequestedSessionId === undefined || args.isNewSession === true)
   // Runtime requests use planned command runtime, or project runtime plus explicit --shell; they have no renderer runtime.
-  const target = await resolvePtySpawnStartupTarget({
-    worktreeId: args.worktreeId,
-    cwd: args.cwd,
-    sessionId: ctx.sessionId,
-    shellOverride: args.shellOverride,
-    plannedPty: args.launchRuntime?.pty,
-    projectRuntimeSource: {
-      kind: 'store',
-      store: ctx.deps.store,
-      workspace: args.resolvedWorkspace,
-      connectionId: args.connectionId,
-      tabId: args.tabId
-    },
-    preAdopted: ctx.preAdoptedStablePane !== null,
-    getSettings: ctx.deps.getSettings,
-    resolveStartupCwd: (id, cwd, fallback) =>
-      ctx.deps.resolvePtySpawnStartupCwd(id, cwd, fallback, args.connectionId),
-    // The same verdict as spawn-options' `wslBackgroundStart`, held before the cwd probe and any provider.
-    ...(isRuntimeWslBackgroundStart(ctx)
-      ? { wslStartHold: { wslBackgroundStart: true, sessionId: ctx.sessionId } }
-      : {})
-  })
+  const target = await resolveRuntimePtySpawnStartupTarget(ctx)
   ctx.cwd = target.cwd
   ctx.requestedCwd = target.requestedCwd
   ctx.prevalidatedCwd = target.prevalidatedCwd
@@ -191,4 +170,31 @@ export async function prepareRuntimePtySpawn(
   ctx.stripInheritedOrcaCodexHome = hostEnv.stripInheritedOrcaCodexHome
 
   return null
+}
+
+export async function resolveRuntimePtySpawnStartupTarget(ctx: RuntimePtySpawnState) {
+  const args = ctx.args
+  return await resolvePtySpawnStartupTarget({
+    worktreeId: args.worktreeId,
+    cwd: args.cwd,
+    requiredCwd: args.requiredCwd,
+    sessionId: ctx.sessionId,
+    shellOverride: args.shellOverride,
+    plannedPty: args.launchRuntime?.pty,
+    projectRuntimeSource: {
+      kind: 'store',
+      store: ctx.deps.store,
+      workspace: args.resolvedWorkspace,
+      connectionId: args.connectionId,
+      tabId: args.tabId
+    },
+    preAdopted: ctx.preAdoptedStablePane !== null,
+    getSettings: ctx.deps.getSettings,
+    resolveStartupCwd: (id, cwd, fallback) =>
+      ctx.deps.resolvePtySpawnStartupCwd(id, cwd, fallback, args.connectionId),
+    // The same verdict as spawn-options' `wslBackgroundStart`, held before the cwd probe and any provider.
+    ...(isRuntimeWslBackgroundStart(ctx)
+      ? { wslStartHold: { wslBackgroundStart: true, sessionId: ctx.sessionId } }
+      : {})
+  })
 }

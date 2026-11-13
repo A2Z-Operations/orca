@@ -60,7 +60,12 @@ export function claudeListedStructuredSessions(
   sessionMoves: ClaudeSessionMoveSummary[]
 } {
   const emails = accounts.map((account) => account.email)
-  const movesByKey = new Map(moves.map((move) => [move.ptyId, move]))
+  const movesByKey = new Map<string, ClaudeSessionMoveSummary>()
+  for (const move of moves) {
+    if (!movesByKey.has(move.ptyId)) {
+      movesByKey.set(move.ptyId, move)
+    }
+  }
   const sessionIdByKey = new Map<string, string>()
   const structuredSessions: ClaudeStructuredSessionSnapshot[] = []
   for (const record of records) {

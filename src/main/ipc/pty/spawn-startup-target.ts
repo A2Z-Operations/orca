@@ -1,4 +1,8 @@
 import {
+  RequiredStartupCwdError,
+  matchesRequiredStartupCwd
+} from '../../../shared/shell/launch/required-startup-cwd'
+import {
   isWslShellName,
   type LocalWindowsTerminalRuntimeOptions
 } from '../../../shared/local-windows-terminal-runtime'
@@ -57,6 +61,7 @@ export type PtySpawnStartupTarget = {
 type PtySpawnStartupArgs = {
   worktreeId: string | undefined
   cwd: string | undefined
+  requiredCwd?: string
   /** Its worktree can imply the WSL distro. */
   sessionId: string | undefined
   shellOverride: string | undefined
@@ -82,6 +87,15 @@ export async function resolvePtySpawnStartupTarget(
   args: PtySpawnStartupArgs
 ): Promise<PtySpawnStartupTarget> {
   const source = args.projectRuntimeSource
+  if (args.requiredCwd !== undefined) {
+    const cwd =
+      source.kind === 'store' && source.workspace
+        ? resolveTerminalStartupCwd(source.workspace.path, args.cwd)
+        : args.resolveStartupCwd(args.worktreeId, args.cwd)
+    if (!matchesRequiredStartupCwd(cwd, args.requiredCwd)) {
+      throw new RequiredStartupCwdError('no-cwd')
+    }
+  }
   // A live pane and a quoted launch already own their runtime; only a fresh plain start derives it.
   const workspace =
     source.kind === 'store'
@@ -206,6 +220,17 @@ async function resolveStartupCwdWithFallback(
         terminalWindowsWslDistro: startupRuntime?.terminalWindowsWslDistro
       })
     : undefined
+  if (args.requiredCwd !== undefined) {
+    const cwd = args.requiredCwd
+    const validationCwd = startupWslContext ? toWindowsWslPath(cwd, startupWslContext.distro) : cwd
+    const exists = isWslUncPath(validationCwd)
+      ? await wslUncDirectoryExistsAsync(validationCwd)
+      : await probeLocalStartupCwdDirectory(validationCwd)
+    if (exists !== true) {
+      throw new RequiredStartupCwdError(exists === false ? 'cwd-missing' : 'no-cwd')
+    }
+    return { cwd, ...(isWslUncPath(validationCwd) ? { prevalidatedCwd: validationCwd } : {}) }
+  }
   let prevalidatedCwd: string | undefined
   let wslStartupCwdExists: boolean | null = null
   let wslWorkspaceCwdExists: boolean | null = null

@@ -2,6 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RequiredStartupCwdError } from '../../shared/shell/launch/required-startup-cwd'
+import { toAppSshPtyId } from '../providers/ssh-pty-id'
 import { getDefaultSettings } from '../../shared/constants'
 import { makePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import type { RuntimePtyController } from '../runtime/terminal/lifecycle/runtime-pty-controller-contract'
@@ -57,7 +59,10 @@ function controller(spawn: Controller['spawn']): Controller {
 
 describe('createResumeMoveStrategy', () => {
   it('resumes the conversation in the same pane on the target account', async () => {
-    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({
+      id: 'pty-new',
+      confirmedStartupCwd: '/fixture/local/sub'
+    }))
     const strategy = createResumeMoveStrategy({
       getController: () => controller(spawn),
       getSettings: () => getDefaultSettings('/tmp'),
@@ -70,6 +75,7 @@ describe('createResumeMoveStrategy', () => {
       cols: 100,
       rows: 30,
       cwd: '/fixture/local/sub',
+      requiredCwd: '/fixture/local/sub',
       launchAgent: 'claude',
       commandDelivery: 'provider',
       resumeProviderSession: { key: 'session_id', id: 'sess-abc' },
@@ -87,8 +93,11 @@ describe('createResumeMoveStrategy', () => {
     expect(opts.env?.CLAUDE_CONFIG_DIR).toBeUndefined()
   })
 
-  it('resumes from the recorded run folder while the shell starts in the pane folder', async () => {
-    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+  it('keeps the resume command in the old pane folder when the recorded folder differs', async () => {
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({
+      id: 'pty-new',
+      confirmedStartupCwd: '/fixture/local/sub'
+    }))
     const strategy = createResumeMoveStrategy({
       getController: () => controller(spawn),
       getSettings: () => getDefaultSettings('/tmp'),
@@ -100,13 +109,16 @@ describe('createResumeMoveStrategy', () => {
     expect(spawn).toHaveBeenCalledTimes(1)
     const opts = spawn.mock.calls[0]![0]
     expect(opts.cwd).toBe('/fixture/local/sub')
-    expect(opts.command).toMatch(/^cd '\/fixture\/recorded run' && /)
+    expect(opts.command).not.toMatch(/^cd /)
     expect(opts.command).toMatch(/'--resume' 'sess-abc'$/)
     expect(opts.resumeProviderSession?.cwd).toBe('/fixture/recorded run')
   })
 
   it('preserves the recorded Claude effort in the resume command', async () => {
-    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({
+      id: 'pty-new',
+      confirmedStartupCwd: '/fixture/local/sub'
+    }))
     const strategy = createResumeMoveStrategy({
       getController: () => controller(spawn),
       getSettings: () => getDefaultSettings('/tmp'),
@@ -122,7 +134,10 @@ describe('createResumeMoveStrategy', () => {
   })
 
   it('uses the recorded run folder when the old PTY cwd cannot be read', async () => {
-    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({
+      id: 'pty-new',
+      confirmedStartupCwd: '/fixture/recorded run'
+    }))
     const strategy = createResumeMoveStrategy({
       getController: () => ({ ...controller(spawn), getCwd: async () => null }),
       getSettings: () => getDefaultSettings('/tmp'),
@@ -141,7 +156,10 @@ describe('createResumeMoveStrategy', () => {
   })
 
   it('waits when reading the old PTY cwd fails and no recorded folder exists', async () => {
-    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({
+      id: 'pty-new',
+      confirmedStartupCwd: '/fixture/local/sub'
+    }))
     const strategy = createResumeMoveStrategy({
       getController: () => ({
         ...controller(spawn),
@@ -157,7 +175,10 @@ describe('createResumeMoveStrategy', () => {
   })
 
   it('waits for a transcript file before replacing the old pane', async () => {
-    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({ id: 'pty-new' }))
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => ({
+      id: 'pty-new',
+      confirmedStartupCwd: '/fixture/local/sub'
+    }))
     const strategy = createResumeMoveStrategy({
       getController: () => controller(spawn),
       getSettings: () => getDefaultSettings('/tmp'),
@@ -185,6 +206,78 @@ describe('createResumeMoveStrategy', () => {
     rmSync(transcript, { recursive: true })
     writeFileSync(transcript, '{"type":"user"}\n')
     await expect(strategy.move(request())).resolves.toEqual({ kind: 'moved', newPtyId: 'pty-new' })
+  })
+
+  it('waits when the controller cannot read cwd and there is no recorded cwd', async () => {
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>()
+    const strategy = createResumeMoveStrategy({
+      getController: () => ({ spawn }),
+      getSettings: () => getDefaultSettings('/tmp'),
+      platform: 'linux'
+    })
+    await expect(strategy.move(request())).resolves.toEqual({ kind: 'wait', reason: 'no-cwd' })
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it.each(['no-cwd', 'cwd-missing'] as const)(
+    'keeps cwd admission refusal %s retryable',
+    async (reason) => {
+      const spawn = vi.fn<NonNullable<Controller['spawn']>>(async () => {
+        throw new RequiredStartupCwdError(reason)
+      })
+      const strategy = createResumeMoveStrategy({
+        getController: () => controller(spawn),
+        getSettings: () => getDefaultSettings('/tmp'),
+        platform: 'linux'
+      })
+      await expect(strategy.move(request())).resolves.toEqual({ kind: 'wait', reason })
+    }
+  )
+
+  it.each([
+    { id: 'pty-new' },
+    { id: 'pty-new', confirmedStartupCwd: '/fixture/local' },
+    {
+      id: 'pty-new',
+      confirmedStartupCwd: '/fixture/local/sub',
+      startupCwdFallback: { kind: 'worktree' as const, cwd: '/fixture/local' }
+    }
+  ])('does not record a move without exact startup confirmation: %j', async (result) => {
+    const strategy = createResumeMoveStrategy({
+      getController: () => controller(async () => result),
+      getSettings: () => getDefaultSettings('/tmp'),
+      platform: 'linux'
+    })
+    await expect(strategy.move(request())).resolves.toEqual({
+      kind: 'wait',
+      reason: 'cwd-unconfirmed'
+    })
+  })
+
+  it('names unsupported remote resumes even when a same-named local transcript exists', async () => {
+    const spawn = vi.fn<NonNullable<Controller['spawn']>>()
+    const strategy = createResumeMoveStrategy({
+      getController: () => controller(spawn),
+      getSettings: () => getDefaultSettings('/tmp'),
+      platform: 'linux'
+    })
+    for (const move of [
+      { ...request(), connectionId: 'ssh-host' },
+      { ...request(), ptyId: toAppSshPtyId('ssh-host', 'remote-pty') },
+      {
+        ...request(),
+        providerSession: {
+          ...request().providerSession,
+          transcriptPath: 'orca-ssh-transcript:remote'
+        }
+      }
+    ]) {
+      await expect(strategy.move(move)).resolves.toEqual({
+        kind: 'wait',
+        reason: 'remote-resume-unsupported'
+      })
+    }
+    expect(spawn).not.toHaveBeenCalled()
   })
 
   it('reports an owner change as a failure without touching anything else', async () => {

@@ -97,8 +97,8 @@ export function collectClaudeMoverSessions(args: {
         ? {
             key: 'session_id',
             id: identity.sessionId,
-            ...(identity.transcriptPath ? { transcriptPath: identity.transcriptPath } : {}),
-            ...args.resolveProviderSession(identity.paneKey, identity.sessionId)
+            ...args.resolveProviderSession(identity.paneKey, identity.sessionId),
+            ...(identity.transcriptPath ? { transcriptPath: identity.transcriptPath } : {})
           }
         : record.providerSessionId
           ? { key: 'session_id', id: record.providerSessionId }

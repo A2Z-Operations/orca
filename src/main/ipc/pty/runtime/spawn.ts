@@ -1,3 +1,4 @@
+import { matchesRequiredStartupCwd } from '../../../../shared/shell/launch/required-startup-cwd'
 import { getConnectionExecutionHostId } from '../../../../shared/execution-host'
 import { getProvider } from '../provider/registry'
 import { makePaneKey } from '../../../../shared/workspace-layout/stable-pane-id'
@@ -10,7 +11,7 @@ import { resolveRuntimeHostSessionBinding } from './spawn-host-binding'
 import { runPtySpawn, normalizePtySpawnSessionId } from '../spawn-operation'
 import { requireAcceptedSpawn } from '../spawn-outcome'
 import type { PtyRuntimeControllerDeps } from './controller-deps'
-import { prepareRuntimePtySpawn } from './spawn-preflight'
+import { prepareRuntimePtySpawn, resolveRuntimePtySpawnStartupTarget } from './spawn-preflight'
 import { applyAgentLaunchPluginHook } from '../spawn-agent-launch-plugin-hook'
 import { buildRuntimePtySpawnOptions } from './spawn-options'
 import { commitRuntimePtySpawn } from './spawn-commit'
@@ -87,6 +88,9 @@ export async function spawnPtyFromRuntimeController(
     ...(args.replacesPtyId !== undefined
       ? {
           replace: async () => {
+            if (args.requiredCwd !== undefined) {
+              await resolveRuntimePtySpawnStartupTarget(ctx)
+            }
             // Validate the target account before stopping the current session.
             if (args.claudeAccountId !== undefined && isClaudeLaunchCommand(args.command)) {
               ctx.claudeAuth = await resolveRuntimeClaudeAuth(ctx)
@@ -116,6 +120,15 @@ export async function spawnPtyFromRuntimeController(
   return {
     ...result,
     wslDistro: result.wslDistro ?? undefined,
+    ...(args.requiredCwd !== undefined &&
+    matchesRequiredStartupCwd(ctx.cwd, args.requiredCwd) &&
+    ctx.result.startupCwdSource === 'request' &&
+    !result.isReattach &&
+    !result.exitedBeforeSpawnReply &&
+    !result.startupCwdFallback &&
+    !ctx.startupCwdFallback
+      ? { confirmedStartupCwd: args.requiredCwd }
+      : {}),
     ...(stablePaneOwner ? { stablePaneOwner } : {}),
     ...(result.agentSessionEnsure ? { agentSessionEnsure: result.agentSessionEnsure } : {}),
     ...(result.startupCwdFallback ? { startupCwdFallback: result.startupCwdFallback } : {})

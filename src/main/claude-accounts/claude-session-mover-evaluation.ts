@@ -141,10 +141,10 @@ export function evaluateClaudeMoverSessions(
       continue
     }
     // Why the claim: five sessions over the line must not all pick the same account in one tick.
-    targetClaims.set(to.id, {
-      at: now,
-      debit: (targetClaims.get(to.id)?.debit ?? 0) + CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT
-    })
+    const targetClaim = targetClaims.get(to.id) ?? { at: now, debit: 0 }
+    targetClaim.at = now
+    targetClaim.debit += CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT
+    targetClaims.set(to.id, targetClaim)
     const paneKey = view.paneKey
     inflight.add(ptyId)
     // Publication can expose the replacement PTY before this move settles.
@@ -171,10 +171,10 @@ export function evaluateClaudeMoverSessions(
           settled('moved', outcome.newPtyId)
         } else if (outcome.kind === 'wait') {
           const claim = targetClaims.get(to.id)
-          if (claim?.at === now) {
+          if (claim === targetClaim) {
             const debit = claim.debit - CLAUDE_SESSION_MOVE_CLAIM_DEBIT_PERCENT
             if (debit > 0) {
-              targetClaims.set(to.id, { ...claim, debit })
+              claim.debit = debit
             } else {
               targetClaims.delete(to.id)
             }

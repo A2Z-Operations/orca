@@ -108,7 +108,7 @@ describe('claudeListedStructuredSessions', () => {
     const { structuredSessions, sessionMoves } = claudeListedStructuredSessions(
       ACCOUNTS,
       [chat('claude_one', '/data/claude-profiles/acct-a/home')],
-      [skipped, terminal]
+      [skipped, { ...skipped, reason: 'moved', toAccountId: 'acct-b', at: 6_000 }, terminal]
     )
     expect(structuredSessions[0]?.lastMove).toEqual({
       reason: 'skipped',
@@ -116,7 +116,8 @@ describe('claudeListedStructuredSessions', () => {
       toAccountId: null,
       at: 7_000
     })
-    expect(sessionMoves).toEqual([{ ...skipped, sessionId: 'claude_one' }, terminal])
+    expect(sessionMoves.map((move) => move.at)).toEqual([7_000, 6_000, 7_000])
+    expect(sessionMoves[0]?.sessionId).toBe('claude_one')
   })
 })
 

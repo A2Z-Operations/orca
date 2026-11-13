@@ -73,6 +73,8 @@ export type RuntimePtyController = {
     cols: number
     rows: number
     cwd?: string
+    /** Refuse fallback or an unresolved cwd before replacing a live pane. */
+    requiredCwd?: string
     command?: string
     launchAgent?: TuiAgent
     trustWorktreeId?: string
@@ -141,6 +143,8 @@ export type RuntimePtyController = {
       stablePaneOwner?: { handle: string; tabId: string; leafId: string }
       startupCwdFallback?: StartupCwdFallback
       savedStartupCwd?: string
+      /** Fresh provider spawn confirmed it used requiredCwd. */
+      confirmedStartupCwd?: string
     }
   >
   /** The local terminal owner's automatic-restore state; null when it has no fork gate. */
