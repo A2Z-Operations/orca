@@ -15,9 +15,12 @@ import {
   type WslOrcadHostCapabilityVerdict
 } from './wsl-orcad-host-environments'
 
+import type { ClaudeManagedAccount } from '../../../shared/managed-account-types'
+
 export type WslAccountTarget = { runtime: 'wsl'; wslDistro: string }
 
 export type WslOrcadAccountEnvDependencies = {
+  registeredClaudeAccounts?: () => readonly ClaudeManagedAccount[]
   /** `ClaudeRuntimeAuthService.prepareForClaudeLaunch`: waits for a first account setup. */
   prepareClaudeLaunch(target: WslAccountTarget): Promise<ClaudeRuntimeAuthPreparation>
   /** The pointer-only env a non-Claude pane gets, so a typed `claude` still follows the account. */

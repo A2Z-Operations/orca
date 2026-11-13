@@ -3,6 +3,15 @@
 import { z } from 'zod'
 import { AgentLaunchAccountEnv } from './agent-launch-account-env'
 
+const HostClaudeAccountRegistration = z
+  .object({
+    id: z.string().min(1),
+    email: z.string().min(1),
+    organizationUuid: z.string().nullable(),
+    wslLinuxAuthPath: z.string().startsWith('/')
+  })
+  .strict()
+
 export const HostAccountLaunchEnvParams = z
   .object({
     /** The distro whose accounts these are; names the owner in this host's messages. */
@@ -10,7 +19,9 @@ export const HostAccountLaunchEnvParams = z
     /** For a `claude` the host starts directly: the selected account's CLAUDE_CONFIG_DIR. */
     claude: AgentLaunchAccountEnv,
     /** For every other process: the pointer a typed `claude` follows, plus CODEX_HOME. */
-    terminal: AgentLaunchAccountEnv
+    terminal: AgentLaunchAccountEnv,
+    /** Registration metadata from Orca, never identity inferred from guest credentials. */
+    claudeAccounts: z.array(HostClaudeAccountRegistration).optional()
   })
   .strict()
 

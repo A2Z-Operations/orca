@@ -39,6 +39,7 @@ function broadcastAccountNotApplied(distro: string): void {
 
 export function installWslOrcadAccountShim(store: Pick<Store, 'getSettings'>): void {
   installWslOrcadAccountEnvDependencies({
+    registeredClaudeAccounts: () => store.getSettings().claudeManagedAccounts,
     prepareClaudeLaunch: (target) => {
       const auth = state.claudeRuntimeAuth
       if (!auth) {

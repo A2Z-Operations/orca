@@ -70,6 +70,27 @@ export function refuseClaudeAuthProxyWithoutSlot(req: IncomingMessage, res: Serv
   return 404
 }
 
+export function refuseClaudeAuthProxyMissingCredentials(
+  req: IncomingMessage,
+  res: ServerResponse,
+  accountId: string
+): 401 {
+  refuse(
+    req,
+    res,
+    401,
+    JSON.stringify({
+      type: 'error',
+      error: {
+        type: 'authentication_error',
+        message: `Claude account "${accountId}" is no longer signed in or its credentials are unavailable. Select a signed-in account in Orca and resume this pane.`
+      }
+    }),
+    { 'content-type': 'application/json; charset=utf-8' }
+  )
+  return 401
+}
+
 function refuse(
   req: IncomingMessage,
   res: ServerResponse,

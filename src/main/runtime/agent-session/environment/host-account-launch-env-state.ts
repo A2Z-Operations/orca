@@ -1,3 +1,4 @@
+import { installClaudeRegisteredAccounts } from '../../../claude-accounts/claude-registered-account'
 import { retireAtRestCommandContext } from '../../../native-chat/agent-session-wire/options/at-rest-command-context'
 import { agentModelCatalogStore } from '../../../native-chat/agent-model-catalog/agent-model-catalog-store'
 import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/commit-message-agent-environment'
@@ -55,6 +56,7 @@ export class HostAccountLaunchEnvState {
     }
     const previous = this.hostLaunchEnv
     this.hostLaunchEnv = launchEnv
+    installClaudeRegisteredAccounts(() => this.hostLaunchEnv?.claudeAccounts ?? [])
     if (JSON.stringify(previous) !== JSON.stringify(launchEnv)) {
       agentModelCatalogStore.expireLaunchScopes(
         (agent) =>
@@ -84,6 +86,7 @@ export class HostAccountLaunchEnvState {
       return
     }
     this.refreshClaudeProfile = options.refreshClaudeProfile ?? null
+    installClaudeRegisteredAccounts(() => this.hostLaunchEnv?.claudeAccounts ?? [])
     if (saved) {
       const previous = this.hostLaunchEnv
       this.hostLaunchEnv = saved

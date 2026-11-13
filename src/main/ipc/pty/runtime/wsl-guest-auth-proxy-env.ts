@@ -1,3 +1,4 @@
+import { registeredClaudeAccountForWslConfigDir } from '../../../claude-accounts/claude-registered-account'
 import {
   bindClaudeAuthProxyAccountDir,
   claudeAuthProxyListeningPort,
@@ -19,6 +20,7 @@ export type WslGuestAuthProxyDeps = {
   localPort: () => number | null
   ready: () => Promise<GuestProxy | null>
   readToken: (configDir: string) => Promise<string | null>
+  registeredAccount: typeof registeredClaudeAccountForWslConfigDir
   bindDir: (accountId: string, configDir: string) => void
 }
 
@@ -38,6 +40,7 @@ const defaultDeps: WslGuestAuthProxyDeps = {
   localPort: claudeAuthProxyListeningPort,
   ready: claudeAuthProxyReady,
   readToken: readGuestConfigDirToken,
+  registeredAccount: registeredClaudeAccountForWslConfigDir,
   bindDir: bindClaudeAuthProxyAccountDir
 }
 
@@ -65,6 +68,10 @@ export async function applyWslGuestAuthProxyEnv(
   if (!enabled || !configDir) {
     return { env: next, auth: null }
   }
+  const account = deps.registeredAccount(configDir)
+  if (!account) {
+    return { env: next, auth: null }
+  }
   const token = await deps.readToken(configDir)
   if (!token) {
     return { env: next, auth: null }
@@ -73,8 +80,8 @@ export async function applyWslGuestAuthProxyEnv(
   if (!proxy || proxy.port() === null) {
     return { env: next, auth: null }
   }
-  deps.bindDir(configDir, configDir)
-  const slot = proxy.allocateSlot(configDir)
+  deps.bindDir(account.id, configDir)
+  const slot = proxy.allocateSlot(account.id)
   const url = proxy.slotBaseUrl(slot)
   if (!url) {
     releaseOwnClaudeAuthProxySlot(slot)
@@ -87,7 +94,7 @@ export async function applyWslGuestAuthProxyEnv(
     auth: {
       configDir,
       envPatch: { ANTHROPIC_BASE_URL: url, CLAUDE_CONFIG_DIR: configDir },
-      provenance: `profile:${configDir}`
+      provenance: `profile:${account.id}`
     }
   }
 }

@@ -282,13 +282,6 @@ describe('claude auth proxy', () => {
     expect(lines.join('\n')).not.toContain('SENTINEL_1b7c')
   })
 
-  it('keeps the incoming Authorization when the account has no token', async () => {
-    const { proxy, seen } = await started(async () => null)
-    const base = proxy.slotBaseUrl(proxy.allocateSlot('account-a'))
-    await proxyRequest(`${base}v1/messages`, { headers: { authorization: 'Bearer from-claude' } })
-    expect(seen[0]?.authorization).toBe('Bearer from-claude')
-  })
-
   it('follows a slot flip on the next request', async () => {
     const tokens = [TOKEN_A, TOKEN_B]
     const readToken = vi.fn(async () => tokens.shift() ?? null)

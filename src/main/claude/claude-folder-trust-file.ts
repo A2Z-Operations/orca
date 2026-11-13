@@ -1,15 +1,39 @@
+import {
+  applyClaudeFolderTrust,
+  isPlainObject,
+  toClaudeTrustKey,
+  type ClaudeGlobalConfigChange,
+  type ClaudeTrustPathStyle,
+  type ClaudeFolderTrustOutcome,
+  type ClaudeConfigEnv
+} from './claude-folder-trust-state'
+export {
+  applyClaudeFolderTrust,
+  toClaudeTrustKey,
+  type ClaudeGlobalConfigChange,
+  type ClaudeTrustPathStyle,
+  type ClaudeFolderTrustOutcome,
+  type ClaudeConfigEnv
+} from './claude-folder-trust-state'
+import {
+  failedClaudeConfigProbe,
+  selectsLegacyClaudeConfig,
+  type ClaudeConfigProbe
+} from './claude-global-config-selection'
+import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
 import { randomUUID } from 'node:crypto'
 import {
   chmodSync,
   existsSync,
   lstatSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
   statSync,
   writeFileSync
 } from 'node:fs'
-import { dirname, join, posix, resolve, win32 } from 'node:path'
+import { basename, dirname, join, posix, resolve, win32 } from 'node:path'
 import { homedir } from 'node:os'
 import { lock } from 'proper-lockfile'
 import { renameFileWithWindowsRetry } from '../codex-accounts/fs-utils'
@@ -18,84 +42,49 @@ import { parseWslUncPath } from '../../shared/wsl-paths'
 import { runWslProcess } from '../wsl/execution/wsl-runner'
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth/runtime-auth-types'
 
-export type ClaudeTrustPathStyle = 'posix' | 'win32'
-
-export type ClaudeFolderTrustOutcome =
-  | 'granted'
-  | 'unchanged'
-  | 'missing-config'
-  | 'locked'
-  | 'unreadable'
-
-type ClaudeConfigEnv = {
-  CLAUDE_CONFIG_DIR?: string
-  CLAUDE_CODE_CUSTOM_OAUTH_URL?: string
-}
-
 // Defer held locks to Claude; keep the long stale window's refresh timer within setTimeout range.
 const NEVER_STALE_MS = 2 ** 30
 const LOCK_RETRIES = { retries: 4, factor: 2, minTimeout: 50, maxTimeout: 250 }
 // Serialize local updates to avoid exhausting file-lock retries during launch bursts.
 const updateQueueByConfigFile = new Map<string, Promise<void>>()
 
-function pathApi(style: ClaudeTrustPathStyle): typeof posix {
-  return style === 'win32' ? win32 : posix
+function probeClaudeConfigFile(file: string): ClaudeConfigProbe {
+  try {
+    return statSync(file)
+  } catch (error) {
+    return failedClaudeConfigProbe(error)
+  }
 }
 
-/** Claude looks up NFC `path.normalize` output, with `/` separators on Windows. */
-export function toClaudeTrustKey(folderPath: string, style: ClaudeTrustPathStyle): string {
-  const normalized = pathApi(style).normalize(folderPath.normalize('NFC'))
-  return style === 'win32' ? normalized.replaceAll('\\', '/') : normalized
+function selectClaudeGlobalConfigFile(legacy: string, current: string): string {
+  let listed = true
+  try {
+    listed = readdirSync(dirname(legacy)).includes(basename(legacy))
+  } catch (error) {
+    listed = !isDefinitiveAbsence(error)
+  }
+  return selectsLegacyClaudeConfig(
+    probeClaudeConfigFile(legacy),
+    probeClaudeConfigFile(current),
+    listed
+  )
+    ? legacy
+    : current
 }
 
-/** Claude prefers legacy .config.json, then .claude.json under CLAUDE_CONFIG_DIR or home. */
+/** Match Claude Code 2.1.323, including empty legacy files beside a current config. */
 export function resolveClaudeGlobalConfigFile(args: {
   env: ClaudeConfigEnv
   homeDir: string
   style: ClaudeTrustPathStyle
   exists: (filePath: string) => boolean
 }): string {
-  const { join } = pathApi(args.style)
+  const { join } = args.style === 'win32' ? win32 : posix
   const legacyDir = (args.env.CLAUDE_CONFIG_DIR ?? join(args.homeDir, '.claude')).normalize('NFC')
   const legacyFile = join(legacyDir, '.config.json')
-  if (args.exists(legacyFile)) {
-    return legacyFile
-  }
   const suffix = args.env.CLAUDE_CODE_CUSTOM_OAUTH_URL ? '-custom-oauth' : ''
-  return join(args.env.CLAUDE_CONFIG_DIR || args.homeDir, `.claude${suffix}.json`)
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-export type ClaudeGlobalConfigChange =
-  | { kind: 'unchanged' }
-  | { kind: 'refuse' }
-  | { kind: 'changed'; config: Record<string, unknown> }
-
-export function applyClaudeFolderTrust(
-  config: Record<string, unknown>,
-  folderKeys: readonly string[]
-): ClaudeGlobalConfigChange {
-  if (config.projects !== undefined && !isPlainObject(config.projects)) {
-    return { kind: 'refuse' }
-  }
-  const projects: Record<string, unknown> = { ...config.projects }
-  const alreadyTrusted = folderKeys.some((key) => {
-    const entry = projects[key]
-    return isPlainObject(entry) && entry.hasTrustDialogAccepted === true
-  })
-  if (alreadyTrusted) {
-    return { kind: 'unchanged' }
-  }
-  for (const key of folderKeys) {
-    const entry = projects[key]
-    projects[key] = isPlainObject(entry)
-      ? { ...entry, hasTrustDialogAccepted: true }
-      : { hasTrustDialogAccepted: true }
-  }
-  return { kind: 'changed', config: { ...config, projects } }
+  const current = join(args.env.CLAUDE_CONFIG_DIR || args.homeDir, `.claude${suffix}.json`)
+  return args.exists(legacyFile) ? selectClaudeGlobalConfigFile(legacyFile, current) : current
 }
 
 function isMissingFileError(error: unknown): boolean {
@@ -110,7 +99,10 @@ function resolveConfigTarget(configFile: string): ConfigTarget {
   try {
     const entry = lstatSync(configFile)
     const path = entry.isSymbolicLink() ? realpathSync(configFile) : configFile
-    return statSync(path).isFile() ? { kind: 'file', path } : { kind: 'unreadable' }
+    const target = probeClaudeConfigFile(path)
+    return typeof target !== 'string' && target.isFile()
+      ? { kind: 'file', path }
+      : { kind: target === 'missing' ? 'missing' : 'unreadable' }
   } catch (error) {
     return { kind: isMissingFileError(error) ? 'missing' : 'unreadable' }
   }
@@ -308,11 +300,15 @@ export function resolveLocalClaudeTrustConfig(args: {
     }
     const legacyFile = join(claudeAuth.configDir, '.config.json')
     return {
-      configFile: existsSync(legacyFile)
-        ? legacyFile
-        : claudeAuth.envPatch.CLAUDE_CONFIG_DIR
-          ? join(claudeAuth.configDir, '.claude.json')
-          : join(dirname(claudeAuth.configDir), '.claude.json'),
+      configFile: selectClaudeGlobalConfigFile(
+        legacyFile,
+        join(
+          claudeAuth.envPatch.CLAUDE_CONFIG_DIR
+            ? claudeAuth.configDir
+            : dirname(claudeAuth.configDir),
+          '.claude.json'
+        )
+      ),
       keyStyle: 'posix',
       toClaudePath: (hostPath) => parseWslUncPath(hostPath)?.linuxPath ?? null
     }

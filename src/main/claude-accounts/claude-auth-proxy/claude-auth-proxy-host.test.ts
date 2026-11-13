@@ -1,5 +1,8 @@
+import { installClaudeRegisteredAccounts } from '../claude-registered-account'
 import { createServer, request as httpRequest } from 'node:http'
+import type * as ClaudeAccountFolder from '../claude-account-folder'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { recoverReattachedProxySlot } from '../../ipc/pty/host-env/claude-pane-proxy-slot-recovery'
 import { installClaudeProfileRouter } from '../claude-profile-installed-router'
 import {
   installClaudePaneAccountPersistence,
@@ -22,6 +25,27 @@ import {
 } from './claude-auth-proxy-persisted-slots'
 import type { ClaudeAuthProxy, ClaudeAuthProxyOptions } from './claude-auth-proxy'
 
+vi.mock('../claude-account-folder', async (importOriginal) => {
+  const actual = await importOriginal<typeof ClaudeAccountFolder>()
+  const login = {
+    email: 'account@example.invalid',
+    organizationUuid: 'org',
+    organizationName: null
+  }
+  return {
+    ...actual,
+    readClaudeFolderLogin: () => login,
+    readClaudeFolderLoginAsync: async () => login
+  }
+})
+
+vi.mock('./claude-auth-proxy-bearer-identity', () => ({
+  readClaudeBearerIdentity: async () => ({
+    email: 'account@example.invalid',
+    organizationUuid: 'org'
+  })
+}))
+
 vi.mock('../../rate-limits/claude-oauth-credentials', () => ({
   readClaudeOAuthCredentials: vi.fn()
 }))
@@ -43,6 +67,7 @@ vi.mock('./claude-auth-proxy', async (importOriginal) => {
 
 afterEach(async () => {
   installClaudeProfileRouter(undefined)
+  installClaudeRegisteredAccounts(undefined)
   fakeUpstream.url = null
   await stopClaudeAuthProxy()
 })
@@ -275,6 +300,44 @@ describe('startClaudeAuthProxy', () => {
     }
   })
 
+  it.each(['startup', 'reattach'])(
+    'refuses a removed billed account recovered through %s before contacting upstream',
+    async (recovery) => {
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+      const upstream = await listenFakeUpstream()
+      fakeUpstream.url = upstream.url
+      try {
+        const port = await restartWithPersistedRows()
+        const proxy = getClaudeAuthProxy()!
+        bindClaudeAuthProxyAccountDir('acct-a', '/tmp/claude-home-acct-a')
+        if (recovery === 'reattach') {
+          proxy.releaseSlot(SLOT_A)
+          expect(
+            recoverReattachedProxySlot({
+              recovered: { slot: SLOT_A, port },
+              accountId: 'acct-b',
+              proxy
+            })
+          ).toBe(SLOT_A)
+        }
+        const url = `http://127.0.0.1:${port}/p/${SLOT_A}/v1/messages`
+        expect(await statusOf(url)).toEqual({ status: 401, retryAfter: undefined })
+        proxy.endStartupGrace()
+        expect(await statusOf(url)).toEqual({ status: 401, retryAfter: undefined })
+        expect(upstream.seen).toEqual([])
+        expect(claudeAuthProxyStatus().lastError).toMatchObject({
+          accountId: 'acct-b',
+          status: 401
+        })
+        expect(info.mock.calls.flat().join('\n')).toContain('quarantined')
+      } finally {
+        info.mockRestore()
+        await stopClaudeAuthProxy()
+        await upstream.close()
+      }
+    }
+  )
+
   it('forwards a request on a re-registered slot with the billed account bearer, before any reattach', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {})
     const upstream = await listenFakeUpstream()
@@ -292,13 +355,24 @@ describe('startClaudeAuthProxy', () => {
       const port = await restartWithPersistedRows()
       // No profile router: the host reads the folder bound to the account id (a stop clears the map).
       bindClaudeAuthProxyAccountDir('acct-a', '/tmp/claude-home-acct-a')
+      installClaudeRegisteredAccounts(() => [
+        {
+          id: 'acct-b',
+          email: 'account@example.invalid',
+          organizationUuid: 'org',
+          managedAuthPath: '/tmp/claude-home-acct-b',
+          authMethod: 'subscription-oauth',
+          createdAt: 0,
+          updatedAt: 0,
+          lastAuthenticatedAt: 0
+        }
+      ])
       bindClaudeAuthProxyAccountDir('acct-b', '/tmp/claude-home-acct-b')
 
       const response = await statusOf(`http://127.0.0.1:${port}/p/${SLOT_A}/v1/messages`)
       expect(response).toEqual({ status: 200, retryAfter: undefined })
       // The slot the row persisted bills the assigned account, not the launch account.
       expect(upstream.seen).toEqual([{ url: '/v1/messages', authorization: 'Bearer tok-acct-b' }])
-      expect(vi.mocked(readClaudeOAuthCredentials)).toHaveBeenCalledTimes(1)
       expect(vi.mocked(readClaudeOAuthCredentials).mock.calls[0]?.[0]).toMatchObject({
         credentialsFileConfigDir: '/tmp/claude-home-acct-b'
       })

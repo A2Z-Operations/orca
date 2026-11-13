@@ -2,11 +2,14 @@ import { join } from 'node:path'
 import type { ClaudeAuthProxyStatus } from '../../../shared/claude-auth-proxy-status'
 import { getOrcaUserDataPath } from '../../codex/configuration/homes/codex-home-paths'
 import {
-  readClaudeOAuthCredentials,
-  type ClaudeOAuthCredentialReadOptions
-} from '../../rate-limits/claude-oauth-credentials'
-import { refreshClaudeOAuthAccessToken } from '../../rate-limits/claude-oauth-refresh'
-import { getClaudeProfileRouter } from '../claude-profile-installed-router'
+  clearClaudeAuthProxyAccountDirs,
+  readClaudeAuthProxyAccessToken,
+  refreshClaudeAuthProxyAccessToken
+} from './claude-auth-proxy-account-credentials'
+export {
+  bindClaudeAuthProxyAccountDir,
+  readClaudeAuthProxyAccessToken
+} from './claude-auth-proxy-account-credentials'
 import { setClaudePaneProxySlotReleaser } from '../claude-pane-account-registry'
 import {
   claudePaneAccountPersistence,
@@ -37,16 +40,6 @@ let proxy: ClaudeAuthProxy | null = null
 let pending: Promise<void> | null = null
 /** The persisted panes this listener re-registered at start, until each has reattached. */
 let persistedSlots: PersistedSlotAdoption | null = null
-/** Account id → folder, for a host whose profile router is not installed (the WSL guest). */
-const accountConfigDirs = new Map<string, string>()
-
-/** Remember which folder a slot's account id reads. The router path ignores this map. */
-export function bindClaudeAuthProxyAccountDir(accountId: string, configDir: string): void {
-  if (accountId && configDir) {
-    accountConfigDirs.set(accountId, configDir)
-  }
-}
-
 export function claudeAuthProxyListeningPort(): number | null {
   return proxy?.port() ?? null
 }
@@ -127,7 +120,7 @@ export async function stopClaudeAuthProxy(): Promise<void> {
   persistedSlots = null
   // Teardown after this point must not erase the rows the next start reattaches from.
   installClaudePaneAccountPersistence(null)
-  accountConfigDirs.clear()
+  clearClaudeAuthProxyAccountDirs()
   resetClaudeAuthProxySlotOwners()
   setClaudePaneProxySlotReleaser(null)
   setClaudeAuthProxyStatusReader(null)
@@ -234,58 +227,4 @@ export function claudeAuthProxyBaseUrl(
   }
   noteClaudeAuthProxySlotAllocated(slot)
   return url
-}
-
-/** Cache miss. A 401 refresh is separate and skips an account whose own Claude is running. */
-export async function readClaudeAuthProxyAccessToken(accountId: string): Promise<string | null> {
-  const readOptions = claudeAuthProxyCredentialReadOptions(accountId)
-  if (!readOptions) {
-    return null
-  }
-  try {
-    const result = await readClaudeOAuthCredentials(readOptions)
-    return result.token || null
-  } catch {
-    return null
-  }
-}
-
-/** Same folder the cache reads. Returns the new access token, or null when refresh does not apply. */
-async function refreshClaudeAuthProxyAccessToken(accountId: string): Promise<string | null> {
-  const readOptions = claudeAuthProxyCredentialReadOptions(accountId)
-  if (!readOptions) {
-    return null
-  }
-  try {
-    const refreshed = await refreshClaudeOAuthAccessToken({ accountId, readOptions })
-    return refreshed.outcome === 'refreshed' ? refreshed.accessToken : null
-  } catch {
-    return null
-  }
-}
-
-function claudeAuthProxyCredentialReadOptions(
-  accountId: string
-): ClaudeOAuthCredentialReadOptions | null {
-  const router = getClaudeProfileRouter()
-  if (router) {
-    const covered = router.coveredBySystemDefault(accountId)
-    const userDir = router.userConfigDir()
-    const configDir = covered
-      ? (userDir ?? router.systemDefaultHome())
-      : router.accountHome(accountId)
-    return {
-      credentialsFileConfigDir: configDir,
-      keychainConfigDir: configDir,
-      unsuffixedKeychainFallback: covered && !userDir
-    }
-  }
-  const configDir = accountConfigDirs.get(accountId)
-  if (!configDir) {
-    return null
-  }
-  return {
-    credentialsFileConfigDir: configDir,
-    keychainConfigDir: configDir
-  }
 }
