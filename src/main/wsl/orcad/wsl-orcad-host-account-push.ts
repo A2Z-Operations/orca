@@ -1,6 +1,9 @@
 /** Push selected distro account homes on connect/selection changes so host-initiated CLI, automation, chat and text-generation launches use the same account. */
 import type { HostAccountLaunchEnv } from '../../../shared/agent-launch/startup/host-account-launch-env'
-import { HOST_ACCOUNT_LAUNCH_ENV_RUNTIME_CAPABILITY } from '../../../shared/orcad-runtime-capabilities'
+import {
+  HOST_ACCOUNT_LAUNCH_ENV_RUNTIME_CAPABILITY,
+  HOST_CLAUDE_REGISTRATION_RUNTIME_CAPABILITY
+} from '../../../shared/orcad-runtime-capabilities'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import {
@@ -10,6 +13,7 @@ import {
   type WslOrcadAccountEnvDependencies
 } from './wsl-orcad-account-env'
 import type { WslOrcadHostCapabilityVerdict } from './wsl-orcad-host-environments'
+import { getClaudeWslSelectionKey } from '../../claude-accounts/runtime-selection'
 import { runKeyedSerializedOperation } from '../../cli/keyed-promise-queue'
 
 export type WslOrcadHostAccountPush = {
@@ -40,7 +44,20 @@ export async function prepareWslOrcadHostLaunchEnv(
   return {
     wslDistro: distro,
     claude: await prepareWslOrcadAccountEnv(distro, 'claude', dependencies),
-    terminal: await prepareWslOrcadAccountEnv(distro, null, dependencies)
+    terminal: await prepareWslOrcadAccountEnv(distro, null, dependencies),
+    claudeAccounts: (dependencies.registeredClaudeAccounts?.() ?? [])
+      .filter(
+        (account) =>
+          account.managedAuthRuntime === 'wsl' &&
+          getClaudeWslSelectionKey(account.wslDistro) === getClaudeWslSelectionKey(distro) &&
+          account.wslLinuxAuthPath?.startsWith('/')
+      )
+      .map((account) => ({
+        id: account.id,
+        email: account.email,
+        organizationUuid: account.organizationUuid ?? null,
+        wslLinuxAuthPath: account.wslLinuxAuthPath!
+      }))
   }
 }
 
@@ -60,6 +77,13 @@ async function pushOnce(
     return
   }
   const launchEnv = await prepareWslOrcadHostLaunchEnv(push.distro, dependencies)
+  const registrationSupport = await push.hostSupports(HOST_CLAUDE_REGISTRATION_RUNTIME_CAPABILITY)
+  if (registrationSupport === 'unknown') {
+    throw new Error('The host did not report registration support.')
+  }
+  if (registrationSupport === 'unsupported') {
+    delete launchEnv.claudeAccounts
+  }
   const response = await push.call('accounts.setHostLaunchEnv', launchEnv)
   if (!response.ok) {
     throw new Error(response.error.message)
