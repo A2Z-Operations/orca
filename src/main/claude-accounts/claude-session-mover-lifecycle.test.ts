@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { AgentStatusIpcPayload } from '../../shared/agent-status/contracts/agent-status-ipc-payload'
 import {
   AGENT_PROMPT_BRACKETED_PASTE_END,
@@ -35,6 +38,7 @@ describe('session mover lifecycle and metadata', () => {
       key: 'session_id' as const,
       id: 'sess-pty-1',
       cwd: '/recorded/run',
+      transcriptPath: '/stale/status.jsonl',
       effort: 'high' as const
     }
     const f = setup({
@@ -63,7 +67,10 @@ describe('session mover lifecycle and metadata', () => {
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     await vi.runAllTimersAsync()
-    expect(f.move.mock.calls[0]?.[0].providerSession).toMatchObject(metadata)
+    expect(f.move.mock.calls[0]?.[0].providerSession).toMatchObject({
+      ...metadata,
+      transcriptPath: '/profiles/b/home/projects/x/sess-pty-1.jsonl'
+    })
   })
 
   it('keeps the cooldown after the registry replaces the old PTY with the new owner', async () => {
@@ -224,6 +231,8 @@ describe('session mover lifecycle and metadata', () => {
   })
 })
 
+let handoffDirectory: string
+
 const CLAUDE_COMPOSER = '\u001b[?2031h❯\u00a0'
 
 function hookRow(
@@ -237,7 +246,11 @@ function hookRow(
     connectionId: null,
     receivedAt,
     stateStartedAt: receivedAt,
-    providerSession: { key: 'session_id', id: 'sess-pty-1' },
+    providerSession: {
+      key: 'session_id',
+      id: 'sess-pty-1',
+      transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+    },
     workingMode: 'monitoring',
     subagents: [{ id: 'child-1', agentType: 'explore', state: 'working', startedAt: 1 }],
     ...extra
@@ -251,7 +264,7 @@ function handoffRig(screen: () => string | null) {
     const data = screen()
     return data === null ? null : { data, cols: 80, rows: 24 }
   })
-  const spawn = vi.fn(async () => ({ id: 'pty-new' as const }))
+  const spawn = vi.fn(async () => ({ id: 'pty-new' as const, confirmedStartupCwd: '/fixture' }))
   const strategy = createResumeMoveStrategy({
     getController: () => ({
       spawn,
@@ -351,7 +364,10 @@ describe('pool rebalance lifecycle', () => {
     expect(f.mover.lastDecisions().map((decision) => decision.reason)).toEqual([
       'under-line',
       'under-line',
-      'under-line'
+      'under-line',
+      'rebalance',
+      'rebalance',
+      'rebalance'
     ])
     expect(f.move).not.toHaveBeenCalled()
   })
@@ -359,10 +375,13 @@ describe('pool rebalance lifecycle', () => {
 
 describe('session mover handoff note', () => {
   beforeEach(() => {
+    handoffDirectory = mkdtempSync(join(tmpdir(), 'claude-handoff-'))
+    writeFileSync(join(handoffDirectory, 'sess-pty-1.jsonl'), '{"type":"user"}\n')
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-19T12:00:00Z'))
   })
   afterEach(() => {
+    rmSync(handoffDirectory, { recursive: true, force: true })
     vi.useRealTimers()
   })
 
@@ -376,6 +395,13 @@ describe('session mover handoff note', () => {
     })
     f.setNonAgentTask(PANE_1, true)
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     await f.move.mock.results[0]!.value
@@ -390,7 +416,7 @@ describe('session mover handoff note', () => {
     vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_FAILURE_HOLD_MS)
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     const second = f.move.mock.results[1]!.value
-    await vi.advanceTimersByTimeAsync(0)
+    await vi.waitFor(() => expect(rig.spawn).toHaveBeenCalledTimes(2))
     expect(rig.write).not.toHaveBeenCalled()
 
     rig.snapshots[0] = hookRow(Date.now(), { providerSessionOnly: true })
@@ -423,7 +449,7 @@ describe('session mover handoff note', () => {
     const rig = handoffRig(() => '$ ')
     rig.spawn.mockImplementation(async () => {
       rig.snapshots[0] = hookRow(Date.now() + 1)
-      return { id: 'pty-new' }
+      return { id: 'pty-new', confirmedStartupCwd: '/fixture' }
     })
     rig.snapshots.push(hookRow(Date.now()))
     const f = setup({
@@ -431,6 +457,13 @@ describe('session mover handoff note', () => {
       getStatusSnapshotForPane: () => rig.snapshots
     })
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     await expect(f.move.mock.results[0]!.value).resolves.toMatchObject({
@@ -448,9 +481,17 @@ describe('session mover handoff note', () => {
       getStatusSnapshotForPane: () => rig.snapshots
     })
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     const pending = f.move.mock.results[0]!.value
+    await vi.waitFor(() => expect(rig.spawn).toHaveBeenCalled())
     await vi.advanceTimersByTimeAsync(CLAUDE_SESSION_MOVE_HANDOFF_TIMEOUT_MS)
     await expect(pending).resolves.toMatchObject({ kind: 'moved', handoffNote: 'sent' })
     expect(rig.write).toHaveBeenCalledTimes(1)
@@ -464,9 +505,17 @@ describe('session mover handoff note', () => {
       getStatusSnapshotForPane: () => rig.snapshots
     })
     f.session('pty-1', PANE_1, 'b')
+    f.setProviderSessions([
+      {
+        paneKey: PANE_1,
+        sessionId: 'sess-pty-1',
+        transcriptPath: join(handoffDirectory, 'sess-pty-1.jsonl')
+      }
+    ])
     f.mover.start()
     f.publish(state(30, { b: limits(96), c: limits(20) }))
     const pending = f.move.mock.results[0]!.value
+    await vi.waitFor(() => expect(rig.spawn).toHaveBeenCalled())
     await vi.advanceTimersByTimeAsync(CLAUDE_SESSION_MOVE_HANDOFF_TIMEOUT_MS)
     await expect(pending).resolves.toMatchObject({ kind: 'moved', handoffNote: 'unsent' })
     expect(rig.write).not.toHaveBeenCalled()

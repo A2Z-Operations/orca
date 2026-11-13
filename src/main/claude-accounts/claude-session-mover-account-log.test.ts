@@ -1,10 +1,12 @@
+import type { ClaudeSessionMoveOutcome } from './claude-session-move-strategy'
+import { CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS } from './claude-session-mover-policy'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { closeClaudeAccountLog, openClaudeAccountLog } from './claude-account-log'
 import { readClaudeAccountLog } from './claude-account-log-read'
-import { limits, PANE_1, setup, state } from './claude-session-mover-test-fixture'
+import { limits, PANE_1, PANE_2, setup, state } from './claude-session-mover-test-fixture'
 
 describe('session mover writes the durable account log', () => {
   let directory = ''
@@ -46,6 +48,84 @@ describe('session mover writes the durable account log', () => {
       strategy: 'resume',
       detail: 'pty-new'
     })
+  })
+
+  it('retains completed and failed move rows after their PTYs leave the registry', async () => {
+    const f = setup()
+    f.session('pty-1', PANE_1, 'b')
+    f.mover.start()
+    f.publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    f.records.splice(0)
+    f.mover.evaluate()
+    expect(f.mover.lastDecisions()).toEqual([
+      expect.objectContaining({ ptyId: 'pty-new', reason: 'moved', toAccountId: 'c' })
+    ])
+    f.session('pty-failed', PANE_1, 'b')
+    f.move.mockImplementationOnce(async () => {
+      f.records.splice(0)
+      throw new Error('replacement exited')
+    })
+    vi.setSystemTime(Date.now() + 20 * 60_000)
+    f.publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    f.mover.evaluate()
+    expect(f.mover.lastDecisions().map((row) => row.reason)).toEqual(['failed', 'moved'])
+    expect(f.notices[1]?.moves).toEqual(f.mover.lastDecisions())
+    vi.useRealTimers()
+    await closeClaudeAccountLog()
+    const rows = (await readClaudeAccountLog({ filePath: path })).entries
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'decision', reason: 'moved', ptyId: 'pty-new' }),
+        expect.objectContaining({ type: 'decision', reason: 'failed', ptyId: 'pty-failed' })
+      ])
+    )
+  })
+
+  it('retries a wait without a failure cooldown or a target reservation', async () => {
+    const f = setup()
+    f.session('pty-1', PANE_1, 'b')
+    f.move.mockResolvedValueOnce({ kind: 'wait', reason: 'no-transcript' })
+    f.mover.start()
+    f.publish(state(30, { b: limits(96), c: limits(20) }))
+    await vi.runAllTimersAsync()
+    expect(f.mover.lastDecisions()).toEqual([
+      expect.objectContaining({ ptyId: 'pty-1', reason: 'wait:no-transcript' })
+    ])
+    f.mover.evaluate()
+    await vi.runAllTimersAsync()
+    expect(f.mover.lastDecisions()).toEqual([
+      expect.objectContaining({ ptyId: 'pty-new', reason: 'moved', toAccountId: 'c' })
+    ])
+  })
+
+  it('releases both waiting claims when a later evaluation updates the same target', async () => {
+    const first = Promise.withResolvers<ClaudeSessionMoveOutcome>()
+    const second = Promise.withResolvers<ClaudeSessionMoveOutcome>()
+    const f = setup()
+    f.session('pty-1', PANE_1, 'b')
+    f.move.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    f.mover.start()
+    f.publish(state(97, { b: limits(96), c: limits(20) }))
+    vi.setSystemTime(Date.now() + CLAUDE_SESSION_MOVE_TARGET_COOLDOWN_MS)
+    f.session('pty-2', PANE_2, 'b')
+    f.publish(state(97, { b: limits(96), c: limits(20) }))
+    first.resolve({ kind: 'wait', reason: 'cwd-missing' })
+    await vi.runAllTimersAsync()
+    second.resolve({ kind: 'wait', reason: 'no-cwd' })
+    await vi.runAllTimersAsync()
+    expect(
+      f.mover
+        .lastDecisions()
+        .map((row) => row.reason)
+        .sort()
+    ).toEqual(['wait:cwd-missing', 'wait:no-cwd'])
+    f.mover.evaluate()
+    await vi.runAllTimersAsync()
+    expect(f.mover.lastDecisions()).toContainEqual(
+      expect.objectContaining({ reason: 'moved', toAccountId: 'c' })
+    )
   })
 
   it('stay and wait reasons are the decision reasons, never a bare "stay"', async () => {

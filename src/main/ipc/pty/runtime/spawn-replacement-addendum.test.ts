@@ -21,6 +21,7 @@ import {
   makePaneSpawnReservationKey
 } from '../pane/spawn-reservation'
 import { makeReplacementDeps, replacementRouter } from './spawn-replacement-flow-fixture'
+import { resolvePtySpawnStartupCwd } from '../host-env/spawn-cwd'
 import { spawnPtyFromRuntimeController } from './spawn'
 import type { RuntimePtySpawnState, RuntimePtySpawnArgs } from './spawn-state'
 
@@ -59,6 +60,9 @@ const persistPtyBinding: Store['persistPtyBinding'] = async (input) => {
 }
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: these are the store ports read by the real replacement, preparation and commit paths exercised below.
 const store = {
+  getFolderWorkspaces: () => [],
+  getProjectGroups: () => [],
+  getRepos: () => [],
   getWorkspaceSession: () => ({
     tabsByWorktree: { [worktreeId]: [{ id: tabId, worktreeId }] },
     terminalLayoutsByTabId: { [tabId]: { ptyIdsByLeafId: { [TEST_LEAF_1]: bound } } },
@@ -77,6 +81,8 @@ const store = {
 function spawn(overrides: Partial<RuntimePtySpawnArgs> = {}) {
   const deps = makeReplacementDeps()
   deps.store = store
+  deps.resolvePtySpawnStartupCwd = (id, cwd, fallback) =>
+    resolvePtySpawnStartupCwd(store, id, cwd, fallback)
   const getSettings = deps.getSettings!
   deps.getSettings = () => ({ ...getSettings()!, activeClaudeManagedAccountId: 'a' })
   deps.prepareClaudeAuth = () => router.prepareLaunch()
@@ -139,6 +145,59 @@ afterEach(() => {
 })
 
 describe('runtime replacement addendum', () => {
+  it('keeps the old pane when its required cwd is deleted, with the workspace root still present', async () => {
+    const missing = join(root, 'deleted')
+    await expect(
+      spawn({
+        cwd: missing,
+        requiredCwd: missing,
+        resolvedWorkspace: {
+          id: worktreeId,
+          path: root,
+          connectionId: null,
+          repo: null,
+          folderWorkspace: null
+        }
+      })
+    ).rejects.toMatchObject({ reason: 'cwd-missing' })
+    expect(physical.stop).not.toHaveBeenCalled()
+    expect(physical.spawn).not.toHaveBeenCalled()
+    expect(bound).toBe('old')
+    expect(getClaudePaneAccount('old')?.accountId).toBe('a')
+  })
+
+  it('keeps the old pane when a folder workspace cannot resolve the required cwd', async () => {
+    await expect(
+      spawn({ cwd: root, requiredCwd: root, worktreeId: 'folder:missing' })
+    ).rejects.toMatchObject({ reason: 'no-cwd' })
+    expect(physical.stop).not.toHaveBeenCalled()
+    expect(physical.spawn).not.toHaveBeenCalled()
+    expect(bound).toBe('old')
+  })
+
+  it('confirms a required cwd only after a fresh provider start at that cwd', async () => {
+    const started = Promise.withResolvers<void>()
+    physical.spawn.mockImplementation(async (ctx: RuntimePtySpawnState) => {
+      expect(ctx.spawnOptions.cwd).toBe(root)
+      await started.promise
+      ctx.result = { id: 'new', incarnationId: 'new-incarnation', startupCwdSource: 'request' }
+    })
+    const result = spawn({ requiredCwd: root })
+    started.resolve()
+    await expect(result).resolves.toMatchObject({ id: 'new', confirmedStartupCwd: root })
+    expect(bound).toBe('new')
+  })
+
+  it.each([undefined, 'recovered-history'] as const)(
+    'does not confirm a provider start with cwd provenance %s',
+    async (startupCwdSource) => {
+      physical.spawn.mockImplementation(async (ctx: RuntimePtySpawnState) => {
+        ctx.result = { id: 'new', incarnationId: 'new-incarnation', startupCwdSource }
+      })
+      await expect(spawn({ requiredCwd: root })).resolves.not.toHaveProperty('confirmedStartupCwd')
+    }
+  )
+
   it('(k) launches on the chosen account and replaces the registry record after the swap', async () => {
     await expect(spawn()).resolves.toMatchObject({ id: 'new' })
     const ctx: RuntimePtySpawnState = physical.spawn.mock.calls[0][0]

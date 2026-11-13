@@ -19,9 +19,11 @@ export function createClaudeSessionMover(deps: ClaudeSessionMoverDeps): ClaudeSe
       return []
     }
     const live = new Set(deps.registry.list().map((record) => record.ptyId))
-    return [...decisions.values()]
-      .filter((record) => live.has(record.ptyId))
-      .sort((a, b) => b.at - a.at)
+    const settled = historyBox.current?.settledMoves ?? []
+    const current = [...decisions.values()].filter(
+      (record) => live.has(record.ptyId) && !settled.includes(record)
+    )
+    return [...current, ...settled].sort((a, b) => b.at - a.at)
   }
   const publishing: ClaudeSessionMoverDeps = {
     ...deps,
