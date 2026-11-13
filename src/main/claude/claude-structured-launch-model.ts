@@ -30,9 +30,10 @@ export function pinStructuredClaudeLaunchModel(
 
 /**
  * A turn that ran another model (a `/model` inside the chat) moves a pinned pane's model, so the
- * header shows what the record's `currentModel` says. A pinned model is never rewritten by the
- * proxy, so routing is unchanged. A policy pane keeps the policy model the proxy actually sends,
- * and a pane with no recorded model stays open to a covered takeover.
+ * header shows what the record's `currentModel` says. Routing is unchanged only while
+ * `claudeModelPolicyCoversExplicit` is off; when on, the policy can take over a pinned pane.
+ * A policy pane keeps the policy model the proxy actually sends, and a pane with no recorded
+ * model stays open to a covered takeover.
  */
 export function noteStructuredClaudeRanModel(sessionId: string, model: string): void {
   const sessionKey = structuredClaudeSessionKey(sessionId)

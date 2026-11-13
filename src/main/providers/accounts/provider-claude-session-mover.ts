@@ -40,7 +40,6 @@ export type StartedClaudeSessionMover = ClaudeSessionMover & { stop: () => void 
 
 let stopModelPolicyTicker: (() => void) | null = null
 
-/** Stops the model ticker when the session mover itself was not started. */
 /** Stops the ticker and drops the chat reader this start installed beside it. */
 export function stopClaudeModelPolicyTicker(): void {
   stopModelPolicyTicker?.()
