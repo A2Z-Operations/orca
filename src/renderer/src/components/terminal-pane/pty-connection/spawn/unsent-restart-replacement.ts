@@ -2,6 +2,10 @@ import { useAppStore } from '@/store/index'
 import type { AccountRestartAgent } from '@/store/terminals/terminal-contracts'
 import type { ConnectPanePtySession } from '../connect-pane-pty-session'
 import { layoutContainsLeafId } from '../../../../../../shared/workspace-layout/terminal-pane-tree'
+import {
+  noteUnsentRestartHandoff,
+  restartTabOwnerWorktreeId
+} from '../../process-exit/pane-restart-queue'
 
 export type UnsentRestartReplacementOutcome = 'handed-back' | 'stopped'
 
@@ -25,9 +29,9 @@ export function settleUnsentRestartReplacement(args: {
   stopPty: (ptyId: string) => Promise<unknown>
 }): UnsentRestartReplacementOutcome {
   const state = useAppStore.getState()
-  const tabPresent = (state.tabsByWorktree[args.worktreeId] ?? []).some(
-    (tab) => tab.id === args.tabId
-  )
+  // A tab that left its original bucket is still open. Only one gone from every bucket is closed.
+  const tabPresent =
+    restartTabOwnerWorktreeId(state.tabsByWorktree, args.worktreeId, args.tabId) !== null
   const layout = state.terminalLayoutsByTabId[args.tabId]
   const boundPtyId = layout?.ptyIdsByLeafId?.[args.leafId]
   // The tab can stay open after its restarting split pane closes.
@@ -47,6 +51,7 @@ export function settleUnsentRestartReplacement(args: {
   const agent = accountRestartAgentOf(args.restartAgent)
   if (agent) {
     // The account move still runs: an unmounted pane's restart replaces the PTY in one main-side step.
+    noteUnsentRestartHandoff(args.ptyId)
     state.queuePaneAccountRestarts([args.ptyId], agent)
   }
   return 'handed-back'

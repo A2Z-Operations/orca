@@ -8,10 +8,12 @@ import {
   clearPaneTerminalError
 } from '../errors/terminal-error-accumulation'
 import {
+  claimPaneRestartAttempt,
   getPaneRestartQueue,
   getTabRestartQueues,
   settlePaneRestart,
-  type PaneRestartAttempt
+  type PaneRestartAttempt,
+  type PaneRestartCallOptions
 } from './pane-restart-queue'
 import { usePaneRestartQueueLifecycle } from './use-pane-restart-queue-lifecycle'
 import { restartUnlessSessionHeld } from './restart-unless-session-held'
@@ -217,7 +219,7 @@ export function usePaneProcessRestart({
     function restartPane(
       paneId: number,
       startup: PtyConnectionDeps['startup'],
-      options: { focus: boolean; queueIfRestarting?: boolean }
+      options: PaneRestartCallOptions
     ): void {
       const manager = managerRef.current
       const pane = manager?.getPanes().find((candidate) => candidate.id === paneId)
@@ -226,11 +228,11 @@ export function usePaneProcessRestart({
         return
       }
       const queue = getPaneRestartQueue(tabId, worktreeId, pane.leafId)
-      if (queue.active) {
-        if (options.queueIfRestarting) {
-          queue.pending = { startup, options }
-          return
-        }
+      const claimed = claimPaneRestartAttempt(queue, startup, options, owner)
+      if (claimed.kind === 'queued') {
+        return
+      }
+      if (claimed.kind === 'busy') {
         setTerminalErrorsByPaneId((current) =>
           appendPaneTerminalError(
             current,
@@ -240,11 +242,7 @@ export function usePaneProcessRestart({
         )
         return
       }
-      if (options.queueIfRestarting) {
-        queue.pending = undefined
-      }
-      const attempt: PaneRestartAttempt = { startup, options, owner, started: false }
-      queue.active = attempt
+      const attempt = claimed.attempt
       const restartingPtyId = getRestartPtyId(paneId)
       if (restartingPtyId) {
         queue.ptyIds.add(restartingPtyId)
@@ -265,7 +263,7 @@ export function usePaneProcessRestart({
               .some((candidate) => candidate.id === paneId && candidate.leafId === pane.leafId)
           if (!samePane) {
             if (!queue.pending) {
-              queue.pending = { startup, options }
+              queue.pending = { startup, options: attempt.options }
             }
             settlePaneRestart(tabId, pane.leafId, attempt)
             return false
@@ -273,7 +271,7 @@ export function usePaneProcessRestart({
           const current = getRestartPtyId(paneId) === restartingPtyId
           if (!current) {
             if (!queue.pending) {
-              queue.pending = { startup, options }
+              queue.pending = { startup, options: attempt.options }
             }
             settlePaneRestart(tabId, pane.leafId, attempt)
           }

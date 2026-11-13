@@ -32,7 +32,7 @@ export function usePaneRestartQueueLifecycle({
       }
       const pending = queue.pending
       queue.pending = undefined
-      handleRestartPane(pane.id, pending.startup, pending.options)
+      handleRestartPane(pane.id, pending.startup, { ...pending.options, fromPending: true })
     }
   })
   useEffect(() => {
