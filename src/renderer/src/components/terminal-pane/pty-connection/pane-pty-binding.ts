@@ -3,7 +3,7 @@ import type { resolveTerminalPaneOwnerContext } from '../host-state/terminal-pan
 import type { HasPty } from './lifecycle/terminal-dead-session-reconcile'
 import { useAppStore } from '@/store'
 import { consumeRestartReplacement } from './spawn/restart-replacement-on-show'
-import { settleUnsentRestartReplacement } from './spawn/unsent-restart-replacement'
+import { settleRestart, settleUnsentRestartReplacement } from './spawn/unsent-restart-replacement'
 import { shouldReconcileMissingSession } from './lifecycle/terminal-dead-session-reconcile'
 import { cancelPendingSafeFitContinuations } from '@/lib/pane-manager/pane-fit-continuation-registry'
 import { PANE_PTY_RESIZE_HOLD_FLUSH_EVENT } from '@/lib/pane-manager/pane-pty-resize-hold'
@@ -177,6 +177,7 @@ export function createPanePtyBinding(session: ConnectPanePtySession): PanePtyBin
       session.spawnedFreshPtyId === ptyId && !Number.isFinite(session.lastTerminalInputAt),
     dispose() {
       session.disposed = true
+      settleRestart(session)
       session.discardAgentPreReadyDraft?.()
       session.cleanupKittyFileReader()
       session.disposeSpawnDeferral()

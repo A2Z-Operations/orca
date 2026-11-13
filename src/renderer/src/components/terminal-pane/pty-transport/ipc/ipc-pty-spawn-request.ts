@@ -156,7 +156,10 @@ export async function spawnIpcPty(
     ...(telemetry ? { telemetry } : {}),
     ...(agentLaunch && !admittedSessionId ? { agentLaunch } : {})
   })
-  if (!replacesPtyId || !connectOptions.onReplacedPtyKept) {
+  if (
+    !replacesPtyId ||
+    (!connectOptions.onReplacedPtyKept && !connectOptions.onReplacedPtyStopped)
+  ) {
     return spawned
   }
   const onReplacedPtyKept = connectOptions.onReplacedPtyKept
@@ -166,7 +169,9 @@ export async function spawnIpcPty(
       isAgentSessionHeldRefusal(error) ||
       (await window.api.pty.hasPty(replacesPtyId).catch(() => null)) !== false
     if (kept) {
-      onReplacedPtyKept(replacesPtyId)
+      onReplacedPtyKept?.(replacesPtyId)
+    } else {
+      connectOptions.onReplacedPtyStopped?.(replacesPtyId)
     }
     throw error
   })

@@ -203,6 +203,8 @@ export type PtyTransport = {
     claimReplacedPtyId?: () => string | null
     /** The failed spawn did not prove the claimed PTY ended; retain its pane binding. */
     onReplacedPtyKept?: (ptyId: string) => void
+    /** The failed spawn confirmed the predecessor is gone; retire its saved binding. */
+    onReplacedPtyStopped?: (ptyId: string) => void
     /** Reject a stale pane after any pre-spawn test gate but before creating a PTY. */
     shouldContinue?: () => boolean
     callbacks: PtyCallbacks

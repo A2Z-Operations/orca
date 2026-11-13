@@ -60,9 +60,23 @@ function accountRestartAgentOf(agent: string | undefined): AccountRestartAgent |
 export function restartReplacementClaim(session: ConnectPanePtySession): {
   claimReplacedPtyId: () => string | null
   onReplacedPtyKept: (ptyId: string) => void
+  onReplacedPtyStopped: (ptyId: string) => void
 } {
   return {
     claimReplacedPtyId: session.claimPendingReplacedPtyId,
+    onReplacedPtyStopped: (ptyId) => {
+      if (
+        session.disposed ||
+        session.deps.paneTransportsRef.current.get(session.pane.id) !== session.transport
+      ) {
+        return
+      }
+      session.restartReplacementStopped = true
+      session.clearExitedPanePtyLayoutBinding(ptyId)
+      session.deps.clearTabPtyId(session.deps.tabId, ptyId)
+      session.deps.consumeSuppressedPtyExit(ptyId)
+      session.reportError('The previous process ended and its replacement failed to start.')
+    },
     // A refused restart is final: the old PTY returns to its pane, and nothing is queued again.
     onReplacedPtyKept: (ptyId) => {
       settleUnsentRestartReplacement({
@@ -78,4 +92,10 @@ export function restartReplacementClaim(session: ConnectPanePtySession): {
       })
     }
   }
+}
+
+export function settleRestart(session: ConnectPanePtySession): void {
+  const onRestartSettled = session.deps.onRestartSettled
+  session.deps.onRestartSettled = undefined
+  onRestartSettled?.()
 }

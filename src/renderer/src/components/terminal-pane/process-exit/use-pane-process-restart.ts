@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { useAppStore } from '../../../store'
 import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
 import { connectPanePty } from '../pty-connection/connect-pane-pty'
@@ -81,23 +81,37 @@ export function usePaneProcessRestart({
   | 'updateTabTitle'
   | 'worktreeId'
 >) {
+  const restartingPanesRef = useRef(new Set<number>())
+  const getRestartPtyId = useCallback(
+    (paneId: number) => {
+      const pane = managerRef.current?.getPanes().find((candidate) => candidate.id === paneId)
+      return (
+        paneTransportsRef.current.get(paneId)?.getPtyId() ??
+        (pane
+          ? useAppStore.getState().terminalLayoutsByTabId[tabId]?.ptyIdsByLeafId?.[pane.leafId]
+          : undefined)
+      )
+    },
+    [managerRef, paneTransportsRef, tabId]
+  )
   const restartPaneNow = useCallback(
     (paneId: number, startup: PtyConnectionDeps['startup'], options: { focus: boolean }) => {
       const manager = managerRef.current
       const pane = manager?.getPanes().find((candidate) => candidate.id === paneId)
       if (!manager || !pane) {
+        restartingPanesRef.current.delete(paneId)
         return
       }
       const transport = paneTransportsRef.current.get(paneId)
       const panePtyBinding = panePtyBindingsRef.current.get(paneId)
-      const existingPtyId = transport?.getPtyId()
+      const existingPtyId = getRestartPtyId(paneId)
       if (existingPtyId) {
         suppressPtyExit(existingPtyId)
         clearCodexRestartNotice(existingPtyId)
       }
       panePtyBinding?.dispose()
       panePtyBindingsRef.current.delete(paneId)
-      const replacesPtyId = releasePaneTransportForRestart(transport)
+      const replacesPtyId = releasePaneTransportForRestart(transport, existingPtyId)
       // A pending local replacement must remain discoverable in the quit checkpoint.
       if (!replacesPtyId) {
         if (existingPtyId) {
@@ -115,6 +129,7 @@ export function usePaneProcessRestart({
         cwd,
         startup,
         ...(replacesPtyId ? { replacesPtyId } : {}),
+        onRestartSettled: () => restartingPanesRef.current.delete(paneId),
         mountFollowsTerminalPark: false,
         paneTransportsRef,
         paneMode2031Ref,
@@ -156,6 +171,7 @@ export function usePaneProcessRestart({
       cwd,
       dispatchNotification,
       handlePaneProcessDied,
+      getRestartPtyId,
       isActiveRef,
       isVisibleRef,
       markTerminalBell,
@@ -187,19 +203,38 @@ export function usePaneProcessRestart({
 
   const handleRestartPane = useCallback(
     (paneId: number, startup: PtyConnectionDeps['startup'], options: { focus: boolean }) => {
-      const restartingPtyId = paneTransportsRef.current.get(paneId)?.getPtyId()
+      if (restartingPanesRef.current.has(paneId)) {
+        setTerminalErrorsByPaneId((current) =>
+          appendPaneTerminalError(
+            current,
+            paneId,
+            'A restart is already in progress for this pane.'
+          )
+        )
+        return
+      }
+      restartingPanesRef.current.add(paneId)
+      const restartingPtyId = getRestartPtyId(paneId)
       restartUnlessSessionHeld({
         replacesPtyId: restartingPtyId,
         resumeProviderSession: startup?.resumeProviderSession,
         findHolder: window.api?.pty?.findAgentSessionHolder,
-        isStillCurrent: () => paneTransportsRef.current.get(paneId)?.getPtyId() === restartingPtyId,
+        isStillCurrent: () => {
+          const current = getRestartPtyId(paneId) === restartingPtyId
+          if (!current) {
+            restartingPanesRef.current.delete(paneId)
+          }
+          return current
+        },
         restart: () => restartPaneNow(paneId, startup, options),
         // The old PTY keeps its pane; the pane says why it did not restart.
-        refuse: (refusal) =>
+        refuse: (refusal) => {
+          restartingPanesRef.current.delete(paneId)
           setTerminalErrorsByPaneId((current) => appendPaneTerminalError(current, paneId, refusal))
+        }
       })
     },
-    [paneTransportsRef, restartPaneNow, setTerminalErrorsByPaneId]
+    [getRestartPtyId, restartPaneNow, setTerminalErrorsByPaneId]
   )
   return { handleRestartPane }
 }
