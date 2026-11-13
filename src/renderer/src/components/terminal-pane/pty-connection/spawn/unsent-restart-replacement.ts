@@ -2,6 +2,7 @@ import { useAppStore } from '@/store/index'
 import type { AccountRestartAgent } from '@/store/terminals/terminal-contracts'
 import type { ConnectPanePtySession } from '../connect-pane-pty-session'
 import { layoutContainsLeafId } from '../../../../../../shared/workspace-layout/terminal-pane-tree'
+import { noteUnsentRestartHandoff } from '../../process-exit/pane-restart-queue'
 
 export type UnsentRestartReplacementOutcome = 'handed-back' | 'stopped'
 
@@ -47,6 +48,7 @@ export function settleUnsentRestartReplacement(args: {
   const agent = accountRestartAgentOf(args.restartAgent)
   if (agent) {
     // The account move still runs: an unmounted pane's restart replaces the PTY in one main-side step.
+    noteUnsentRestartHandoff(args.ptyId)
     state.queuePaneAccountRestarts([args.ptyId], agent)
   }
   return 'handed-back'

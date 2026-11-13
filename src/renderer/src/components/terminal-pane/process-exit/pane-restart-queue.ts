@@ -1,16 +1,75 @@
 import { useAppStore } from '@/store'
+import { getTerminalTabOwnerWorktreeId } from '@/store/terminals/terminal-tab-owner-index'
 import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
 import { layoutContainsLeafId } from '../../../../../shared/workspace-layout/terminal-pane-tree'
 import type { PtyConnectionDeps } from '../pty-connection/pty-connection-deps'
 
+export type PaneRestartOptions = {
+  focus: boolean
+  queueIfRestarting?: boolean
+}
+
+/** `handoff` is a parked restart's re-queue. `fromPending` is the drain starting what it took. */
+export type PaneRestartCallOptions = PaneRestartOptions & {
+  handoff?: boolean
+  fromPending?: boolean
+}
+
 export type PaneRestartRequest = {
   startup: PtyConnectionDeps['startup']
-  options: { focus: boolean; queueIfRestarting?: boolean }
+  options: PaneRestartOptions
 }
 
 export type PaneRestartAttempt = PaneRestartRequest & {
   owner: object
   started: boolean
+  /** Taken from `pending` by the drain, so a later hand-back must not run behind it. */
+  drained: boolean
+}
+
+export function storedRestartOptions(options: PaneRestartCallOptions): PaneRestartOptions {
+  return {
+    focus: options.focus,
+    ...(options.queueIfRestarting ? { queueIfRestarting: true } : {})
+  }
+}
+
+export type PaneRestartClaim =
+  | { kind: 'start'; attempt: PaneRestartAttempt }
+  | { kind: 'queued' }
+  | { kind: 'busy' }
+
+export function claimPaneRestartAttempt(
+  queue: PaneRestartQueue,
+  startup: PtyConnectionDeps['startup'],
+  options: PaneRestartCallOptions,
+  owner: object
+): PaneRestartClaim {
+  const kept = storedRestartOptions(options)
+  // The parked spawn re-queues its move. A startup already waiting, or the one the drain just
+  // started from that wait, is newer and must not be cleared or run a second time.
+  if (options.handoff && (queue.pending || queue.active?.drained)) {
+    return { kind: 'queued' }
+  }
+  if (queue.active) {
+    if (options.queueIfRestarting) {
+      queue.pending = { startup, options: kept }
+      return { kind: 'queued' }
+    }
+    return { kind: 'busy' }
+  }
+  if (options.queueIfRestarting) {
+    queue.pending = undefined
+  }
+  const attempt: PaneRestartAttempt = {
+    startup,
+    options: kept,
+    owner,
+    started: false,
+    drained: options.fromPending === true
+  }
+  queue.active = attempt
+  return { kind: 'start', attempt }
 }
 
 type PaneRestartQueue = {
@@ -25,6 +84,26 @@ type PaneRestartQueue = {
 
 const queues = new Map<string, PaneRestartQueue>()
 const listeners = new Set<() => void>()
+const unsentRestartHandoffs = new Set<string>()
+
+export function noteUnsentRestartHandoff(ptyId: string): void {
+  unsentRestartHandoffs.add(ptyId)
+}
+
+export function takeUnsentRestartHandoff(ptyId: string): boolean {
+  return unsentRestartHandoffs.delete(ptyId)
+}
+
+function restartQueueWorktreeId(
+  tabsByWorktree: Readonly<Record<string, readonly { id: string }[]>>,
+  queue: PaneRestartQueue
+): string | null {
+  if (tabsByWorktree[queue.worktreeId]?.some((tab) => tab.id === queue.tabId)) {
+    return queue.worktreeId
+  }
+  // The tab left this bucket. Another bucket still owning it is a move, not a close.
+  return getTerminalTabOwnerWorktreeId(tabsByWorktree, queue.tabId)
+}
 
 export function notifyPaneRestartQueues(): void {
   for (const listener of listeners) {
@@ -57,10 +136,12 @@ export function getPaneRestartQueue(
   queues.set(key, queue)
   queue.unsubscribe = useAppStore.subscribe(() => {
     const state = useAppStore.getState()
+    const ownerWorktreeId = restartQueueWorktreeId(state.tabsByWorktree, queue)
     if (
-      state.tabsByWorktree[worktreeId]?.some((tab) => tab.id === tabId) &&
+      ownerWorktreeId &&
       layoutContainsLeafId(state.terminalLayoutsByTabId[tabId]?.root ?? null, leafId)
     ) {
+      queue.worktreeId = ownerWorktreeId
       releaseIdlePaneRestartQueue(queue)
       return
     }
@@ -73,6 +154,7 @@ export function getPaneRestartQueue(
     queue.pending = undefined
     queue.active = undefined
     for (const ptyId of queue.ptyIds) {
+      unsentRestartHandoffs.delete(ptyId)
       if (state.pendingPaneAccountRestarts[ptyId]) {
         console.warn('[terminal] discarded pending account switch: pane removed', { tabId, leafId })
         state.consumePendingPaneAccountRestart(ptyId)

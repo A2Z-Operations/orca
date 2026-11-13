@@ -1,5 +1,8 @@
 import { useEffect } from 'react'
-import { getRestartingPanePtyIds } from '../process-exit/pane-restart-queue'
+import {
+  getRestartingPanePtyIds,
+  takeUnsentRestartHandoff
+} from '../process-exit/pane-restart-queue'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../../../store'
 import {
@@ -51,12 +54,14 @@ export function useReadyPaneAccountRestarts({
         continue
       }
       const agent = consumePendingPaneAccountRestart(ptyId)
+      const handoff = takeUnsentRestartHandoff(ptyId)
       const startup = agent ? buildAccountRestartStartup(agent, pane.leafId) : null
       if (agent && startup) {
         // Why: one Claude switch restarts many panes at once; none was the one the user clicked.
         handleRestartPane(pane.id, startup, {
           focus: agent === 'codex',
-          queueIfRestarting: true
+          queueIfRestarting: true,
+          ...(handoff ? { handoff: true } : {})
         })
       } else if (agent) {
         console.warn('[terminal] discarded account switch: startup unavailable', {
