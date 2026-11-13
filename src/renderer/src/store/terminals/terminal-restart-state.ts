@@ -1,3 +1,4 @@
+import { recordQueuedPaneAccountRestart } from '@/components/terminal-pane/process-exit/unsent-restart-handoff'
 import { isSameCodexRestartNoticeAccount } from './codex-restart-notice-account-identity'
 import type { AccountRestartAgent } from './terminal-contracts'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
@@ -47,6 +48,10 @@ export function createTerminalRestartActions(
     queuePaneAccountRestarts: (ptyIds, agent) => {
       if (ptyIds.length === 0) {
         return
+      }
+      // Before subscribers read the new pending entry, so a hand-back stays tied to this queue only.
+      for (const ptyId of ptyIds) {
+        recordQueuedPaneAccountRestart(ptyId)
       }
       set((s) => {
         const pendingPaneAccountRestarts = {

@@ -26,6 +26,7 @@ import {
   type TerminalErrorsByPaneId
 } from '../errors/terminal-error-accumulation'
 import { mockPanePtyArgs } from '../pty-connection/test-fixtures/pty-connection-test-connect-mock-pane'
+import { noteUnsentRestartHandoff, recordQueuedPaneAccountRestart } from './unsent-restart-handoff'
 
 vi.unmock('react')
 
@@ -90,11 +91,7 @@ describe('restart queue races', () => {
         return { remounted: true }
       }),
       queuePaneAccountRestarts: vi.fn((ptyIds: string[], agent: 'claude' | 'codex') => {
-        state.pendingPaneAccountRestarts = {
-          ...state.pendingPaneAccountRestarts,
-          ...Object.fromEntries(ptyIds.map((id) => [id, agent]))
-        }
-        publish()
+        queueAccountSwitch(ptyIds, agent)
       }),
       consumePendingPaneAccountRestart: vi.fn((ptyId: string) => {
         const agent = state.pendingPaneAccountRestarts?.[ptyId] ?? null
@@ -119,6 +116,9 @@ describe('restart queue races', () => {
   })
 
   function queueAccountSwitch(ptyIds: string[], agent: 'claude' | 'codex') {
+    for (const ptyId of ptyIds) {
+      recordQueuedPaneAccountRestart(ptyId)
+    }
     state.pendingPaneAccountRestarts = {
       ...state.pendingPaneAccountRestarts,
       ...Object.fromEntries(ptyIds.map((id) => [id, agent]))
@@ -325,7 +325,7 @@ describe('restart queue races', () => {
     await remounted.unmount()
   })
 
-  it('does not run an unsent Claude hand-back behind the drained startup', async () => {
+  it('ignores an unsent Claude hand-back and still runs a newer switch behind the drained startup', async () => {
     const spawning = Promise.withResolvers<{ id: string }>()
     const first = createMockTransport('pty-intermediate')
     first.detach = vi.fn()
@@ -336,7 +336,8 @@ describe('restart queue races', () => {
     const drainedLookup = Promise.withResolvers<null>()
     window.api.pty.findAgentSessionHolder = vi.fn().mockReturnValue(drainedLookup.promise)
     const successor = successfulTransport('pty-switched')
-    transports.push(first, successor)
+    const newer = successfulTransport('pty-newer')
+    transports.push(first, successor, newer)
     const mounted = await mountRestartPane()
     mounted.restart.handleRestartPane(2, { command: 'sh' }, { focus: false })
     await flushAsyncTicks()
@@ -351,19 +352,24 @@ describe('restart queue races', () => {
     })
     expect(successor.connect).not.toHaveBeenCalled()
     currentAccount = 'account-d'
-    const { noteUnsentRestartHandoff } = await import('./pane-restart-queue')
     noteUnsentRestartHandoff('pty-old')
+    await act(async () => {
+      queueAccountSwitch(['pty-old'], 'claude')
+    })
+    currentAccount = 'account-e'
     await act(async () => {
       queueAccountSwitch(['pty-old'], 'claude')
     })
     await act(async () => {
       drainedLookup.resolve(null)
-      await flushAsyncTicks(30)
+      await flushAsyncTicks(40)
     })
     expect(successor.connect).toHaveBeenCalledTimes(1)
+    expect(newer.connect).toHaveBeenCalledTimes(1)
     expect(transportOptions.map((options) => options.env)).toEqual([
       expect.not.objectContaining({ CLAUDE_CONFIG_DIR: expect.anything() }),
-      expect.objectContaining({ CLAUDE_CONFIG_DIR: 'account-c' })
+      expect.objectContaining({ CLAUDE_CONFIG_DIR: 'account-c' }),
+      expect.objectContaining({ CLAUDE_CONFIG_DIR: 'account-e' })
     ])
     await mounted.unmount()
   })

@@ -24,6 +24,7 @@ import {
   restoreTerminalTestGlobals
 } from '../test-fixtures/pty-connection-test-environment'
 import { mockPanePtyArgs } from '../test-fixtures/pty-connection-test-connect-mock-pane'
+import { recordQueuedPaneAccountRestart } from '../../process-exit/unsent-restart-handoff'
 
 export function registerPtyConnectionRestartReplacementDisposeTests(): void {
   let mockStoreState: StoreState
@@ -93,7 +94,11 @@ export function registerPtyConnectionRestartReplacementDisposeTests(): void {
     }
 
     function installRestartStoreActions(): void {
-      mockStoreState.queuePaneAccountRestarts = vi.fn()
+      mockStoreState.queuePaneAccountRestarts = vi.fn((ptyIds: string[]) => {
+        for (const ptyId of ptyIds) {
+          recordQueuedPaneAccountRestart(ptyId)
+        }
+      })
       mockStoreState.replaceTerminalLayoutPanePtyId = vi.fn(
         (tabId: string, leafId: string, ptyId: string) => {
           const layout = mockStoreState.terminalLayoutsByTabId?.[tabId]
@@ -230,6 +235,34 @@ export function registerPtyConnectionRestartReplacementDisposeTests(): void {
       expect(mockStoreState.terminalLayoutsByTabId?.['tab-split-closed']?.ptyIdsByLeafId).toEqual({
         [LEAF_1]: 'pty-first'
       })
+    })
+
+    it('hands a parked pane back when its tab moves to another worktree bucket', async () => {
+      const { connectPanePty } = await import('../connect-pane-pty')
+      const agentTitleMocks =
+        await vi.importMock<PtyConnectionAgentTitleMocks>('@/lib/agent-status')
+      installRestartStoreActions()
+      addRestartingTab('tab-moved')
+      transportFactoryQueue.push(createMockTransport('pty-unsent'))
+      const deps = createDeps({
+        tabId: 'tab-moved',
+        startup: claudeRestartStartup('session-moved'),
+        replacesPtyId: 'pty-moved'
+      })
+      const args = mockPanePtyArgs(createPane(1), createManager(1), deps)
+      bindPaneAgentTitleMocks(args[2], agentTitleMocks)
+      const moved = mockStoreState.tabsByWorktree['wt-1'].find((row) => row.id === 'tab-moved')
+      if (!moved) {
+        throw new Error('missing moved tab')
+      }
+      mockStoreState.tabsByWorktree = { 'wt-2': [moved] }
+
+      connectPanePty(...args).dispose()
+      await flushAsyncTicks()
+
+      expect(window.api.pty.kill).not.toHaveBeenCalled()
+      expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-moved', 'pty-moved')
+      expect(mockStoreState.queuePaneAccountRestarts).toHaveBeenCalledWith(['pty-moved'], 'claude')
     })
 
     it('hands a split pane its live agent back while that pane is still in the layout', async () => {

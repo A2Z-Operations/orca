@@ -3,6 +3,9 @@ import { getTerminalTabOwnerWorktreeId } from '@/store/terminals/terminal-tab-ow
 import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
 import { layoutContainsLeafId } from '../../../../../shared/workspace-layout/terminal-pane-tree'
 import type { PtyConnectionDeps } from '../pty-connection/pty-connection-deps'
+import { clearUnsentRestartHandoff } from './unsent-restart-handoff'
+
+export { noteUnsentRestartHandoff, takeUnsentRestartHandoff } from './unsent-restart-handoff'
 
 export type PaneRestartOptions = {
   focus: boolean
@@ -84,25 +87,17 @@ type PaneRestartQueue = {
 
 const queues = new Map<string, PaneRestartQueue>()
 const listeners = new Set<() => void>()
-const unsentRestartHandoffs = new Set<string>()
 
-export function noteUnsentRestartHandoff(ptyId: string): void {
-  unsentRestartHandoffs.add(ptyId)
-}
-
-export function takeUnsentRestartHandoff(ptyId: string): boolean {
-  return unsentRestartHandoffs.delete(ptyId)
-}
-
-function restartQueueWorktreeId(
+/** The bucket that still contains the tab. Another bucket owning it is a move, not a close. */
+export function restartTabOwnerWorktreeId(
   tabsByWorktree: Readonly<Record<string, readonly { id: string }[]>>,
-  queue: PaneRestartQueue
+  worktreeId: string,
+  tabId: string
 ): string | null {
-  if (tabsByWorktree[queue.worktreeId]?.some((tab) => tab.id === queue.tabId)) {
-    return queue.worktreeId
+  if (tabsByWorktree[worktreeId]?.some((tab) => tab.id === tabId)) {
+    return worktreeId
   }
-  // The tab left this bucket. Another bucket still owning it is a move, not a close.
-  return getTerminalTabOwnerWorktreeId(tabsByWorktree, queue.tabId)
+  return getTerminalTabOwnerWorktreeId(tabsByWorktree, tabId)
 }
 
 export function notifyPaneRestartQueues(): void {
@@ -136,7 +131,11 @@ export function getPaneRestartQueue(
   queues.set(key, queue)
   queue.unsubscribe = useAppStore.subscribe(() => {
     const state = useAppStore.getState()
-    const ownerWorktreeId = restartQueueWorktreeId(state.tabsByWorktree, queue)
+    const ownerWorktreeId = restartTabOwnerWorktreeId(
+      state.tabsByWorktree,
+      queue.worktreeId,
+      queue.tabId
+    )
     if (
       ownerWorktreeId &&
       layoutContainsLeafId(state.terminalLayoutsByTabId[tabId]?.root ?? null, leafId)
@@ -154,7 +153,7 @@ export function getPaneRestartQueue(
     queue.pending = undefined
     queue.active = undefined
     for (const ptyId of queue.ptyIds) {
-      unsentRestartHandoffs.delete(ptyId)
+      clearUnsentRestartHandoff(ptyId)
       if (state.pendingPaneAccountRestarts[ptyId]) {
         console.warn('[terminal] discarded pending account switch: pane removed', { tabId, leafId })
         state.consumePendingPaneAccountRestart(ptyId)
