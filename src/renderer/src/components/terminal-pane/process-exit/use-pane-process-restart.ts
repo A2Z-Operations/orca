@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '../../../store'
 import { makePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'
 import { connectPanePty } from '../pty-connection/connect-pane-pty'
@@ -82,6 +82,17 @@ export function usePaneProcessRestart({
   | 'worktreeId'
 >) {
   const restartingPanesRef = useRef(new Set<number>())
+  const pendingRestartsRef = useRef(new Map<number, () => void>())
+  useEffect(() => () => pendingRestartsRef.current.clear(), [])
+  const settlePaneRestart = useCallback((paneId: number) => {
+    // Let the previous spawn finish binding and remove its pending-spawn entry first.
+    queueMicrotask(() => {
+      restartingPanesRef.current.delete(paneId)
+      const pending = pendingRestartsRef.current.get(paneId)
+      pendingRestartsRef.current.delete(paneId)
+      pending?.()
+    })
+  }, [])
   const getRestartPtyId = useCallback(
     (paneId: number) => {
       const pane = managerRef.current?.getPanes().find((candidate) => candidate.id === paneId)
@@ -100,6 +111,7 @@ export function usePaneProcessRestart({
       const pane = manager?.getPanes().find((candidate) => candidate.id === paneId)
       if (!manager || !pane) {
         restartingPanesRef.current.delete(paneId)
+        pendingRestartsRef.current.delete(paneId)
         return
       }
       const transport = paneTransportsRef.current.get(paneId)
@@ -129,7 +141,7 @@ export function usePaneProcessRestart({
         cwd,
         startup,
         ...(replacesPtyId ? { replacesPtyId } : {}),
-        onRestartSettled: () => restartingPanesRef.current.delete(paneId),
+        onRestartSettled: () => settlePaneRestart(paneId),
         mountFollowsTerminalPark: false,
         paneTransportsRef,
         paneMode2031Ref,
@@ -190,6 +202,7 @@ export function usePaneProcessRestart({
       setCacheTimerStartedAt,
       setRuntimePaneTitle,
       setTerminalError,
+      settlePaneRestart,
       showRestoredSessionBanner,
       suppressPtyExit,
       syncPanePtyLayoutBinding,
@@ -202,8 +215,16 @@ export function usePaneProcessRestart({
   )
 
   const handleRestartPane = useCallback(
-    (paneId: number, startup: PtyConnectionDeps['startup'], options: { focus: boolean }) => {
+    function restartPane(
+      paneId: number,
+      startup: PtyConnectionDeps['startup'],
+      options: { focus: boolean; queueIfRestarting?: boolean }
+    ): void {
       if (restartingPanesRef.current.has(paneId)) {
+        if (options.queueIfRestarting) {
+          pendingRestartsRef.current.set(paneId, () => restartPane(paneId, startup, options))
+          return
+        }
         setTerminalErrorsByPaneId((current) =>
           appendPaneTerminalError(
             current,
@@ -222,19 +243,19 @@ export function usePaneProcessRestart({
         isStillCurrent: () => {
           const current = getRestartPtyId(paneId) === restartingPtyId
           if (!current) {
-            restartingPanesRef.current.delete(paneId)
+            settlePaneRestart(paneId)
           }
           return current
         },
         restart: () => restartPaneNow(paneId, startup, options),
         // The old PTY keeps its pane; the pane says why it did not restart.
         refuse: (refusal) => {
-          restartingPanesRef.current.delete(paneId)
+          settlePaneRestart(paneId)
           setTerminalErrorsByPaneId((current) => appendPaneTerminalError(current, paneId, refusal))
         }
       })
     },
-    [getRestartPtyId, restartPaneNow, setTerminalErrorsByPaneId]
+    [getRestartPtyId, restartPaneNow, setTerminalErrorsByPaneId, settlePaneRestart]
   )
   return { handleRestartPane }
 }

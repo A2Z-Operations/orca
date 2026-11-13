@@ -30,11 +30,13 @@ vi.unmock('react')
 describe('restart pane persistence', () => {
   let state: StoreState & Required<Pick<StoreState, 'ptyIdsByTabId' | 'terminalLayoutsByTabId'>>
   let transports: MockTransport[]
+  let transportOptions: Record<string, unknown>[]
   let subscribers: ((state: StoreState) => void)[]
 
   beforeEach(async () => {
     vi.clearAllMocks()
     transports = []
+    transportOptions = []
     subscribers = []
     state = {
       ...createInitialStoreState(() => state),
@@ -44,7 +46,7 @@ describe('restart pane persistence', () => {
     bindPtyConnectionTestMocks({
       getState: () => state,
       getTransportQueue: () => transports,
-      getTransportOptions: () => [],
+      getTransportOptions: () => transportOptions,
       getStoreSubscribers: () => subscribers,
       setStoreSubscribers: (next) => {
         subscribers = next
@@ -101,6 +103,7 @@ describe('restart pane persistence', () => {
     })
     const [, typedManager, typedDeps] = mockPanePtyArgs(pane, manager, deps)
     manager.getPanes.mockReturnValue([pane])
+    deps.paneTransportsRef.current.set(1, createMockTransport('pty-first'))
     deps.paneTransportsRef.current.set(2, oldTransport)
     let errors: TerminalErrorsByPaneId = {}
     const restartDeps: Parameters<typeof usePaneProcessRestart>[0] = {
@@ -269,4 +272,106 @@ describe('restart pane persistence', () => {
     expect(state.ptyIdsByTabId['tab-1']).toEqual(['pty-first', 'pty-new'])
     binding.dispose()
   })
+
+  it.each([
+    { switches: ['account-b'], expectedAccount: 'account-b' },
+    { switches: ['account-b', 'account-c'], expectedAccount: 'account-c' }
+  ])(
+    'applies only $expectedAccount after an in-flight restart',
+    async ({ switches, expectedAccount }) => {
+      const spawning = Promise.withResolvers<{ id: string }>()
+      const first = createMockTransport('pty-intermediate')
+      first.detach = vi.fn()
+      first.connect.mockImplementation((options: Parameters<PtyTransport['connect']>[0]) => {
+        options.claimReplacedPtyId?.()
+        return spawning.promise
+      })
+      const successor = createMockTransport('pty-switched')
+      successor.connect.mockImplementation(
+        async (options: Parameters<PtyTransport['connect']>[0]) => {
+          options.claimReplacedPtyId?.()
+          return { id: 'pty-switched' }
+        }
+      )
+      transports.push(first, successor)
+      const { restart, restartDeps } = await mountRestartPane()
+      restart.handleRestartPane(2, { command: 'codex' }, { focus: false })
+      await flushAsyncTicks()
+
+      for (const account of switches) {
+        restart.handleRestartPane(
+          2,
+          { command: 'codex', env: { CODEX_HOME: account } },
+          { focus: false, queueIfRestarting: true }
+        )
+      }
+      expect(transportOptions.map((options) => options.env)).toEqual([
+        expect.not.objectContaining({ CODEX_HOME: expect.anything() })
+      ])
+
+      spawning.resolve({ id: 'pty-intermediate' })
+      await flushAsyncTicks(30)
+      expect(transportOptions.map((options) => options.env)).toEqual([
+        expect.not.objectContaining({ CODEX_HOME: expect.anything() }),
+        expect.objectContaining({ CODEX_HOME: expectedAccount })
+      ])
+      expect(state.terminalLayoutsByTabId['tab-1'].ptyIdsByLeafId).toEqual({
+        [LEAF_1]: 'pty-first',
+        [LEAF_2]: 'pty-switched'
+      })
+      expect(state.ptyIdsByTabId['tab-1']).toEqual(['pty-first', 'pty-switched'])
+      restartDeps.panePtyBindingsRef.current.get(2)?.dispose()
+    }
+  )
+
+  it.each([
+    { live: true, expectedPtys: ['pty-first', 'pty-old'] },
+    { live: false, expectedPtys: ['pty-first'] }
+  ])(
+    'keeps the pending switch failure visible when predecessor liveness is $live',
+    async ({ live, expectedPtys }) => {
+      const { spawnIpcPty } = await import('../pty-transport/ipc/ipc-pty-spawn-request')
+      const liveness = Promise.withResolvers<boolean>()
+      window.api.pty.spawn = vi.fn().mockRejectedValue(new Error('ENOENT'))
+      window.api.pty.hasPty = vi.fn(() => liveness.promise)
+      for (let index = 0; index < 2; index += 1) {
+        const transport = createMockTransport(null)
+        transport.detach = vi.fn()
+        transport.connect = vi
+          .fn()
+          .mockImplementation(async (options: Parameters<PtyTransport['connect']>[0]) => {
+            try {
+              return await spawnIpcPty({}, options)
+            } catch (error) {
+              options.callbacks?.onError?.('ENOENT')
+              throw error
+            }
+          })
+        transports.push(transport)
+      }
+      const { restart, restartDeps, getErrors } = await mountRestartPane()
+      restart.handleRestartPane(2, { command: 'codex' }, { focus: false })
+      await flushAsyncTicks()
+      restart.handleRestartPane(
+        2,
+        { command: 'codex', env: { CODEX_HOME: 'account-b' } },
+        { focus: false, queueIfRestarting: true }
+      )
+      expect(transportOptions.map((options) => options.env)).toEqual([
+        expect.not.objectContaining({ CODEX_HOME: expect.anything() })
+      ])
+
+      liveness.resolve(live)
+      await flushAsyncTicks(40)
+      expect(transportOptions.map((options) => options.env)).toEqual([
+        expect.not.objectContaining({ CODEX_HOME: expect.anything() }),
+        expect.objectContaining({ CODEX_HOME: 'account-b' })
+      ])
+      expect(getErrors()[2]).toEqual(
+        expect.arrayContaining([{ message: 'ENOENT', resourceLimit: false }])
+      )
+      expect(state.ptyIdsByTabId['tab-1']).toEqual(expectedPtys)
+      restartDeps.panePtyBindingsRef.current.get(2)?.dispose()
+    }
+  )
 })
