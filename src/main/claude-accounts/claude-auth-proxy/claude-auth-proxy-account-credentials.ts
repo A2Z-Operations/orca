@@ -1,8 +1,8 @@
+import { registeredClaudeAccount } from '../claude-registered-account'
+import { readClaudeBearerIdentity } from './claude-auth-proxy-bearer-identity'
 import {
-  claudeStateFile,
   claudeStateFileAsync,
   isSameClaudeLogin,
-  readClaudeFolderLogin,
   readClaudeFolderLoginAsync,
   type ClaudeFolderLogin
 } from '../claude-account-folder'
@@ -21,18 +21,14 @@ type CredentialSource = {
   userHome?: string
 }
 
-const accountDirs = new Map<string, { configDir: string; identity: AccountIdentity | null }>()
+const accountDirs = new Map<string, string>()
 
-/** Guest bindings pin the login at registration; rebinding must not adopt a replacement login. */
+/** A binding locates credentials; only the registration store establishes ownership. */
 export function bindClaudeAuthProxyAccountDir(accountId: string, configDir: string): void {
   if (!accountId || !configDir || getClaudeProfileRouter()) {
     return
   }
-  const previous = accountDirs.get(accountId)
-  accountDirs.set(accountId, {
-    configDir,
-    identity: previous ? previous.identity : readClaudeFolderLogin(claudeStateFile(configDir))
-  })
+  accountDirs.set(accountId, configDir)
 }
 
 export function clearClaudeAuthProxyAccountDirs(): void {
@@ -49,6 +45,7 @@ function credentialSource(accountId: string): CredentialSource | null {
     const saved = router.savedAccount(accountId)
     return {
       readOptions: {
+        requireConsistentSources: true,
         credentialsFileConfigDir: credentialsDir,
         keychainConfigDir: credentialsDir,
         unsuffixedKeychainFallback: covered && !userDir
@@ -61,12 +58,17 @@ function credentialSource(accountId: string): CredentialSource | null {
     }
   }
   const bound = accountDirs.get(accountId)
+  const saved = registeredClaudeAccount(accountId)
   return bound
     ? {
-        ...bound,
+        configDir: bound,
+        identity: saved
+          ? { email: saved.email, organizationUuid: saved.organizationUuid ?? null }
+          : null,
         readOptions: {
-          credentialsFileConfigDir: bound.configDir,
-          keychainConfigDir: bound.configDir
+          requireConsistentSources: true,
+          credentialsFileConfigDir: bound,
+          keychainConfigDir: bound
         }
       }
     : null
@@ -74,27 +76,60 @@ function credentialSource(accountId: string): CredentialSource | null {
 
 async function matchesAccount(source: CredentialSource): Promise<boolean> {
   const current = await readClaudeFolderLoginAsync(
-    await claudeStateFileAsync(source.configDir, source.userHome)
+    await claudeStateFileAsync(source.configDir, source.userHome),
+    true
   )
-  if (!source.identity || !current) {
+  if (!source.identity?.email || !source.identity.organizationUuid?.trim()) {
+    console.info('[claude-auth-proxy] identity unknown')
     return false
   }
-  if (!isSameClaudeLogin(source.identity, current)) {
+  if (!current) {
+    return false
+  }
+  if (!isSameClaudeLogin(source.identity, current, true)) {
     console.info('[claude-auth-proxy] account changed under slot')
     return false
   }
   return true
 }
 
+async function admitBearer(
+  accountId: string,
+  source: CredentialSource,
+  token: string | null
+): Promise<string | null> {
+  if (!token || !source.identity) {
+    return null
+  }
+  const identity = await readClaudeBearerIdentity(token)
+  if (!identity || !isSameClaudeLogin(source.identity, identity, true)) {
+    console.info('[claude-auth-proxy] account changed under slot')
+    return null
+  }
+  const latest = credentialSource(accountId)
+  if (
+    !latest?.identity ||
+    latest.configDir !== source.configDir ||
+    !isSameClaudeLogin(source.identity, latest.identity, true)
+  ) {
+    return null
+  }
+  return (await matchesAccount(latest)) ? token : null
+}
+
 /** Cache misses and refreshes must verify the selected source before admitting its bearer. */
 export async function readClaudeAuthProxyAccessToken(accountId: string): Promise<string | null> {
   try {
     const source = credentialSource(accountId)
-    if (!source || !(await matchesAccount(source))) {
+    if (!source) {
+      console.info('[claude-auth-proxy] identity unknown')
+      return null
+    }
+    if (!(await matchesAccount(source))) {
       return null
     }
     const result = await readClaudeOAuthCredentials(source.readOptions)
-    return result.token && (await matchesAccount(source)) ? result.token : null
+    return await admitBearer(accountId, source, result.token)
   } catch {
     return null
   }
@@ -103,15 +138,23 @@ export async function readClaudeAuthProxyAccessToken(accountId: string): Promise
 export async function refreshClaudeAuthProxyAccessToken(accountId: string): Promise<string | null> {
   try {
     const source = credentialSource(accountId)
-    if (!source || !(await matchesAccount(source))) {
+    if (!source) {
+      console.info('[claude-auth-proxy] identity unknown')
+      return null
+    }
+    if (!(await matchesAccount(source))) {
       return null
     }
     const refreshed = await refreshClaudeOAuthAccessToken({
       accountId,
       readOptions: source.readOptions
     })
-    return refreshed.outcome === 'refreshed' && (await matchesAccount(source))
-      ? refreshed.accessToken
+    if (refreshed.outcome !== 'refreshed') {
+      return null
+    }
+    const stored = await readClaudeOAuthCredentials(source.readOptions)
+    return stored.token === refreshed.accessToken
+      ? await admitBearer(accountId, source, stored.token)
       : null
   } catch {
     return null

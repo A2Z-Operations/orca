@@ -1,3 +1,4 @@
+import { installClaudeRegisteredAccounts } from '../claude-registered-account'
 import { createServer, request as httpRequest } from 'node:http'
 import type * as ClaudeAccountFolder from '../claude-account-folder'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -38,6 +39,13 @@ vi.mock('../claude-account-folder', async (importOriginal) => {
   }
 })
 
+vi.mock('./claude-auth-proxy-bearer-identity', () => ({
+  readClaudeBearerIdentity: async () => ({
+    email: 'account@example.invalid',
+    organizationUuid: 'org'
+  })
+}))
+
 vi.mock('../../rate-limits/claude-oauth-credentials', () => ({
   readClaudeOAuthCredentials: vi.fn()
 }))
@@ -59,6 +67,7 @@ vi.mock('./claude-auth-proxy', async (importOriginal) => {
 
 afterEach(async () => {
   installClaudeProfileRouter(undefined)
+  installClaudeRegisteredAccounts(undefined)
   fakeUpstream.url = null
   await stopClaudeAuthProxy()
 })
@@ -346,6 +355,18 @@ describe('startClaudeAuthProxy', () => {
       const port = await restartWithPersistedRows()
       // No profile router: the host reads the folder bound to the account id (a stop clears the map).
       bindClaudeAuthProxyAccountDir('acct-a', '/tmp/claude-home-acct-a')
+      installClaudeRegisteredAccounts(() => [
+        {
+          id: 'acct-b',
+          email: 'account@example.invalid',
+          organizationUuid: 'org',
+          managedAuthPath: '/tmp/claude-home-acct-b',
+          authMethod: 'subscription-oauth',
+          createdAt: 0,
+          updatedAt: 0,
+          lastAuthenticatedAt: 0
+        }
+      ])
       bindClaudeAuthProxyAccountDir('acct-b', '/tmp/claude-home-acct-b')
 
       const response = await statusOf(`http://127.0.0.1:${port}/p/${SLOT_A}/v1/messages`)

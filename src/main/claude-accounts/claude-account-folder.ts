@@ -1,3 +1,4 @@
+import { selectClaudeGlobalConfigFileAsync } from '../claude/claude-global-config-selection'
 import {
   existsSync,
   lstatSync,
@@ -51,10 +52,10 @@ export async function claudeStateFileAsync(
   configDir: string | undefined,
   userHome = homedir()
 ): Promise<string> {
-  const legacy = claudeStateFile(configDir, userHome, () => true)
-  return (await stat(legacy).catch(() => null))
-    ? legacy
-    : claudeStateFile(configDir, userHome, () => false)
+  return selectClaudeGlobalConfigFileAsync(
+    join((configDir ?? join(userHome, '.claude')).normalize('NFC'), '.config.json'),
+    join(configDir || userHome, '.claude.json')
+  )
 }
 
 // Cache large, frequently rewritten state files across account-list refreshes.
@@ -63,13 +64,16 @@ const logins = new Map<
   { mtimeMs: number; size: number; readAt: number; login: ClaudeFolderLogin | null }
 >()
 
-/** Missing organization IDs permit an email-only match. */
+/** Proxy admission requires an organization; legacy UI comparisons may match email alone. */
 export function isSameClaudeLogin(
   left: { email: string; organizationUuid?: string | null },
-  right: { email: string; organizationUuid?: string | null }
+  right: { email: string; organizationUuid?: string | null },
+  requireOrganization = false
 ): boolean {
   return (
     left.email.trim().toLowerCase() === right.email.trim().toLowerCase() &&
+    (!requireOrganization ||
+      Boolean(left.organizationUuid?.trim() && right.organizationUuid?.trim())) &&
     (!left.organizationUuid ||
       !right.organizationUuid ||
       left.organizationUuid === right.organizationUuid)
@@ -119,8 +123,12 @@ const pendingLogins = new Map<
 
 /** Avoid blocking main on state files across WSL shares. */
 export async function readClaudeFolderLoginAsync(
-  stateFile: string
+  stateFile: string,
+  fresh = false
 ): Promise<ClaudeFolderLogin | null> {
+  if (fresh) {
+    return readStateLogin(stateFile)
+  }
   const current = await stat(stateFile).catch(() => null)
   if (!current) {
     logins.delete(stateFile)

@@ -1,3 +1,4 @@
+import { installClaudeRegisteredAccounts } from './claude-registered-account'
 import type { ClaudeSessionMoverSetting } from '../../shared/claude-account-switch-settings'
 import type {
   ClaudeAccountSignIn,
@@ -35,6 +36,7 @@ export class ClaudeAccountService {
       Pick<ClaudeRuntimeAuthService, 'getRuntimeConfigDir'>,
     private readonly runLoginCommand = runClaudeCommandProcess
   ) {
+    installClaudeRegisteredAccounts(() => store.getSettings().claudeManagedAccounts)
     this.selection = new ClaudeAccountSelection(store, rateLimits, runtimeAuth)
     this.registration = new ClaudeAccountRegistration({
       store,

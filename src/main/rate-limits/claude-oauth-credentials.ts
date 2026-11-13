@@ -23,6 +23,7 @@ export type ClaudeOAuthCredentialReadResult = {
   unavailable?: boolean
 }
 export type ClaudeOAuthCredentialReadOptions = {
+  requireConsistentSources?: boolean
   credentialsFileConfigDir?: string
   keychainConfigDir?: string
   /** System Default only: a managed profile never reads another login's item. */
@@ -105,11 +106,14 @@ export async function readClaudeOAuthCredentials(
     process.platform === 'darwin'
       ? await readClaudeKeychainCredentials(options)
       : emptyClaudeOAuthCredentialReadResult()
-  if (keychain.token) {
+  if (keychain.token && !options?.requireConsistentSources) {
     return keychain
   }
+  if (options?.requireConsistentSources && keychain.unavailable) {
+    return { ...emptyClaudeOAuthCredentialReadResult(), unavailable: true }
+  }
   try {
-    return parseClaudeOAuthCredentialsJson(
+    const file = parseClaudeOAuthCredentialsJson(
       await readFile(
         path.join(
           options?.credentialsFileConfigDir ?? path.join(homedir(), '.claude'),
@@ -119,8 +123,14 @@ export async function readClaudeOAuthCredentials(
       ),
       'credentials-file'
     )
+    if (keychain.token && (file.unavailable || file.token !== keychain.token)) {
+      return { ...emptyClaudeOAuthCredentialReadResult(), unavailable: true }
+    }
+    return keychain.token ? keychain : file
   } catch (error) {
-    return isDefinitiveAbsence(error) ? keychain : { ...keychain, unavailable: true }
+    return isDefinitiveAbsence(error)
+      ? keychain
+      : { ...emptyClaudeOAuthCredentialReadResult(), unavailable: true }
   }
 }
 export function resolveClaudeOAuthCredentialReadOptions(
