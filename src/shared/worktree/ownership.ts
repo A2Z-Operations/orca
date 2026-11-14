@@ -220,7 +220,7 @@ export function areRuntimePathsEqual(leftPath: string, rightPath: string): boole
   )
 }
 
-function hasStrongOrcaMetadata(meta: WorktreeMeta | undefined): boolean {
+export function hasStrongOrcaMetadata(meta: WorktreeMeta | undefined): boolean {
   return Boolean(
     meta?.orcaCreatedAt ||
     meta?.orcaCreationWorkspaceLayout ||

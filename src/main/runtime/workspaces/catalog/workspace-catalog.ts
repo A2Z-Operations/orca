@@ -7,11 +7,8 @@ import type { ResolvedWorktreeSnapshot } from './runtime-resolved-worktree-cache
 
 import { getWorktreeScanMutationRevision } from '../../../workspaces/catalog/local-worktree-scan-generation'
 import { resolveLocalProjectRuntimesForRepos } from '../../../workspaces/execution-host/local-project-runtime-resolution'
-import {
-  resolveRepoWorktreeRows,
-  resolveScopedWorktreeIdRow,
-  type RepoWorktreeRowDeps
-} from './repo-worktree-row-resolution'
+import { resolveRepoWorktreeRows, type RepoWorktreeRowDeps } from './repo-worktree-row-resolution'
+import { resolveScopedWorktreeIdRow } from './scoped-worktree-id-row'
 import {
   joinResolvedWorktreeScans,
   platformsByRepoId,

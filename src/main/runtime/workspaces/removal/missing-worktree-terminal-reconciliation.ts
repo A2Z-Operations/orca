@@ -1,9 +1,46 @@
+import { readFile, stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { getRepoRoutingConnectionId } from '../../../../shared/execution-host'
 import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import type { Repo } from '../../../../shared/repo-types'
 import { splitWorktreeId } from '../../../../shared/worktree/id'
 import { mapWithConcurrency } from '../../../../shared/map-with-concurrency'
+import { rememberLocalDirectoryIdentity } from '../../../workspaces/catalog/local-worktree-directory-alias'
 import { killAllProcessesForWorktree, type WorktreeTeardownRuntime } from './worktree-teardown'
+
+// A scan listing under a quarter of the known ids is truncated, not evidence those checkouts were deleted.
+function detectedScanLooksPartial(knownCount: number, detectedCount: number): boolean {
+  return detectedCount > 0 && detectedCount * 4 < knownCount
+}
+
+async function linkedCheckoutStillPresent(worktreePath: string): Promise<boolean> {
+  try {
+    const gitEntry = await stat(join(worktreePath, '.git'))
+    if (gitEntry.isDirectory()) {
+      return true
+    }
+    if (!gitEntry.isFile()) {
+      return false
+    }
+    const text = await readFile(join(worktreePath, '.git'), 'utf8')
+    return text.startsWith('gitdir:')
+  } catch {
+    return false
+  }
+}
+
+async function detectedScanStillListsWorktree(
+  worktreePath: string,
+  detectedWorktreeIds: readonly string[]
+): Promise<boolean> {
+  for (const detectedId of detectedWorktreeIds) {
+    const detectedPath = splitWorktreeId(detectedId)?.worktreePath
+    if (detectedPath && (await rememberLocalDirectoryIdentity(worktreePath, detectedPath))) {
+      return true
+    }
+  }
+  return false
+}
 
 const MISSING_WORKTREE_TEARDOWN_CONCURRENCY = 4
 
@@ -64,15 +101,42 @@ export async function stopMissingWorktreeTerminals(
   deps: MissingWorktreeTerminalReconciliationDeps
 ): Promise<{ stoppedWorktreeIds: string[] }> {
   const detectedIds = new Set(detectedWorktreeIds)
-  const missingIds = [
-    ...new Set(
-      knownWorktreeIds.filter(
-        (worktreeId) =>
-          splitWorktreeId(worktreeId)?.repoId === repo.id && !detectedIds.has(worktreeId)
-      )
-    )
-  ]
+  const repoKnownIds = knownWorktreeIds.filter(
+    (worktreeId) => splitWorktreeId(worktreeId)?.repoId === repo.id
+  )
+  if (detectedScanLooksPartial(repoKnownIds.length, detectedWorktreeIds.length)) {
+    return { stoppedWorktreeIds: [] }
+  }
+  const missingIds = [...new Set(repoKnownIds.filter((worktreeId) => !detectedIds.has(worktreeId)))]
   if (missingIds.length === 0) {
+    return { stoppedWorktreeIds: [] }
+  }
+  const remote = Boolean(getRepoRoutingConnectionId(repo))
+  const presentIds = new Set(
+    remote
+      ? []
+      : (
+          await mapWithConcurrency(
+            missingIds,
+            MISSING_WORKTREE_TEARDOWN_CONCURRENCY,
+            async (worktreeId) => {
+              const worktreePath = splitWorktreeId(worktreeId)?.worktreePath
+              if (!worktreePath) {
+                return null
+              }
+              if (
+                (await detectedScanStillListsWorktree(worktreePath, detectedWorktreeIds)) ||
+                (await linkedCheckoutStillPresent(worktreePath))
+              ) {
+                return worktreeId
+              }
+              return null
+            }
+          )
+        ).filter((worktreeId): worktreeId is string => worktreeId !== null)
+  )
+  const stopIds = missingIds.filter((worktreeId) => !presentIds.has(worktreeId))
+  if (stopIds.length === 0) {
     return { stoppedWorktreeIds: [] }
   }
 
@@ -81,7 +145,7 @@ export async function stopMissingWorktreeTerminals(
   if (!provider) {
     const stoppedWorktreeIds = (
       await mapWithConcurrency(
-        missingIds,
+        stopIds,
         MISSING_WORKTREE_TEARDOWN_CONCURRENCY,
         async (worktreeId) => {
           try {
@@ -97,26 +161,22 @@ export async function stopMissingWorktreeTerminals(
   }
 
   const stoppedWorktreeIds = (
-    await mapWithConcurrency(
-      missingIds,
-      MISSING_WORKTREE_TEARDOWN_CONCURRENCY,
-      async (worktreeId) => {
-        try {
-          await killAllProcessesForWorktree(worktreeId, {
-            runtime: deps.runtime,
-            ...hostFence(repo, worktreeId),
-            localProvider: provider,
-            onPtyStopped: deps.onPtyStopped,
-            // Cached pre-shutdown inventory can support only best-effort teardown.
-            requirePhysicalStop: false
-          })
-          return worktreeId
-        } catch (error) {
-          console.warn(`[worktree-teardown] Failed to stop missing workspace ${worktreeId}`, error)
-          return null
-        }
+    await mapWithConcurrency(stopIds, MISSING_WORKTREE_TEARDOWN_CONCURRENCY, async (worktreeId) => {
+      try {
+        await killAllProcessesForWorktree(worktreeId, {
+          runtime: deps.runtime,
+          ...hostFence(repo, worktreeId),
+          localProvider: provider,
+          onPtyStopped: deps.onPtyStopped,
+          // Cached pre-shutdown inventory can support only best-effort teardown.
+          requirePhysicalStop: false
+        })
+        return worktreeId
+      } catch (error) {
+        console.warn(`[worktree-teardown] Failed to stop missing workspace ${worktreeId}`, error)
+        return null
       }
-    )
+    })
   ).filter((worktreeId): worktreeId is string => worktreeId !== null)
 
   return { stoppedWorktreeIds }
