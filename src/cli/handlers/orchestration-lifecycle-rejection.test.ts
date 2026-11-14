@@ -1,4 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import type { HandlerContext } from '../dispatch'
+import type { RuntimeClient } from '../runtime-client'
 
 const callMock = vi.fn()
 const originalExitCode = process.exitCode
@@ -8,10 +10,80 @@ vi.mock('../selectors', () => ({ getTerminalHandle: vi.fn() }))
 import { printResult } from '../format'
 import { ORCHESTRATION_HANDLERS } from './orchestration'
 
+function sendContext(flags: Map<string, string>, json = false): HandlerContext {
+  return {
+    flags,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this handler only calls client.call, which the fixture supplies.
+    client: { call: callMock } as unknown as RuntimeClient,
+    cwd: '/tmp/repo',
+    json
+  }
+}
+
 afterEach(() => {
   process.exitCode = originalExitCode
   vi.clearAllMocks()
   callMock.mockReset()
+})
+
+it('exits 76 and tells a heartbeat loop to stop when the dispatch is released', async () => {
+  process.exitCode = undefined
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  callMock.mockResolvedValueOnce({
+    result: {
+      message: { id: 'msg_beat' },
+      lifecycle: {
+        action: 'rejected',
+        code: 'dispatch_released',
+        reason: 'dispatch released: stop sending'
+      }
+    }
+  })
+
+  await ORCHESTRATION_HANDLERS['orchestration send'](
+    sendContext(
+      new Map([
+        ['from', 'term_worker'],
+        ['subject', 'alive'],
+        ['type', 'heartbeat']
+      ])
+    )
+  )
+
+  expect(process.exitCode).toBe(76)
+  expect(error.mock.calls).toEqual([['dispatch released: stop sending']])
+  expect(printResult).not.toHaveBeenCalled()
+})
+
+it('still raises an ordinary heartbeat rejection', async () => {
+  process.exitCode = undefined
+  callMock.mockResolvedValueOnce({
+    result: {
+      message: { id: 'msg_beat' },
+      lifecycle: {
+        action: 'rejected',
+        code: 'worker_identity_changed',
+        reason: 'term_worker is not the exact process that owns Dispatch ctx_1.'
+      }
+    }
+  })
+
+  await expect(
+    ORCHESTRATION_HANDLERS['orchestration send'](
+      sendContext(
+        new Map([
+          ['from', 'term_worker'],
+          ['subject', 'alive'],
+          ['type', 'heartbeat']
+        ])
+      )
+    )
+  ).rejects.toMatchObject({
+    code: 'worker_identity_changed',
+    message: 'term_worker is not the exact process that owns Dispatch ctx_1.'
+  })
+  expect(process.exitCode).toBeUndefined()
+  expect(printResult).not.toHaveBeenCalled()
 })
 
 it('raises a lifecycle rejection for the CLI error boundary', async () => {

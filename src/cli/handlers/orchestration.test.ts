@@ -89,7 +89,10 @@ describe('orchestration send structured payload flags', () => {
           phase: 'verification'
         }),
         waitForLifecycleSettlement: true,
-        devMode: false
+        devMode: false,
+        run: undefined,
+        senderPaneKey: undefined,
+        senderPid: process.pid
       },
       WORKER_DONE_REQUEST
     )

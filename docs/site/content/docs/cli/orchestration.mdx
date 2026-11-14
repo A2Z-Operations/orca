@@ -71,6 +71,8 @@ orca orchestration send \
 
 `worker_done` requires `--outcome succeeded|failed`.
 
+A heartbeat that Orca rejects because its Dispatch is released or stopped exits 76 and prints `dispatch released: stop sending`. A heartbeat loop must stop on exit 76 and must not send another heartbeat.
+
 Inspect / recover:
 
 ```bash

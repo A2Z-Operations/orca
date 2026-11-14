@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  OptionalPositiveInt,
   OptionalString,
   OptionalBoolean,
   requiredString
@@ -32,6 +33,8 @@ export const SendParams = z
     payload: OptionalString,
     // Use remint-stable pane keys to attest worker_done/heartbeat; from handles only route.
     senderPaneKey: OptionalString,
+    // Log label for a rejected report. Never used to authorize the sender.
+    senderPid: OptionalPositiveInt,
     run: OptionalString,
     waitForLifecycleSettlement: OptionalBoolean,
     devMode: OptionalBoolean

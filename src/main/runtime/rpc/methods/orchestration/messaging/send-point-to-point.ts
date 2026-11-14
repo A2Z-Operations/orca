@@ -18,6 +18,12 @@ import {
   workerReportRefusal,
   type WorkerReportRefusal
 } from '../../../../orchestration/workers/reports/worker-report-admission'
+import {
+  hasPriorRejectedReport,
+  isReleasedOrStoppedDispatch,
+  logUndeliveredReleasedDispatchRejection,
+  releasedHeartbeatLifecycle
+} from './released-worker-rejection'
 import type { z } from 'zod'
 
 type SendParamsInput = z.infer<typeof SendParams>
@@ -96,16 +102,29 @@ export function sendPointToPointMessage(args: {
       if (refusal) {
         const rejection =
           db.convertLifecycleMessageToRejection(msg.id, refusal.code, refusal.reason) ?? msg
+        const delivery = settleRejectedDelivery({
+          db,
+          dispatch,
+          messageId: rejection.id,
+          toHandle: rejection.to_handle,
+          type: rejection.type,
+          from,
+          senderPid: params.senderPid
+        })
         const receipt = withSendWarnings({
           message: exposeMessage(rejection),
-          lifecycle: {
-            action: 'rejected',
-            code: refusal.code,
-            reason: refusal.reason
-          }
+          lifecycle: delivery.withheld
+            ? releasedHeartbeatLifecycle()
+            : {
+                action: 'rejected',
+                code: refusal.code,
+                reason: refusal.reason
+              }
         })
         return recordReceiptForPostCommitNudge(recordMutationReceipt, receipt, () =>
-          runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
+          delivery.notify
+            ? runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
+            : undefined
         )
       }
     }
@@ -122,12 +141,23 @@ export function sendPointToPointMessage(args: {
       }
       if (reconciled.action === 'rejected') {
         const rejection = db.getMessageById(msg.id) ?? msg
+        const delivery = settleRejectedDelivery({
+          db,
+          dispatch,
+          messageId: rejection.id,
+          toHandle: rejection.to_handle,
+          type: rejection.type,
+          from,
+          senderPid: params.senderPid
+        })
         const receipt = withSendWarnings({
           message: exposeMessage(rejection),
-          lifecycle: reconciled
+          lifecycle: delivery.withheld ? releasedHeartbeatLifecycle() : reconciled
         })
         return recordReceiptForPostCommitNudge(recordMutationReceipt, receipt, () =>
-          runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
+          delivery.notify
+            ? runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
+            : undefined
         )
       }
       const receipt = withSendWarnings(
@@ -160,6 +190,71 @@ export function sendPointToPointMessage(args: {
       : commitMessage()
   committed.nudge()
   return committed.receipt
+}
+
+type RejectedDelivery = {
+  db: OrchestrationDb
+  dispatch: ReturnType<OrchestrationDb['getDispatchContextById']>
+  messageId: string
+  toHandle: string
+  type: string
+  from: string
+  senderPid: number | undefined
+}
+
+function settleRejectedDelivery(args: RejectedDelivery): { withheld: boolean; notify: boolean } {
+  const withheld = withholdReleasedHeartbeat(args)
+  const duplicate = !withheld && swallowDuplicateRejectedReport(args)
+  return { withheld, notify: !withheld && !duplicate }
+}
+
+function isRejectedDispatchReleasedOrStopped(args: RejectedDelivery): boolean {
+  const dispatch = args.dispatch
+  if (!dispatch) {
+    return false
+  }
+  const resource = args.db.getWorkerTerminalResourceByOwner(dispatch.id)
+  return isReleasedOrStoppedDispatch({
+    workerState: args.db.getWorkerDispatch(dispatch.id)?.state,
+    releaseState: resource?.release_state,
+    ownershipState: resource?.ownership_state
+  })
+}
+
+function withholdReleasedHeartbeat(args: RejectedDelivery): boolean {
+  const dispatch = args.dispatch
+  if (args.type !== 'heartbeat' || !dispatch || !isRejectedDispatchReleasedOrStopped(args)) {
+    return false
+  }
+  args.db.markAsRead([args.messageId])
+  args.db.markAsDelivered([args.messageId], args.toHandle)
+  logUndeliveredReleasedDispatchRejection({
+    type: args.type,
+    from: args.from,
+    senderPid: args.senderPid,
+    dispatchId: dispatch.id
+  })
+  return true
+}
+
+function swallowDuplicateRejectedReport(args: RejectedDelivery): boolean {
+  const dispatch = args.dispatch
+  // A live dispatch must surface every rejection. Dedupe only a released or stopped one.
+  if (args.type === 'heartbeat' || !dispatch || !isRejectedDispatchReleasedOrStopped(args)) {
+    return false
+  }
+  if (
+    !hasPriorRejectedReport(args.db, {
+      dispatchId: dispatch.id,
+      from: args.from,
+      messageId: args.messageId
+    })
+  ) {
+    return false
+  }
+  args.db.markAsRead([args.messageId])
+  args.db.markAsDelivered([args.messageId], args.toHandle)
+  return true
 }
 
 type LifecycleRefusal = {

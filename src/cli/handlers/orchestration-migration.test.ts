@@ -51,7 +51,8 @@ describe('orchestration CLI migration recovery', () => {
           payload: undefined,
           senderPaneKey: 'tab-worker:leaf-worker',
           waitForLifecycleSettlement: true,
-          devMode: false
+          devMode: false,
+          senderPid: process.pid
         },
         WORKER_DONE_REQUEST
       )
