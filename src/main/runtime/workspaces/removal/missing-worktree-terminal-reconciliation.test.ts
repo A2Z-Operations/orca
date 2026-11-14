@@ -1,3 +1,6 @@
+import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import type { Repo } from '../../../../shared/repo-types'
@@ -20,6 +23,28 @@ function createRuntime(): OrcaRuntimeService {
     stopTerminalsForWorktree: vi.fn(async () => ({ stopped: 0 }))
   } as unknown as OrcaRuntimeService
 }
+
+function volumeFoldsDirectoryCase(): boolean {
+  const root = mkdtempSync(join(tmpdir(), 'orca-fold-'))
+  const createdPath = join(root, 'Aa')
+  mkdirSync(createdPath)
+  try {
+    const created = statSync(createdPath)
+    const folded = statSync(join(root, 'aa'))
+    return (
+      created.isDirectory() &&
+      folded.isDirectory() &&
+      created.dev === folded.dev &&
+      created.ino === folded.ino
+    )
+  } catch {
+    return false
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+const foldsDirectoryCase = volumeFoldsDirectoryCase()
 
 const localRepo: Repo = {
   id: 'repo-1',
@@ -131,4 +156,59 @@ describe('stopMissingWorktreeTerminals', () => {
       expect.objectContaining({ immediate: true })
     )
   })
+
+  it('does not stop terminals when the scan lists far fewer checkouts than are known', async () => {
+    const known = Array.from({ length: 8 }, (_, index) => `repo-1::/workspace/gone-${index}`)
+    const provider = createProvider(known.map((id) => `${id}@@session`))
+
+    const result = await stopMissingWorktreeTerminals(
+      localRepo,
+      known,
+      ['repo-1::/workspace/main'],
+      { runtime: createRuntime(), getLocalProvider: () => provider }
+    )
+
+    expect(result).toEqual({ stoppedWorktreeIds: [] })
+    expect(provider.shutdown).not.toHaveBeenCalled()
+  })
+
+  it('does not stop a worktree whose directory still has a gitdir file', async () => {
+    const checkout = mkdtempSync(join(tmpdir(), 'orca-missing-gitdir-'))
+    writeFileSync(join(checkout, '.git'), 'gitdir: /tmp/orca-missing-gitdir-target\n')
+    try {
+      const knownId = `repo-1::${checkout}`
+      const provider = createProvider([`${knownId}@@session`])
+      const result = await stopMissingWorktreeTerminals(localRepo, [knownId], [], {
+        runtime: createRuntime(),
+        getLocalProvider: () => provider
+      })
+      expect(result).toEqual({ stoppedWorktreeIds: [] })
+      expect(provider.shutdown).not.toHaveBeenCalled()
+    } finally {
+      rmSync(checkout, { recursive: true, force: true })
+    }
+  })
+
+  it.skipIf(!foldsDirectoryCase)(
+    'does not stop a checkout that the scan listed under a different path case',
+    async () => {
+      const root = mkdtempSync(join(tmpdir(), 'orca-missing-case-'))
+      const directory = join(root, 'Blowzer', 'probe')
+      mkdirSync(directory, { recursive: true })
+      try {
+        const knownId = `repo-1::${directory}`
+        const provider = createProvider([`${knownId}@@session`])
+        const result = await stopMissingWorktreeTerminals(
+          localRepo,
+          [knownId],
+          [`repo-1::${join(root, 'BLOWzer', 'probe')}`],
+          { runtime: createRuntime(), getLocalProvider: () => provider }
+        )
+        expect(result).toEqual({ stoppedWorktreeIds: [] })
+        expect(provider.shutdown).not.toHaveBeenCalled()
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    }
+  )
 })

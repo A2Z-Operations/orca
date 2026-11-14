@@ -11,6 +11,7 @@ import { isFolderRepo } from '../../../../shared/repo-kind'
 import { projectWorktreeLineageWithHostPeers } from '../../../workspaces/catalog/worktree-lineage-host-peers'
 import type { DirectSshDetectedWorktreeRequest } from '../../../../shared/detected-worktree-provider-contract'
 import { isAdmissibleDirectSshAuthority } from '../../../../shared/ssh-retained-payload-admission'
+import { primeLocalWorktreeDirectoryAliases } from '../../../workspaces/catalog/local-worktree-directory-alias'
 import {
   buildDetectedGitWorktrees,
   createSshWorktreeMetaIndex,
@@ -160,6 +161,12 @@ export async function listDetectedWorktreesForCapturedRepo(
     }
     loggedWorktreeListFailures.delete(`${repo.id}:${repo.path}`)
     releaseWslStoppedWorktreeRescan(repo.id)
+    await primeLocalWorktreeDirectoryAliases(
+      repo,
+      localRows,
+      allMeta ?? store.getAllWorktreeMeta?.() ?? {},
+      store.getRepos().filter((candidate) => candidate.id === repo.id).length
+    )
     // Rows describe scan-start generation, which clients order against applied create/remove replies.
     return {
       repoId: repo.id,
