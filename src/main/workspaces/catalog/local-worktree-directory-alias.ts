@@ -57,7 +57,7 @@ export async function rememberLocalDirectoryIdentity(
   if (cached !== undefined) {
     return cached
   }
-  let same = false
+  let same: boolean
   try {
     const [leftStat, rightStat] = await Promise.all([stat(left), stat(right)])
     same =
@@ -66,7 +66,9 @@ export async function rememberLocalDirectoryIdentity(
       leftStat.dev === rightStat.dev &&
       leftStat.ino === rightStat.ino
   } catch {
-    same = false
+    // A failed stat proves nothing (a deleted checkout can be re-created under
+    // the same name), so it is never cached; only two answered stats are.
+    return false
   }
   directoryIdentityCache.set(key, same)
   return same

@@ -157,7 +157,22 @@ describe('stopMissingWorktreeTerminals', () => {
     )
   })
 
-  it('does not stop terminals when the scan lists far fewer checkouts than are known', async () => {
+  it("does not stop a remote repo's terminals when the scan lists far fewer checkouts than are known", async () => {
+    const known = Array.from({ length: 8 }, (_, index) => `repo-1::/workspace/gone-${index}`)
+    const runtime = createRuntime()
+
+    const result = await stopMissingWorktreeTerminals(
+      { ...localRepo, connectionId: 'ssh-1' },
+      known,
+      ['repo-1::/workspace/main'],
+      { runtime, getLocalProvider: () => null }
+    )
+
+    expect(result).toEqual({ stoppedWorktreeIds: [] })
+    expect(runtime.stopTerminalsForWorktree).not.toHaveBeenCalled()
+  })
+
+  it('sweeps a local mass delete even when the scan lists far fewer checkouts than are known', async () => {
     const known = Array.from({ length: 8 }, (_, index) => `repo-1::/workspace/gone-${index}`)
     const provider = createProvider(known.map((id) => `${id}@@session`))
 
@@ -168,8 +183,8 @@ describe('stopMissingWorktreeTerminals', () => {
       { runtime: createRuntime(), getLocalProvider: () => provider }
     )
 
-    expect(result).toEqual({ stoppedWorktreeIds: [] })
-    expect(provider.shutdown).not.toHaveBeenCalled()
+    expect(result.stoppedWorktreeIds.sort()).toEqual([...known].sort())
+    expect(provider.shutdown).toHaveBeenCalledTimes(known.length)
   })
 
   it('does not stop a worktree whose directory still has a gitdir file', async () => {

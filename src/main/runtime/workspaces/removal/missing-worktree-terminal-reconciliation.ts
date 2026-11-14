@@ -104,14 +104,16 @@ export async function stopMissingWorktreeTerminals(
   const repoKnownIds = knownWorktreeIds.filter(
     (worktreeId) => splitWorktreeId(worktreeId)?.repoId === repo.id
   )
-  if (detectedScanLooksPartial(repoKnownIds.length, detectedWorktreeIds.length)) {
+  const remote = Boolean(getRepoRoutingConnectionId(repo))
+  // Only a remote repo needs the ratio guard: a local one checks every missing
+  // checkout on disk below, so an out-of-band mass delete is still swept.
+  if (remote && detectedScanLooksPartial(repoKnownIds.length, detectedWorktreeIds.length)) {
     return { stoppedWorktreeIds: [] }
   }
   const missingIds = [...new Set(repoKnownIds.filter((worktreeId) => !detectedIds.has(worktreeId)))]
   if (missingIds.length === 0) {
     return { stoppedWorktreeIds: [] }
   }
-  const remote = Boolean(getRepoRoutingConnectionId(repo))
   const presentIds = new Set(
     remote
       ? []
