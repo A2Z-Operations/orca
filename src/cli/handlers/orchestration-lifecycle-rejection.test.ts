@@ -14,7 +14,7 @@ function sendContext(flags: Map<string, string>, json = false): HandlerContext {
   return {
     flags,
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this handler only calls client.call, which the fixture supplies.
-    client: { call: callMock } as RuntimeClient,
+    client: { call: callMock } as unknown as RuntimeClient,
     cwd: '/tmp/repo',
     json
   }
