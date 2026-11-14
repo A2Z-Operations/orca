@@ -157,3 +157,13 @@ Worker task_b4f886169d51. New heads (all force-with-lease on origin): 0=7e4c2859
 
 ## 2026-11-03 — docs PRs #4 and #3 reviewed (independent reviewer subagent, Nacho's order 03:58 PT)
 #4 (PR-LADDER-v2-REPORT.md, +338) PASS; #3 (STATUS.md) PASS. Checks: only docs/team/orca-fork/ touched, no secrets, Nachumi-only authors, no AI trailers, "Refs #2" present, content coherent. The "detect changes and check repository guards" check stays queued forever on this fork (upstream's blacksmith runner label; not required, main has no protection; same state as when #1 merged). Merge order: #4 then #3, normal merge.
+
+## 2026-11-14 17:04Z — ladder state and set-hooks hold re-read (read-only from GitHub and blowzer/fork-only)
+
+The last entry above is from 2026-11-03; this one records what changed since, as read from GitHub and the fork tree today.
+
+- **A (#37568) closed upstream 2026-11-05 02:21Z** by maintainer nwparker, not merged. He says the headless usage gap is fixed by his own #37633 (`fix/serve-runtime-parity`, merged 2026-11-05 01:43Z): usage refreshes while a window or a paired client watches, with no background polling. His #38314 (`fix/37256-cli-account-usage`, merged 2026-11-05 09:49Z) also landed. Both are maintainer PRs, not ladder PRs.
+- **The other six ladder PRs are still OPEN and all CONFLICTING:** 0 #37567 (ready, head `bc09ca7485b`) and the drafts B #37569 `a062912fddb`, C #37570 `ae0df5704cb`, D #37571 `2c734004a52`, F #37572 `efe10dececb`, E #37573 `d6ebc616765`.
+  - These heads are newer than the rebase-#4 heads logged above. Their last commits are 2026-11-06 14:16–14:22Z, so at least one rebase after #4 is not logged here; this entry does not reconstruct it.
+  - Our 2026-11-04 comment on #37567 holds further rebases until a maintainer signals. The only review activity since is CodeRabbit's (2026-11-06 12:56Z), and no maintainer has reviewed any of the six. The hold stands.
+- **Set-hooks hold, corrected:** "`.16` NOT installed, both Macs on .15" is no longer true. `src/cli/handlers/repo-set-hooks.ts` is on `blowzer/fork-only`, so every `1.4.256-blowzer.*` build ships `orca repo set-hooks`, including the build the MacBook runs. The other half of the hold is unchanged: no upstream PR for set-hooks until Nachumi says.
