@@ -1,4 +1,3 @@
-import { reapAgentPaneSession } from '../../pty/process-retirement/agent-pane-session-reap'
 import { killWithDescendantSweep } from '../../pty/process-retirement/pty-descendant-termination'
 import { excludeShellBackgroundJobs } from '../../pty/process-retirement/pty-shell-job-preservation'
 import { terminateShutdownDescendants } from '../sessions/terminal-descendant-shutdown'
@@ -154,47 +153,39 @@ export class TerminalSessionTeardown {
     }
 
     return this.track(sessionId, session, immediate, (entry) => {
-      // A user shell must throw a rejected signal synchronously so the caller can retry.
-      // An agent pane reads its session first; that wait stays ahead of the root signal.
-      const sweep = (): Promise<void> => {
-        const pending = Promise.resolve(
-          killWithDescendantSweep(
-            session.pid,
-            () => {
-              // Natural exit can recycle the PID during capture; signal only while this Session still owns a live root.
-              if (!session.isAlive) {
-                return
-              }
-              entry.rootSignalled = true
-              if (entry.immediate) {
-                entry.rootCompletion = session.forceKillAndWaitForExit()
-              } else {
-                session.signalTerminationRoot()
-              }
-            },
-            {
-              // Captured descendants are authoritative only while this exact Session owns the live root.
-              ownsRoot: () => this.sessions.get(sessionId) === session && session.isAlive,
-              terminateOwnedTree: () => session.terminateOwnedTree(),
-              terminateDescendants: (snapshot) => {
-                entry.descendantVerification = terminateShutdownDescendants(
-                  session.launchAgent || entry.immediate
-                    ? snapshot
-                    : excludeShellBackgroundJobs(snapshot, session.shellIsRootChild)
-                )
-                return entry.descendantVerification
-              },
-              awaitEscalation: () => entry.immediate
+      const sweep = Promise.resolve(
+        killWithDescendantSweep(
+          session.pid,
+          () => {
+            // Natural exit can recycle the PID during capture; signal only while this Session still owns a live root.
+            if (!session.isAlive) {
+              return
             }
-          )
+            entry.rootSignalled = true
+            if (entry.immediate) {
+              entry.rootCompletion = session.forceKillAndWaitForExit()
+            } else {
+              session.signalTerminationRoot()
+            }
+          },
+          {
+            // Captured descendants are authoritative only while this exact Session owns the live root.
+            ownsRoot: () => this.sessions.get(sessionId) === session && session.isAlive,
+            terminateOwnedTree: () => session.terminateOwnedTree(),
+            terminateDescendants: (snapshot) => {
+              entry.descendantVerification = terminateShutdownDescendants(
+                session.launchAgent || entry.immediate
+                  ? snapshot
+                  : excludeShellBackgroundJobs(snapshot, session.shellIsRootChild)
+              )
+              return entry.descendantVerification
+            },
+            awaitEscalation: () => entry.immediate
+          }
         )
-        // Requested signals do not prove exit; retain native ownership until OS-confirmed death.
-        return pending.then(() => entry.rootCompletion)
-      }
-      if (!(session.launchAgent && session.isAlive)) {
-        return sweep()
-      }
-      return Promise.resolve(reapAgentPaneSession(session.pid)).then(sweep, sweep)
+      )
+      // Requested signals do not prove exit; retain native ownership until OS-confirmed death.
+      return sweep.then(() => entry.rootCompletion)
     })
   }
 }

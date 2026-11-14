@@ -78,6 +78,7 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
       'Run groups exclude their owning coordinator; send to run:<id> to raise something with yours. Nested coordinators receive group mail in their child Run mailbox; @worktree:<id> includes workspace coordinators.',
       'On Windows PowerShell, quote group addresses such as --to "@all" or --to "@worktree:<id>".',
       "worker_done and heartbeat are exact-Dispatch signals and cannot target groups; omit --to to use the Dispatch's Run mailbox.",
+      'A heartbeat rejected because its Dispatch is released or stopped exits 76 and prints `dispatch released: stop sending`. A heartbeat loop must stop on exit 76 and must not send another heartbeat.',
       'worker_done requires --outcome succeeded or --outcome failed.',
       'From a worker, an omitted recipient defaults to its coordinator, also after it finished; mail sent after finishing, worker_done included, leaves the finished task unchanged.',
       'Use --to dispatch:<id> for attempt-specific coordinator guidance; Orca durably relays it to a connected worker server.',

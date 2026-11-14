@@ -31,37 +31,19 @@ type ProcessRow = {
   state?: string
 }
 
-/** Fields after the parenthesised comm in `/proc/<pid>/stat`. */
-function linuxProcStatFields(stat: string): string[] | null {
+/** Field 6 (`session`) of `/proc/<pid>/stat`, read past the parenthesised comm. */
+export function parseLinuxProcStatSessionId(stat: string): number | null {
   const closingParen = stat.lastIndexOf(')')
   if (closingParen === -1) {
     return null
   }
-  return stat
-    .slice(closingParen + 1)
-    .trim()
-    .split(/\s+/)
-}
-
-function linuxProcStatPositiveField(stat: string, index: number): number | null {
-  const value = Number(linuxProcStatFields(stat)?.[index])
-  return Number.isSafeInteger(value) && value > 0 ? value : null
-}
-
-/** Field 6 (`session`) of `/proc/<pid>/stat`, read past the parenthesised comm. */
-export function parseLinuxProcStatSessionId(stat: string): number | null {
-  return linuxProcStatPositiveField(stat, 3)
-}
-
-/** Field 5 (`pgrp`) of `/proc/<pid>/stat`, read past the parenthesised comm. */
-export function parseLinuxProcStatProcessGroup(stat: string): number | null {
-  return linuxProcStatPositiveField(stat, 2)
-}
-
-/** Field 7 (`tty_nr`) of `/proc/<pid>/stat`. Zero means no controlling terminal. */
-export function parseLinuxProcStatTtyNumber(stat: string): number | null {
-  const value = Number(linuxProcStatFields(stat)?.[4])
-  return Number.isSafeInteger(value) && value >= 0 ? value : null
+  const session = Number(
+    stat
+      .slice(closingParen + 1)
+      .trim()
+      .split(/\s+/)[3]
+  )
+  return Number.isSafeInteger(session) && session > 0 ? session : null
 }
 
 export function readLinuxProcessSessionId(pid: number): number | null {

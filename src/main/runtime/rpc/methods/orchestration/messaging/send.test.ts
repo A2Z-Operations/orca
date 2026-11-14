@@ -278,8 +278,20 @@ describe('orchestration RPC methods', () => {
       expect(db.getMessageById(result.message.id)).toMatchObject({ read: 1 })
     })
 
-    it('does not deliver a rejected heartbeat for a released dispatch', async () => {
-      setup()
+    async function sendRejectedHeartbeat(dispatchId: string) {
+      return rejectionReceipt(
+        await call('orchestration.send', {
+          from: 'term_worker',
+          to: 'term_coord',
+          subject: 'alive',
+          type: 'heartbeat',
+          senderPid: 85380,
+          payload: JSON.stringify({ dispatchId })
+        })
+      )
+    }
+
+    function mismatchedDispatch(): { taskId: string; dispatchId: string } {
       const task = db.createTask({ spec: 'released worker' })
       const dispatch = createRootDispatch(
         db,
@@ -289,87 +301,209 @@ describe('orchestration RPC methods', () => {
         undefined,
         'runtime_test:term_worker:1'
       )
+      return { taskId: task.id, dispatchId: dispatch.id }
+    }
+
+    function insertWorkerState(dispatchId: string, state: string): void {
       db.db
-        .prepare(`UPDATE dispatch_contexts SET status = 'completed' WHERE id = ?`)
-        .run(dispatch.id)
+        .prepare('INSERT INTO worker_dispatches (dispatch_id, state) VALUES (?, ?)')
+        .run(dispatchId, state)
+    }
+
+    function insertResource(
+      dispatchId: string,
+      releaseState: string,
+      ownershipState: string
+    ): void {
+      db.db
+        .prepare(
+          `INSERT INTO worker_terminal_resources (
+             id, origin_dispatch_id, owner_dispatch_id, terminal_handle, release_state, ownership_state
+           ) VALUES (?, ?, ?, 'term_worker', ?, ?)`
+        )
+        .run(`resource-${dispatchId}`, dispatchId, dispatchId, releaseState, ownershipState)
+    }
+
+    it.each(['stopped', 'abandoned'])(
+      'withholds a rejected heartbeat when the worker is %s',
+      async (state) => {
+        setup()
+        const { dispatchId } = mismatchedDispatch()
+        insertWorkerState(dispatchId, state)
+        const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        try {
+          const result = await sendRejectedHeartbeat(dispatchId)
+          const row = db.getMessageById(result.message.id)
+          expect(result.lifecycle).toEqual({
+            action: 'rejected',
+            code: 'dispatch_released',
+            reason: 'dispatch released: stop sending'
+          })
+          expect(row?.read).toBe(1)
+          expect(row?.body).toContain(
+            `term_worker is not the exact process that owns Dispatch ${dispatchId}.`
+          )
+          expect(db.getUnreadMessages(row?.to_handle ?? '')).toEqual([])
+          expect(notify).not.toHaveBeenCalled()
+          expect(warn.mock.calls.map((entry) => String(entry[0]))).toEqual([
+            `rejected heartbeat from term_worker pid 85380 for released dispatch ${dispatchId} not delivered`
+          ])
+        } finally {
+          warn.mockRestore()
+        }
+      }
+    )
+
+    it('withholds a rejected heartbeat when release_state is released', async () => {
+      setup()
+      const { dispatchId } = mismatchedDispatch()
+      insertResource(dispatchId, 'released', 'owned')
       const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       try {
-        const result = rejectionReceipt(
-          await call('orchestration.send', {
-            from: 'term_worker',
-            to: 'term_coord',
-            subject: 'alive',
-            type: 'heartbeat',
-            senderPid: 85380,
-            payload: JSON.stringify({ dispatchId: dispatch.id })
-          })
-        )
-
-        expect(result.lifecycle).toEqual({
-          action: 'rejected',
-          code: 'worker_identity_changed',
-          reason: `term_worker is not the exact process that owns Dispatch ${dispatch.id}.`
-        })
+        const result = await sendRejectedHeartbeat(dispatchId)
         const row = db.getMessageById(result.message.id)
+        expect(result.lifecycle.code).toBe('dispatch_released')
         expect(row?.read).toBe(1)
-        expect(db.getUnreadMessages(row?.to_handle ?? `run:${activeRunId}`)).toEqual([])
         expect(notify).not.toHaveBeenCalled()
-        expect(warn.mock.calls.map((entry) => String(entry[0]))).toEqual([
-          `rejected heartbeat from term_worker pid 85380 for released dispatch ${dispatch.id} not delivered`
-        ])
+        expect(warn).toHaveBeenCalledOnce()
       } finally {
         warn.mockRestore()
       }
     })
 
-    it('does not queue a rejected worker_done for a released dispatch', async () => {
+    it('withholds a rejected heartbeat when ownership_state is released', async () => {
       setup()
-      const task = db.createTask({ spec: 'released worker' })
-      const dispatch = createRootDispatch(
-        db,
-        task.id,
-        'term_worker',
-        undefined,
-        undefined,
-        'runtime_test:term_worker:1'
-      )
-      db.db
-        .prepare(`UPDATE dispatch_contexts SET status = 'completed' WHERE id = ?`)
-        .run(dispatch.id)
+      const { dispatchId } = mismatchedDispatch()
+      insertResource(dispatchId, 'not_requested', 'released')
       const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       try {
-        const result = rejectionReceipt(
-          await call('orchestration.send', {
-            from: 'term_worker',
-            to: 'term_coord',
-            subject: 'Done',
-            type: 'worker_done',
-            senderPid: 85380,
-            payload: JSON.stringify({
-              taskId: task.id,
-              dispatchId: dispatch.id,
-              outcome: 'succeeded'
-            })
-          })
-        )
+        const result = await sendRejectedHeartbeat(dispatchId)
+        expect(result.lifecycle).toEqual({
+          action: 'rejected',
+          code: 'dispatch_released',
+          reason: 'dispatch released: stop sending'
+        })
+        expect(db.getMessageById(result.message.id)?.read).toBe(1)
+        expect(notify).not.toHaveBeenCalled()
+      } finally {
+        warn.mockRestore()
+      }
+    })
 
+    it('still delivers a rejected heartbeat for an active dispatch', async () => {
+      setup()
+      const { dispatchId } = mismatchedDispatch()
+      insertWorkerState(dispatchId, 'ready')
+      insertResource(dispatchId, 'not_requested', 'owned')
+      const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      try {
+        const result = await sendRejectedHeartbeat(dispatchId)
+        const row = db.getMessageById(result.message.id)
         expect(result.lifecycle).toEqual({
           action: 'rejected',
           code: 'worker_identity_changed',
-          reason: `term_worker is not the exact process that owns Dispatch ${dispatch.id}.`
+          reason: `term_worker is not the exact process that owns Dispatch ${dispatchId}.`
         })
-        const row = db.getMessageById(result.message.id)
-        expect(row?.read).toBe(1)
-        expect(db.getUnreadMessages(row?.to_handle ?? `run:${activeRunId}`)).toEqual([])
-        expect(notify).not.toHaveBeenCalled()
-        expect(db.getTask(task.id)?.status).toBe('dispatched')
-        expect(warn.mock.calls.map((entry) => String(entry[0]))).toEqual([
-          `rejected worker_done from term_worker pid 85380 for released dispatch ${dispatch.id} not delivered`
+        expect(row?.body).toContain(result.lifecycle.reason)
+        expect(notify).toHaveBeenCalledWith(row?.to_handle, 'heartbeat')
+        expect(warn).not.toHaveBeenCalled()
+      } finally {
+        warn.mockRestore()
+      }
+    })
+
+    it('still delivers a rejected heartbeat when the worker is stop_unknown', async () => {
+      setup()
+      const { dispatchId } = mismatchedDispatch()
+      insertWorkerState(dispatchId, 'stop_unknown')
+      const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+
+      try {
+        const result = await sendRejectedHeartbeat(dispatchId)
+        expect(result.lifecycle.code).toBe('worker_identity_changed')
+        expect(notify).toHaveBeenCalledOnce()
+        expect(notify).toHaveBeenCalledWith(
+          db.getMessageById(result.message.id)?.to_handle,
+          'heartbeat'
+        )
+      } finally {
+        notify.mockRestore()
+      }
+    })
+
+    it('still delivers a rejected heartbeat when only the dispatch status is completed', async () => {
+      setup()
+      const { dispatchId } = mismatchedDispatch()
+      db.db
+        .prepare(`UPDATE dispatch_contexts SET status = 'completed' WHERE id = ?`)
+        .run(dispatchId)
+      const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+
+      try {
+        const result = await sendRejectedHeartbeat(dispatchId)
+        expect(result.lifecycle.code).toBe('worker_identity_changed')
+        expect(notify).toHaveBeenCalledOnce()
+        expect(notify).toHaveBeenCalledWith(
+          db.getMessageById(result.message.id)?.to_handle,
+          'heartbeat'
+        )
+      } finally {
+        notify.mockRestore()
+      }
+    })
+
+    it('delivers one rejected worker_done for a released dispatch and dedupes the next', async () => {
+      setup()
+      const { taskId, dispatchId } = mismatchedDispatch()
+      insertWorkerState(dispatchId, 'stopped')
+      insertResource(dispatchId, 'released', 'released')
+      const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const send = () =>
+        call('orchestration.send', {
+          from: 'term_worker',
+          to: 'term_coord',
+          subject: 'Done',
+          type: 'worker_done',
+          senderPid: 85380,
+          payload: JSON.stringify({
+            taskId,
+            dispatchId,
+            outcome: 'succeeded'
+          })
+        })
+
+      try {
+        const first = rejectionReceipt(await send())
+        const firstRow = db.getMessageById(first.message.id)
+        expect(first.lifecycle).toEqual({
+          action: 'rejected',
+          code: 'worker_identity_changed',
+          reason: `term_worker is not the exact process that owns Dispatch ${dispatchId}.`
+        })
+        expect(firstRow?.read).toBe(0)
+        expect(firstRow?.body).toContain(first.lifecycle.reason)
+        expect(notify).toHaveBeenCalledTimes(1)
+        expect(notify).toHaveBeenCalledWith(firstRow?.to_handle, 'worker_done')
+        expect(db.getTask(taskId)?.status).toBe('dispatched')
+
+        const second = rejectionReceipt(await send())
+        const secondRow = db.getMessageById(second.message.id)
+        expect(second.lifecycle).toEqual(first.lifecycle)
+        expect(secondRow?.read).toBe(1)
+        expect(notify).toHaveBeenCalledTimes(1)
+        expect(db.getUnreadMessages(firstRow?.to_handle ?? '')).toEqual([
+          expect.objectContaining({ id: first.message.id })
         ])
+        expect(warn).not.toHaveBeenCalled()
       } finally {
         warn.mockRestore()
       }

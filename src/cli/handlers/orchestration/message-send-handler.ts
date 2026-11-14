@@ -13,6 +13,11 @@ import { getOptionalStructuredMessagePayload } from './message-payload'
 import { callOrchestrationMutation } from './mutation-request'
 import { isDevCliInvocation } from './runtime-compatibility'
 import {
+  DISPATCH_RELEASED_HEARTBEAT_CODE,
+  DISPATCH_RELEASED_HEARTBEAT_EXIT_CODE,
+  DISPATCH_RELEASED_HEARTBEAT_STOP_LINE
+} from '../../../shared/orchestration/dispatch-released-heartbeat'
+import {
   resolveOrchestrationTerminalHandle,
   throwNoActiveSenderTerminal
 } from './terminal-identity'
@@ -125,6 +130,12 @@ export const ORCHESTRATION_SEND_HANDLER: Record<string, CommandHandler> = {
       type === 'worker_done' ? WORKER_DONE_UNAVAILABLE_RETRY_MS : 0
     )
     await requireWorkerDoneSettlement(client, type, sendParams.payload, result.result)
+    if (isReleasedDispatchHeartbeat(type, result.result)) {
+      // One line and a distinct exit so a heartbeat loop can stop without parsing the receipt.
+      console.error(DISPATCH_RELEASED_HEARTBEAT_STOP_LINE)
+      process.exitCode = DISPATCH_RELEASED_HEARTBEAT_EXIT_CODE
+      return
+    }
     if ('lifecycle' in result.result && result.result.lifecycle?.action === 'rejected') {
       throw new RuntimeClientError(result.result.lifecycle.code, result.result.lifecycle.reason)
     }
@@ -182,6 +193,20 @@ export const ORCHESTRATION_SEND_HANDLER: Record<string, CommandHandler> = {
       )
     })
   }
+}
+
+function isReleasedDispatchHeartbeat(
+  type: string | undefined,
+  result: OrchestrationSendResult
+): boolean {
+  if (type !== 'heartbeat' || !('lifecycle' in result)) {
+    return false
+  }
+  const lifecycle = result.lifecycle
+  if (!lifecycle || lifecycle.action !== 'rejected') {
+    return false
+  }
+  return lifecycle.code === DISPATCH_RELEASED_HEARTBEAT_CODE
 }
 
 type SendFields = {
