@@ -208,19 +208,22 @@ function settleRejectedDelivery(args: RejectedDelivery): { withheld: boolean; no
   return { withheld, notify: !withheld && !duplicate }
 }
 
-function withholdReleasedHeartbeat(args: RejectedDelivery): boolean {
+function isRejectedDispatchReleasedOrStopped(args: RejectedDelivery): boolean {
   const dispatch = args.dispatch
-  if (args.type !== 'heartbeat' || !dispatch) {
+  if (!dispatch) {
     return false
   }
   const resource = args.db.getWorkerTerminalResourceByOwner(dispatch.id)
-  if (
-    !isReleasedOrStoppedDispatch({
-      workerState: args.db.getWorkerDispatch(dispatch.id)?.state,
-      releaseState: resource?.release_state,
-      ownershipState: resource?.ownership_state
-    })
-  ) {
+  return isReleasedOrStoppedDispatch({
+    workerState: args.db.getWorkerDispatch(dispatch.id)?.state,
+    releaseState: resource?.release_state,
+    ownershipState: resource?.ownership_state
+  })
+}
+
+function withholdReleasedHeartbeat(args: RejectedDelivery): boolean {
+  const dispatch = args.dispatch
+  if (args.type !== 'heartbeat' || !dispatch || !isRejectedDispatchReleasedOrStopped(args)) {
     return false
   }
   args.db.markAsRead([args.messageId])
@@ -236,7 +239,8 @@ function withholdReleasedHeartbeat(args: RejectedDelivery): boolean {
 
 function swallowDuplicateRejectedReport(args: RejectedDelivery): boolean {
   const dispatch = args.dispatch
-  if (args.type === 'heartbeat' || !dispatch) {
+  // A live dispatch must surface every rejection. Dedupe only a released or stopped one.
+  if (args.type === 'heartbeat' || !dispatch || !isRejectedDispatchReleasedOrStopped(args)) {
     return false
   }
   if (

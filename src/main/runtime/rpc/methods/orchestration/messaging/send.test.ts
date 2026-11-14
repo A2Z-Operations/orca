@@ -509,6 +509,60 @@ describe('orchestration RPC methods', () => {
       }
     })
 
+    async function sendRejectedReport(
+      type: 'worker_done' | 'escalation',
+      taskId: string,
+      dispatchId: string
+    ) {
+      return rejectionReceipt(
+        await call('orchestration.send', {
+          from: 'term_worker',
+          to: 'term_coord',
+          subject: type === 'worker_done' ? 'Done' : 'Blocked: disk',
+          type,
+          payload: JSON.stringify({
+            taskId,
+            dispatchId,
+            ...(type === 'worker_done' ? { outcome: 'succeeded' } : {})
+          })
+        })
+      )
+    }
+
+    it.each(['worker_done', 'escalation'] as const)(
+      'delivers both rejected %s reports on a live dispatch',
+      async (type) => {
+        setup()
+        const { taskId, dispatchId } = mismatchedDispatch()
+        insertWorkerState(dispatchId, 'ready')
+        insertResource(dispatchId, 'not_requested', 'owned')
+        const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+
+        const first = await sendRejectedReport(type, taskId, dispatchId)
+        const second = await sendRejectedReport(type, taskId, dispatchId)
+        const firstRow = db.getMessageById(first.message.id)
+        const secondRow = db.getMessageById(second.message.id)
+
+        expect(first.lifecycle).toEqual({
+          action: 'rejected',
+          code: 'worker_identity_changed',
+          reason: `term_worker is not the exact process that owns Dispatch ${dispatchId}.`
+        })
+        expect(second.lifecycle).toEqual(first.lifecycle)
+        expect(firstRow?.read).toBe(0)
+        expect(secondRow?.read).toBe(0)
+        expect(firstRow?.body).toContain(first.lifecycle.reason)
+        expect(secondRow?.body).toContain(first.lifecycle.reason)
+        expect(notify).toHaveBeenCalledTimes(2)
+        expect(notify).toHaveBeenNthCalledWith(1, firstRow?.to_handle, firstRow?.type)
+        expect(notify).toHaveBeenNthCalledWith(2, secondRow?.to_handle, secondRow?.type)
+        expect(db.getUnreadMessages(firstRow?.to_handle ?? '')).toEqual([
+          expect.objectContaining({ id: first.message.id }),
+          expect.objectContaining({ id: second.message.id })
+        ])
+      }
+    )
+
     it('releases dispatch lock before waking recipients when worker_done is sent via send', async () => {
       setup()
       const task = db.createTask({ spec: 'lock-release work' })
