@@ -5,11 +5,15 @@ import type { DescendantSnapshot } from '../../../pty/process-retirement/pty-des
 
 const killWithDescendantSweepMock = vi.hoisted(() => vi.fn())
 const terminateShutdownDescendantsMock = vi.hoisted(() => vi.fn())
+const reapAgentPaneSessionMock = vi.hoisted(() => vi.fn())
 vi.mock('../../sessions/terminal-descendant-shutdown', () => ({
   terminateShutdownDescendants: terminateShutdownDescendantsMock
 }))
 vi.mock('../../../pty/process-retirement/pty-descendant-termination', () => ({
   killWithDescendantSweep: killWithDescendantSweepMock
+}))
+vi.mock('../../../pty/process-retirement/agent-pane-session-reap', () => ({
+  reapAgentPaneSession: reapAgentPaneSessionMock
 }))
 
 function createPlainShellSession(overrides: Partial<Session> = {}): Session {
@@ -33,6 +37,7 @@ describe('TerminalSessionTeardown plain-shell teardown', () => {
     platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
     killWithDescendantSweepMock.mockReset()
     killWithDescendantSweepMock.mockResolvedValue(undefined)
+    reapAgentPaneSessionMock.mockReset()
   })
 
   afterEach(() => {
@@ -74,7 +79,11 @@ describe('TerminalSessionTeardown plain-shell teardown', () => {
     })
     const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
 
+    reapAgentPaneSessionMock.mockImplementation(() => {
+      expect(killWithDescendantSweepMock).not.toHaveBeenCalled()
+    })
     const graceful = teardown.killSession('s1', session, false)
+    expect(reapAgentPaneSessionMock).toHaveBeenCalledWith(4242)
     await Promise.resolve()
     const immediate = teardown.requestImmediate('s1')
 
@@ -91,5 +100,14 @@ describe('TerminalSessionTeardown plain-shell teardown', () => {
     finishRoot()
     await immediate
     expect(settled).toBe(true)
+  })
+
+  it('does not reap a user shell on immediate close', async () => {
+    const session = createPlainShellSession()
+    const teardown = new TerminalSessionTeardown(new Map([['s1', session]]))
+
+    await teardown.killSession('s1', session, true)
+
+    expect(reapAgentPaneSessionMock).not.toHaveBeenCalled()
   })
 })

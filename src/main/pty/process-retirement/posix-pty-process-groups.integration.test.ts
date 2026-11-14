@@ -1,6 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import * as pty from 'node-pty'
 import { expect, it } from 'vitest'
+import {
+  captureAgentPaneSessionGroups,
+  signalAgentPaneSessionGroups
+} from './agent-pane-session-reap'
 import { forceKillPosixPtyProcessGroups } from './posix-pty-process-groups'
 import { readPtsName } from './node-pty-pts-name'
 
@@ -120,4 +124,81 @@ itOnPosix(
     }
   },
   10_000
+)
+
+itOnPosix(
+  'reaps a background loop that outlives a pid-only kill of the session leader',
+  async () => {
+    const token = `ORCA_PTY_GROUP_TEST_${process.pid}_${Date.now()}`
+    const proc = pty.spawn('/bin/bash', ['--noprofile', '--norc'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: process.cwd(),
+      env: process.env as Record<string, string>
+    })
+    const tty = readPtsName(proc)?.replace(/^\/dev\//, '')
+    if (!tty) {
+      throw new Error('node-pty did not expose the PTY slave name')
+    }
+
+    let tagged: TaggedProcess[] = []
+    try {
+      proc.write(
+        `set -m; shopt -u huponexit; /bin/bash --noprofile --norc -c 'trap "" HUP TERM; while :; do sleep 30; done' ${token} &\n`
+      )
+      await waitFor(() => {
+        const found = findTaggedProcesses(['-t', tty], token)
+        return found.some((process) => process.pgid !== readProcessGroup(proc.pid))
+      })
+      tagged = findTaggedProcesses(['-t', tty], token)
+      const leaderPgid = readProcessGroup(proc.pid)
+      const allowed = new Set([leaderPgid, ...tagged.map((process) => process.pgid)])
+      // One timed-out table is a skip, not an empty session. Retry while the leader still exists.
+      let snapshot = await captureAgentPaneSessionGroups(proc.pid)
+      if (!snapshot) {
+        snapshot = await captureAgentPaneSessionGroups(proc.pid)
+      }
+      if (!snapshot) {
+        throw new Error('agent pane session was not captured while the leader was alive')
+      }
+      // Prove the snapshot before any signal, so a bad filter cannot kill an unrelated group.
+      expect(snapshot.groups.every((pgid) => allowed.has(pgid))).toBe(true)
+      expect(snapshot.groups).toContain(tagged.find((process) => process.pgid !== leaderPgid)?.pgid)
+
+      process.kill(proc.pid, 'SIGKILL')
+      await waitFor(() => {
+        try {
+          process.kill(proc.pid, 0)
+          return false
+        } catch (error) {
+          return error instanceof Error && 'code' in error && error.code === 'ESRCH'
+        }
+      })
+      expect(findSurvivors(tagged, token).length).toBeGreaterThan(0)
+
+      await forceKillPosixPtyProcessGroups(proc.pid, () => {
+        try {
+          process.kill(proc.pid, 'SIGKILL')
+        } catch {
+          // The leader pid is already gone, so this fallback must not reach the orphan.
+        }
+      })
+      expect(findSurvivors(tagged, token).length).toBeGreaterThan(0)
+
+      signalAgentPaneSessionGroups(snapshot)
+      await waitFor(() => findSurvivors(tagged, token).length === 0)
+    } finally {
+      try {
+        cleanupTaggedProcesses(tty, tagged, token)
+      } finally {
+        try {
+          proc.kill('SIGKILL')
+        } catch {
+          // node-pty may already have reaped and disposed the leader.
+        }
+      }
+    }
+  },
+  30_000
 )

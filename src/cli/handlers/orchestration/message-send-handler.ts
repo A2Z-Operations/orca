@@ -111,7 +111,8 @@ export const ORCHESTRATION_SEND_HANDLER: Record<string, CommandHandler> = {
           ? undefined
           : process.env.ORCA_PANE_KEY || undefined,
       waitForLifecycleSettlement: type === 'worker_done' ? true : undefined,
-      devMode: isDevCliInvocation()
+      devMode: isDevCliInvocation(),
+      senderPid: process.pid
     }
     const dispatchCapability = getOptionalStringFlag(flags, 'dispatch-capability')
     const result = await callOrchestrationMutation<OrchestrationSendResult>(

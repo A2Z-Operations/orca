@@ -18,6 +18,10 @@ import {
   workerReportRefusal,
   type WorkerReportRefusal
 } from '../../../../orchestration/workers/reports/worker-report-admission'
+import {
+  isReleasedOrStoppedDispatch,
+  logUndeliveredReleasedDispatchRejection
+} from './released-worker-rejection'
 import type { z } from 'zod'
 
 type SendParamsInput = z.infer<typeof SendParams>
@@ -104,8 +108,17 @@ export function sendPointToPointMessage(args: {
             reason: refusal.reason
           }
         })
+        const delivered = !withholdReleasedDispatchRejection({
+          db,
+          dispatch,
+          messageId: rejection.id,
+          toHandle: rejection.to_handle,
+          type: rejection.type,
+          from,
+          senderPid: params.senderPid
+        })
         return recordReceiptForPostCommitNudge(recordMutationReceipt, receipt, () =>
-          runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
+          delivered ? runtime.notifyMessageArrived(rejection.to_handle, rejection.type) : undefined
         )
       }
     }
@@ -126,8 +139,17 @@ export function sendPointToPointMessage(args: {
           message: exposeMessage(rejection),
           lifecycle: reconciled
         })
+        const delivered = !withholdReleasedDispatchRejection({
+          db,
+          dispatch,
+          messageId: rejection.id,
+          toHandle: rejection.to_handle,
+          type: rejection.type,
+          from,
+          senderPid: params.senderPid
+        })
         return recordReceiptForPostCommitNudge(recordMutationReceipt, receipt, () =>
-          runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
+          delivered ? runtime.notifyMessageArrived(rejection.to_handle, rejection.type) : undefined
         )
       }
       const receipt = withSendWarnings(
@@ -160,6 +182,41 @@ export function sendPointToPointMessage(args: {
       : commitMessage()
   committed.nudge()
   return committed.receipt
+}
+
+function withholdReleasedDispatchRejection(args: {
+  db: OrchestrationDb
+  dispatch: ReturnType<OrchestrationDb['getDispatchContextById']>
+  messageId: string
+  toHandle: string
+  type: string
+  from: string
+  senderPid: number | undefined
+}): boolean {
+  const dispatch = args.dispatch
+  if (!dispatch) {
+    return false
+  }
+  const resource = args.db.getWorkerTerminalResourceByOwner(dispatch.id)
+  if (
+    !isReleasedOrStoppedDispatch({
+      dispatchStatus: dispatch.status,
+      workerState: args.db.getWorkerDispatch(dispatch.id)?.state,
+      releaseState: resource?.release_state,
+      ownershipState: resource?.ownership_state
+    })
+  ) {
+    return false
+  }
+  args.db.markAsRead([args.messageId])
+  args.db.markAsDelivered([args.messageId], args.toHandle)
+  logUndeliveredReleasedDispatchRejection({
+    type: args.type,
+    from: args.from,
+    senderPid: args.senderPid,
+    dispatchId: dispatch.id
+  })
+  return true
 }
 
 type LifecycleRefusal = {
