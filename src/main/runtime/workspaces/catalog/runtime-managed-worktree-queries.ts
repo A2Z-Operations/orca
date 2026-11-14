@@ -19,6 +19,10 @@ import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { buildWorktreeListingPage, listingKnownHostIds } from './worktree-listing-host-scope'
 import { readWorktreeMetaForHost } from '../../../persistence/host-qualified-worktree-meta'
 import { getRepoOwnedWorktreeMeta } from '../../../workspaces/catalog/worktree-metadata-ownership'
+import {
+  primeLocalWorktreeDirectoryAliases,
+  resolveRegisteredLocalWorktreeListing
+} from '../../../workspaces/catalog/local-worktree-directory-alias'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
 import { isFolderRepo } from '../../../../shared/repo-kind'
 import {
@@ -44,10 +48,7 @@ import { getWorkspaceAttachments } from '../../../../shared/workspace-attachment
 import { scanRuntimeWorktreesUntilNotOvertaken } from './runtime-witnessed-worktree-scan'
 import { listRuntimeFolderWorkspaces } from './runtime-worktree-filesystem'
 import { resolveConfiguredWorktreeBasePaths } from '../../../../shared/worktree/configured-worktree-base-path'
-import {
-  getRetiredNameRegistryForRepo,
-  hasRetiredNameRegistryStore
-} from '../../../workspaces/removal/retirement/worktree-name-retirement'
+import { retiredWorktreeNamesForSelector } from './runtime-retired-worktree-names'
 
 export class RuntimeManagedWorktreeQueries {
   constructor(private readonly deps: RuntimeManagedWorktreeQueryDependencies) {}
@@ -187,13 +188,21 @@ export class RuntimeManagedWorktreeQueries {
     const expectedHostId = getRepoExecutionHostId(repo)
     const repoOwnerCount = store.getRepos().filter((candidate) => candidate.id === repo.id).length
     const metaById = store.getAllWorktreeMeta()
+    await primeLocalWorktreeDirectoryAliases(repo, scan.worktrees, metaById, repoOwnerCount)
     const detected = scan.worktrees.map((gitWorktree) => {
       const id = `${repo.id}::${gitWorktree.path}`
-      const meta =
+      const exact =
         readWorktreeMetaForHost(store, id, expectedHostId) ??
         getRepoOwnedWorktreeMeta(repo, id, metaById, repoOwnerCount)
+      const { listed, meta } = resolveRegisteredLocalWorktreeListing(
+        repo,
+        gitWorktree,
+        exact,
+        metaById,
+        repoOwnerCount
+      )
       const worktree = {
-        ...mergeWorktree(repo.id, gitWorktree, meta, repo.displayName),
+        ...mergeWorktree(repo.id, listed, meta, repo.displayName),
         hostId: repoOwnerCount === 1 ? (meta?.hostId ?? expectedHostId) : expectedHostId
       }
       const result = this.toDetected(
@@ -283,21 +292,8 @@ export class RuntimeManagedWorktreeQueries {
     })
   }
 
-  async listRetiredNames(repoSelector: string): Promise<{
-    retiredNamesByRepo: Record<string, readonly string[]>
-    retiredNameTiersByRepo: Record<string, number>
-  }> {
-    const store = this.deps.getStore()
-    if (!store || !hasRetiredNameRegistryStore(store)) {
-      return { retiredNamesByRepo: {}, retiredNameTiersByRepo: {} }
-    }
-    const repo = await this.deps.resolveRepo(repoSelector)
-    const settings = store.getSettings()
-    const registry = await getRetiredNameRegistryForRepo(store, repo, store.getRepos(), settings)
-    return {
-      retiredNamesByRepo: { [repo.id]: registry.names },
-      retiredNameTiersByRepo: { [repo.id]: registry.exhaustedTiers }
-    }
+  listRetiredNames(repoSelector: string): ReturnType<typeof retiredWorktreeNamesForSelector> {
+    return retiredWorktreeNamesForSelector(this.deps, repoSelector)
   }
 
   private visibilityDefaults(

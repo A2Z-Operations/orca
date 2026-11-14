@@ -15,6 +15,7 @@ import { resolveLocalProjectRuntimesForRepos } from '../../../workspaces/executi
 import { getAgentLaunchPlatformForRepo } from '../../terminal/launch/runtime-agent-launch-resolution'
 import type { ResolvedWorktreeSnapshot } from './runtime-resolved-worktree-cache'
 import type { RuntimeStore } from '../../construction/runtime-store-contract'
+import { primeLocalWorktreeDirectoryAliases } from '../../../workspaces/catalog/local-worktree-directory-alias'
 import {
   joinRepoWorktreeRows,
   scanRepoWorktreeRows,
@@ -74,6 +75,19 @@ export async function scanResolvedWorktreeRepos(
       // The key listRepoWorktreesForResolution caches under.
       const gitRun = scanCacheEntry(`${repo.id}\0${getRepoExecutionHostId(repo)}`) ?? null
       scans.set(resolvedWorktreeRepoScanKey(repo), { ...scan, gitRun })
+    })
+  )
+  const metaById = store.getAllWorktreeMeta() ?? {}
+  const allRepos = store.getRepos()
+  await Promise.all(
+    repos.map((repo) => {
+      const scan = scans.get(resolvedWorktreeRepoScanKey(repo))
+      return primeLocalWorktreeDirectoryAliases(
+        repo,
+        scan?.worktrees ?? [],
+        metaById,
+        allRepos.filter((candidate) => candidate.id === repo.id).length
+      )
     })
   )
   return scans

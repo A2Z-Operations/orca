@@ -14,7 +14,7 @@ export function getRepoOwnedWorktreeMeta(
 }
 
 export function isWorktreeMetaOwnedByRepo(
-  repo: Repo,
+  repo: Parameters<typeof getRepoExecutionHostId>[0],
   meta: WorktreeMeta | undefined,
   repoOwnerCount: number
 ): meta is WorktreeMeta {

@@ -7,11 +7,8 @@ import type { GitWorktreeInfo, Worktree } from '../../../../shared/worktree/type
 import type { Store } from '../../../persistence/loading-store/store'
 import { mergeWorktreeMetaForWrite } from '../../../persistence/loading-store/worktree-meta-write-normalization'
 import { buildDetectedGitWorktrees } from '../../../ipc/worktrees/listing/ssh-worktree-fallback'
-import {
-  resolveRepoWorktreeRows,
-  resolveScopedWorktreeIdRow,
-  type RepoWorktreeRowDeps
-} from './repo-worktree-row-resolution'
+import { resolveRepoWorktreeRows, type RepoWorktreeRowDeps } from './repo-worktree-row-resolution'
+import { resolveScopedWorktreeIdRow } from './scoped-worktree-id-row'
 import type { HostWorktreeTarget } from '../../../../shared/worktree/host-qualified-identity'
 
 function repo(

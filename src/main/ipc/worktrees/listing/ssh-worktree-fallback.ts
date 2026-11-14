@@ -13,6 +13,7 @@ import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { readWorktreeMetaForRepo } from '../../../persistence/host-qualified-worktree-meta'
 import { hostWorktreeTarget } from '../../../../shared/worktree/host-qualified-identity'
 import { getRepoOwnedWorktreeMeta } from '../../../workspaces/catalog/worktree-metadata-ownership'
+import { resolveRegisteredLocalWorktreeListing } from '../../../workspaces/catalog/local-worktree-directory-alias'
 import {
   buildKnownOrcaWorkspaceLayouts,
   isLegacyRepoForExternalWorktreeVisibility,
@@ -162,10 +163,15 @@ export function buildDetectedGitWorktrees(
     // Locator-keyed metadata is only a compatibility fallback when no host snapshot exists.
     const legacyMeta = allMeta === undefined ? store.getWorktreeMeta?.(worktreeId) : undefined
     const metaById = allMeta ?? (legacyMeta ? { [worktreeId]: legacyMeta } : {})
-    const meta =
+    const exact =
       readWorktreeMetaForRepo(store, worktreeId, repo) ??
       getRepoOwnedWorktreeMeta(repo, worktreeId, metaById, repoOwnerCount)
-    const worktree = mergeWorktree(repo.id, gitWorktree, meta, repo.displayName)
+    const {
+      listed,
+      meta,
+      id: listedId
+    } = resolveRegisteredLocalWorktreeListing(repo, gitWorktree, exact, metaById, repoOwnerCount)
+    const worktree = mergeWorktree(repo.id, listed, meta, repo.displayName)
     const detected = toDetectedWorktree({
       repo,
       worktree,
@@ -182,7 +188,7 @@ export function buildDetectedGitWorktrees(
     const backfilledMeta = resolveWorktreeMetaWithDiscoveryBackfill(
       store,
       repo,
-      worktreeId,
+      listedId,
       allMeta,
       repoOwnerCount
     )
@@ -192,7 +198,7 @@ export function buildDetectedGitWorktrees(
     }
     return toDetectedWorktree({
       repo,
-      worktree: mergeWorktree(repo.id, gitWorktree, backfilledMeta, repo.displayName),
+      worktree: mergeWorktree(repo.id, listed, backfilledMeta, repo.displayName),
       meta: backfilledMeta,
       settings,
       knownOrcaLayouts,

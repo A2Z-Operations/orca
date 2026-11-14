@@ -1,10 +1,8 @@
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session/workspace-session-state-types'
 import type { WorktreeLineage } from '../../../../shared/worktree/lineage-types'
 import type { GitWorktreeInfo, Worktree } from '../../../../shared/worktree/types'
-import {
-  isPathInsideOrEqual,
-  normalizeRuntimePathForComparison
-} from '../../../../shared/cross-platform-path'
+import { isPathInsideOrEqual } from '../../../../shared/cross-platform-path'
+import { localPathsAreSameDirectory } from '../../../workspaces/catalog/local-worktree-directory-alias'
 import { parsePtySessionId } from '../../../../shared/terminal/pty/lifecycle/pty-session-id-format'
 import {
   splitWorktreeId,
@@ -26,7 +24,7 @@ export function branchSelectorMatches(branch: string, selector: string): boolean
 }
 
 export function runtimePathsEqual(left: string, right: string): boolean {
-  return normalizeRuntimePathForComparison(left) === normalizeRuntimePathForComparison(right)
+  return localPathsAreSameDirectory(left, right)
 }
 
 export function createIncrementalResolvedWorktreeLookup(

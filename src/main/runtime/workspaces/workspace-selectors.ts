@@ -115,6 +115,19 @@ export abstract class RuntimeWorkspaceSelectors extends RuntimeProjectLaunchCont
         )
       }
       if (candidates.length === 0) {
+        const parsedId = splitWorktreeIdForFilesystem(worktreeId)
+        const sameDirectory = parsedId?.worktreePath
+          ? worktrees.filter(
+              (worktree) =>
+                worktree.repoId === parsedId.repoId &&
+                runtimePathsEqual(worktree.path, parsedId.worktreePath)
+            )
+          : []
+        if (sameDirectory.length === 1) {
+          candidates = sameDirectory
+        }
+      }
+      if (candidates.length === 0) {
         const parsed = splitWorktreeIdForFilesystem(worktreeId)
         const owner = this.store && resolveWorktreeMetaOwner(this.store, worktreeId)
         const fallback =

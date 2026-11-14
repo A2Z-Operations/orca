@@ -28,6 +28,8 @@ import {
 } from './runtime-local-git-worktree-create'
 import { resolveRuntimeLocalWorktreeCreateBase } from './runtime-local-worktree-create-base'
 import { materializeRuntimeLocalWorktree } from './runtime-local-worktree-materialization'
+import { createdWorktreeNotFoundError } from '../../../ipc/created-worktree-reconciliation'
+import { createdWorktreeRegistrationHolds } from '../../../workspaces/catalog/local-worktree-directory-alias'
 import {
   holdInFlightWorktreeCreate,
   openWorktreeCreatePathClaim,
@@ -220,6 +222,19 @@ async function performRuntimeLocalWorktreeCreate<T>(
       },
       timing: args.timing
     })
+    const repoOwnerCount =
+      store.getRepos?.().filter((candidate) => candidate.id === repo.id).length ?? 1
+    if (
+      !(await createdWorktreeRegistrationHolds(
+        repo,
+        candidate.worktreePath,
+        git.created.path,
+        store.getAllWorktreeMeta?.() ?? {},
+        repoOwnerCount
+      ))
+    ) {
+      throw createdWorktreeNotFoundError(candidate.worktreePath, candidate.branchName)
+    }
     return {
       ...materialized,
       worktreePath: candidate.worktreePath,
