@@ -3,7 +3,7 @@ import { existsSync, watch, type FSWatcher } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as gitRunner from '../../command-runner/git-exec-file'
 import {
   createWorktreePreparationLockReason,
@@ -25,6 +25,23 @@ import {
 import { hasPendingStalePreparationCleanup } from '../../../workspaces/creation/preparation/worktree-create-preparation-stale-cleanup'
 
 const tempRoots: string[] = []
+
+/**
+ * orca #48: git here reads no host config file. A host's global core.hooksPath (the owner's identity-guard hooks)
+ * ran a reference-transaction hook on every ref update; git worktree add holds HEAD.lock while it runs, and a test
+ * that looks inside the new worktree in that window read "not a git repository". The only config file is one in the
+ * test's own temp root (the test identity), for the test's git and the product's alike. Env-passed config
+ * (GIT_CONFIG_COUNT/KEY_n/VALUE_n) is kept: the compat lane sets it (vitest-inherited-git-env-setup.ts).
+ */
+let isolatedGitConfig = ''
+beforeEach(async () => {
+  const root = await mkdtemp(join(tmpdir(), 'orca-prepared-worktree-gitconfig-'))
+  tempRoots.push(root)
+  isolatedGitConfig = join(root, 'gitconfig')
+  await writeFile(isolatedGitConfig, '[user]\n\tname = Orca Test\n\temail = t@example.invalid\n')
+  vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1')
+  vi.stubEnv('GIT_CONFIG_GLOBAL', isolatedGitConfig)
+})
 
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, {
@@ -50,10 +67,25 @@ async function createRepo(): Promise<{ repoPath: string; root: string }> {
 }
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
 describe('prepared worktree creation with real Git', () => {
+  it('reads no host git config file: only its own, plus config passed in the environment', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-prepared-worktree-origin-'))
+    tempRoots.push(root)
+    const origins = new Set(
+      execFileSync('git', ['config', '--list', '--show-origin'], { cwd: root, encoding: 'utf8' })
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => line.split('\t')[0])
+    )
+    expect([...origins].filter((origin) => origin !== 'command line:')).toEqual([
+      `file:${isolatedGitConfig}`
+    ])
+  })
+
   it('registers during fetch and materializes its settled tip only once before the final hook', async () => {
     const { repoPath, root } = await createRepo()
     const preparedPath = join(root, 'prepared-barrier')
