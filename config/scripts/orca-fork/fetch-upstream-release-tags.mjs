@@ -6,7 +6,10 @@
 // tags, so every clone of it had none and about 40 cross-version files failed. Upstream's release tags are read-only
 // facts about published builds; only tags are fetched, and nothing is pushed anywhere.
 //
-// Usage: node config/scripts/orca-fork/fetch-upstream-release-tags.mjs [--upstream <url or path>] [--repo <checkout>]
+// The preflight's unit step runs it with --if-missing: a clone that already has release tags is left alone, without
+// reaching upstream.
+//
+// Usage: node config/scripts/orca-fork/fetch-upstream-release-tags.mjs [--if-missing] [--upstream <url or path>] [--repo <checkout>]
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -27,19 +30,37 @@ function releaseTagCount(repo) {
   return git(repo, ['tag', '--list', 'v[0-9]*']).split('\n').filter(Boolean).length
 }
 
-/** Fetches upstream's v* tags into `repo` (no other refs, no tag that moved is overwritten); returns the counts. */
-export function fetchUpstreamReleaseTags({ repo, upstream = DEFAULT_UPSTREAM }) {
+/**
+ * Fetches upstream's v* tags into `repo` (no other refs, no tag that moved is overwritten); returns the counts.
+ * `ifMissing` fetches only when the clone has no release tag at all.
+ */
+export function fetchUpstreamReleaseTags({ repo, upstream = DEFAULT_UPSTREAM, ifMissing = false }) {
   const before = releaseTagCount(repo)
+  if (ifMissing && before > 0) {
+    return { before, after: before, fetched: false }
+  }
   git(repo, ['fetch', '--quiet', '--no-tags', upstream, RELEASE_TAG_REFSPEC])
-  return { before, after: releaseTagCount(repo) }
+  return { before, after: releaseTagCount(repo), fetched: true }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { values } = parseArgs({
-    options: { upstream: { type: 'string' }, repo: { type: 'string' } }
+    options: {
+      upstream: { type: 'string' },
+      repo: { type: 'string' },
+      'if-missing': { type: 'boolean', default: false }
+    }
   })
   const repo = resolve(values.repo ?? '.')
   const upstream = values.upstream ?? process.env.ORCA_UPSTREAM_URL ?? DEFAULT_UPSTREAM
-  const { before, after } = fetchUpstreamReleaseTags({ repo, upstream })
-  console.log(`release tags in ${repo}: ${before} -> ${after} (from ${upstream})`)
+  const { before, after, fetched } = fetchUpstreamReleaseTags({
+    repo,
+    upstream,
+    ifMissing: values['if-missing']
+  })
+  console.log(
+    fetched
+      ? `release tags in ${repo}: ${before} -> ${after} (from ${upstream})`
+      : `release tags in ${repo}: ${before} already present; nothing fetched`
+  )
 }

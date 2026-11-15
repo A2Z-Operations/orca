@@ -50,7 +50,11 @@ it('fetches only upstream v* tags, including ones on a release branch the clone 
   const { upstream, fork } = repos()
   expect(git(fork, 'tag', '--list')).toBe('')
 
-  expect(fetchUpstreamReleaseTags({ repo: fork, upstream })).toEqual({ before: 0, after: 2 })
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream })).toEqual({
+    before: 0,
+    after: 2,
+    fetched: true
+  })
   expect(git(fork, 'tag', '--list').split('\n')).toEqual(['v1.0.0', 'v1.0.1'])
   expect(git(fork, 'rev-parse', 'v1.0.1^{commit}')).toBe(
     git(upstream, 'rev-parse', 'v1.0.1^{commit}')
@@ -61,7 +65,11 @@ it('fetches only upstream v* tags, including ones on a release branch the clone 
 it('is idempotent', () => {
   const { upstream, fork } = repos()
   fetchUpstreamReleaseTags({ repo: fork, upstream })
-  expect(fetchUpstreamReleaseTags({ repo: fork, upstream })).toEqual({ before: 2, after: 2 })
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream })).toEqual({
+    before: 2,
+    after: 2,
+    fetched: true
+  })
 })
 
 it('fails loudly when upstream cannot be read', () => {
@@ -69,4 +77,24 @@ it('fails loudly when upstream cannot be read', () => {
   expect(() => fetchUpstreamReleaseTags({ repo: fork, upstream: join(fork, 'missing') })).toThrow(
     /git fetch .* failed/
   )
+})
+
+it('--if-missing leaves a clone that already has release tags alone, without reaching upstream', () => {
+  const { upstream, fork } = repos()
+  fetchUpstreamReleaseTags({ repo: fork, upstream })
+  const missing = join(fork, 'missing')
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream: missing, ifMissing: true })).toEqual({
+    before: 2,
+    after: 2,
+    fetched: false
+  })
+})
+
+it('--if-missing still fetches into a clone with no release tags', () => {
+  const { upstream, fork } = repos()
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream, ifMissing: true })).toEqual({
+    before: 0,
+    after: 2,
+    fetched: true
+  })
 })
