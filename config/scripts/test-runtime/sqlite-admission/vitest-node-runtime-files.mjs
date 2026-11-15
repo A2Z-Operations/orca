@@ -73,6 +73,8 @@ const NODE_RUNTIME_INCLUDE = [
   'src/main/persistence/**/*.test.ts',
   'src/main/persistence*.test.ts',
   'src/main/sqlite/**/*.test.ts',
+  // The server re-reads its saved status read-only on start; Bun's macOS SQLite refuses a closed WAL file then.
+  'src/main/agent-hooks/server/**/*.test.ts',
   'src/main/orca-profiles/**/*.test.ts',
   'src/main/managed-data-accounts/**/*.test.ts',
   'src/main/startup/quit/quit-path-durable-write-blocking.test.ts',
