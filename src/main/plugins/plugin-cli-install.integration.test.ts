@@ -32,8 +32,36 @@ const savedEnvironment = {
   GIT_SSH_VARIANT: process.env.GIT_SSH_VARIANT,
   ORCA_TEST_SSH_REPOSITORIES: process.env.ORCA_TEST_SSH_REPOSITORIES
 }
+/** Every git config variable of the caller (GIT_CONFIG_GLOBAL, _NOSYSTEM, _COUNT, _KEY_n, _VALUE_n, _PARAMETERS). */
+const savedGitConfigEnvironment = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => key.startsWith('GIT_CONFIG'))
+)
+
+/**
+ * orca #48: git reads no host config here, neither the system file (Xcode's git sets init.defaultBranch=main) nor
+ * ~/.gitconfig, nor config a calling shell passes in the environment (GIT_CONFIG_COUNT/KEY_n/VALUE_n); its only config is
+ * a file in the test's own root, for the test's git and the installer's alike.
+ */
+async function isolateGitConfig(root: string): Promise<string> {
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith('GIT_CONFIG')) {
+      delete process.env[key]
+    }
+  }
+  const config = join(root, 'gitconfig')
+  await writeFile(config, '[user]\n\tname = Orca Test\n\temail = t@example.invalid\n', 'utf8')
+  process.env.GIT_CONFIG_NOSYSTEM = '1'
+  process.env.GIT_CONFIG_GLOBAL = config
+  return config
+}
 
 afterEach(async () => {
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith('GIT_CONFIG') && !(key in savedGitConfigEnvironment)) {
+      delete process.env[key]
+    }
+  }
+  Object.assign(process.env, savedGitConfigEnvironment)
   for (const [key, value] of Object.entries(savedEnvironment)) {
     if (value === undefined) {
       delete process.env[key]
@@ -45,11 +73,7 @@ afterEach(async () => {
 })
 
 async function git(cwd: string, args: string[]): Promise<void> {
-  await execFileAsync(
-    'git',
-    ['-c', 'user.name=Orca Test', '-c', 'user.email=t@example.invalid', ...args],
-    { cwd }
-  )
+  await execFileAsync('git', args, { cwd })
 }
 
 async function commitTag(repository: string, files: Record<string, string>, tag: string) {
@@ -106,11 +130,13 @@ process.exit(spawnSync('git', ['upload-pack', repository], { stdio: 'inherit' })
 async function harness() {
   const root = await mkdtemp(join(tmpdir(), 'orca-plugin-cli-install-'))
   roots.push(root)
+  await isolateGitConfig(root)
   const notes = join(root, 'notes')
   const locale = join(root, 'locale')
   for (const repository of [notes, locale]) {
     await mkdir(repository, { recursive: true })
-    await git(repository, ['init', '--quiet'])
+    // orca #48: name the first branch; a plain init takes it from the host (Xcode's git sets init.defaultBranch=main).
+    await git(repository, ['init', '--quiet', '--initial-branch=master'])
   }
   await commitTag(
     notes,
@@ -205,6 +231,22 @@ async function approvalOf(promise: Promise<unknown>): Promise<PluginApprovalRequ
 }
 
 describe('orca plugin install and update over Git', () => {
+  it('reads no host git config: only the file in its own root', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-plugin-cli-git-config-'))
+    roots.push(root)
+    const config = await isolateGitConfig(root)
+    const { stdout } = await execFileAsync('git', ['config', '--list', '--show-origin'], {
+      cwd: root
+    })
+    const origins = new Set(
+      stdout
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => line.split('\t')[0])
+    )
+    expect([...origins]).toEqual([`file:${config}`])
+  })
+
   it('refuses code without --approve, writes nothing, and installs with the shown fingerprint', async () => {
     const { deps, consents, lock } = await harness()
     const source = { kind: 'git' as const, input: NOTES_URL }
@@ -292,7 +334,8 @@ describe('orca plugin install and update over Git', () => {
     const catalog = join(root, 'catalog')
     const moved = join(root, 'moved-locale')
     await mkdir(catalog, { recursive: true })
-    await git(catalog, ['init', '--quiet'])
+    // The catalog source below asks for ref 'master', so the branch is named, never the host's default.
+    await git(catalog, ['init', '--quiet', '--initial-branch=master'])
     const listCatalog = (url: string, tag: string) =>
       commitTag(
         catalog,
