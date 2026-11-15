@@ -6,17 +6,23 @@
 // tags, so every clone of it had none and about 40 cross-version files failed. Upstream's release tags are read-only
 // facts about published builds; only tags are fetched, and nothing is pushed anywhere.
 //
-// The preflight's unit step runs it with --if-missing: a clone that already has release tags is left alone, without
-// reaching upstream.
+// The preflight's unit step runs it with --if-missing: it fetches only when the clone has no release tag, or lacks a
+// release ref the cross-version tests pin (read from those tests, #55); otherwise upstream is not contacted. A clone
+// with only the fork's own history's tags therefore still fetches, since many pinned releases sit on upstream release
+// branches.
 //
 // Usage: node config/scripts/orca-fork/fetch-upstream-release-tags.mjs [--if-missing] [--upstream <url or path>] [--repo <checkout>]
 import { spawnSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
+import { compareReleaseTags } from '../release/versioning/stable-release-tags.mjs'
 
 export const DEFAULT_UPSTREAM = 'https://github.com/stablyai/orca'
 const RELEASE_TAG_REFSPEC = 'refs/tags/v*:refs/tags/v*'
+const CROSS_VERSION_TESTS = join('tests', 'e2e', 'cross-version-wire')
+const RELEASE_REF_LITERAL = /['"`](v\d+\.\d+\.\d+)['"`]/g
 
 function git(repo, args) {
   const result = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8' })
@@ -30,17 +36,63 @@ function releaseTagCount(repo) {
   return git(repo, ['tag', '--list', 'v[0-9]*']).split('\n').filter(Boolean).length
 }
 
+function checkoutVersion(repo) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
+    return /^v?(\d+\.\d+\.\d+)/.exec(String(manifest?.version ?? ''))?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The release refs the cross-version tests name ('vX.Y.Z' literals in tests/e2e/cross-version-wire), never one newer
+ * than the checkout's own version: the harness never uses one, so it is not a pin (a test may list later tags as data).
+ */
+export function pinnedReleaseRefs(repo) {
+  let files
+  try {
+    files = readdirSync(join(repo, CROSS_VERSION_TESTS), { recursive: true }).map(String)
+  } catch {
+    return []
+  }
+  const version = checkoutVersion(repo)
+  const refs = new Set()
+  for (const file of files.filter((name) => /\.[cm]?[jt]sx?$/.test(name))) {
+    const source = readFileSync(join(repo, CROSS_VERSION_TESTS, file), 'utf8')
+    for (const [, ref] of source.matchAll(RELEASE_REF_LITERAL)) {
+      if (version === null || compareReleaseTags(ref, `v${version}`) <= 0) {
+        refs.add(ref)
+      }
+    }
+  }
+  return [...refs].sort(compareReleaseTags)
+}
+
+function hasTag(repo, ref) {
+  return (
+    spawnSync('git', ['-C', repo, 'rev-parse', '-q', '--verify', `refs/tags/${ref}^{commit}`], {
+      encoding: 'utf8'
+    }).status === 0
+  )
+}
+
 /**
  * Fetches upstream's v* tags into `repo` (no other refs, no tag that moved is overwritten); returns the counts.
- * `ifMissing` fetches only when the clone has no release tag at all.
+ * `ifMissing` fetches only when the clone has no release tag or lacks a pinned release ref (`missing` lists them).
  */
 export function fetchUpstreamReleaseTags({ repo, upstream = DEFAULT_UPSTREAM, ifMissing = false }) {
+  // Passed to git positionally: a leading dash would be read as an option (#55).
+  if (String(upstream).startsWith('-')) {
+    throw new Error(`upstream must not start with "-": ${upstream}`)
+  }
   const before = releaseTagCount(repo)
-  if (ifMissing && before > 0) {
-    return { before, after: before, fetched: false }
+  const missing = before === 0 ? [] : pinnedReleaseRefs(repo).filter((ref) => !hasTag(repo, ref))
+  if (ifMissing && before > 0 && missing.length === 0) {
+    return { before, after: before, fetched: false, missing }
   }
   git(repo, ['fetch', '--quiet', '--no-tags', upstream, RELEASE_TAG_REFSPEC])
-  return { before, after: releaseTagCount(repo), fetched: true }
+  return { before, after: releaseTagCount(repo), fetched: true, missing }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -61,6 +113,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(
     fetched
       ? `release tags in ${repo}: ${before} -> ${after} (from ${upstream})`
-      : `release tags in ${repo}: ${before} already present; nothing fetched`
+      : `release tags in ${repo}: ${before}, every pinned release ref present; nothing fetched`
   )
 }
