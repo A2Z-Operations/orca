@@ -1,5 +1,6 @@
 import { sharesWithAgent, type FdInfo } from './pane-ownership-fds'
 import { lstartUtcToMs, type OwnershipRow } from './pane-ownership-table'
+import type { FdRead, RecordedFds } from './pane-ownership-wiring'
 import type { OwnedEntry, PaneSet } from './pane-ownership-sets'
 
 /**
@@ -69,11 +70,16 @@ export function entryLine(
     verdict: Verdict
     nowMs: number
     agentIds: ReadonlySet<string>
-    atRecord: readonly FdInfo[] | undefined
+    /** What was read when the entry was recorded (undefined: never read, e.g. gone before a second sample). */
+    atRecord: RecordedFds | undefined
     atClose: readonly FdInfo[] | undefined
+    closeRead: FdRead
+    agentIdsDropped: number
+    /** How old the agent root's last fd read is at this close; null if it was never read. */
+    rootReadAgeMs: number | null
   }
 ): Record<string, unknown> {
-  const closeFds = details.atClose ?? []
+  const closeFds = details.closeRead === 'ok' ? (details.atClose ?? null) : null
   return {
     sessionId: set.sessionId,
     reason: details.reason,
@@ -92,10 +98,41 @@ export function entryLine(
           ? 'still-linked'
           : 'reparented',
     ownGroup: row.pgid === row.pid,
-    fdsAtRecord: describeFds(details.atRecord),
-    fdsAtClose: describeFds(details.atClose),
-    sharesWithAgent: closeFds.some((fd) => fd.fd <= 2 && sharesWithAgent(fd, details.agentIds))
+    fdsAtRecord: describeFds(details.atRecord?.fds ?? undefined),
+    fdsAtRecordRead: details.atRecord?.read ?? 'none',
+    fdsAtClose: describeFds(closeFds ?? undefined),
+    fdsAtCloseRead: details.closeRead,
+    // O1: at record, compared with the root's fds read in the same call; at close, with the root's last read.
+    sharesWithAgentAtRecord: details.atRecord?.sharesAtRecord ?? null,
+    sharesWithAgent: closeFds
+      ? closeFds.some((fd) => fd.fd <= 2 && sharesWithAgent(fd, details.agentIds))
+      : null,
+    agentIdsDropped: details.agentIdsDropped,
+    rootReadAgeMs: details.rootReadAgeMs
   }
+}
+
+/** A kept mark covers the children of a kept entry, also those recorded before the parent was marked. */
+export function inheritKept(present: { entry: OwnedEntry; row: OwnershipRow }[]): void {
+  const byPid = new Map(present.map((p) => [p.entry.pid, p]))
+  for (let changed = true; changed;) {
+    changed = false
+    for (const { entry, row } of present) {
+      const parent = byPid.get(row.ppid)?.entry
+      if (entry.kept === null && parent?.kept) {
+        entry.kept = parent.kept
+        changed = true
+      }
+    }
+  }
+}
+
+/** The fds read at record, only if they were read for this same process (pid and start time). */
+export function recordFor(
+  record: RecordedFds | undefined,
+  startedAt: string
+): RecordedFds | undefined {
+  return record?.startedAt === startedAt ? record : undefined
 }
 
 /** Daily counts per verdict and the most common names that would have been signalled: what stage 3 reads. */

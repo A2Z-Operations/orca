@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import type { PaneSet } from './pane-ownership-sets'
 import { lstartUtcToMs } from './pane-ownership-table'
 
 /**
@@ -121,4 +122,33 @@ export function matchDurableJob(
 
 function isMeta(value: unknown): value is { pid?: unknown; startedAt?: unknown } {
   return typeof value === 'object' && value !== null
+}
+
+/** Unmarked entries are matched against the durable jobs only while younger than this (and once more at close). */
+export const DURABLE_CHECK_WINDOW_MS = 60_000
+
+/**
+ * M2: marks the young unmarked entries that are Orca durable jobs; none of them, no read. A job's meta file is written
+ * within milliseconds of its start, so only young entries can still become one.
+ */
+export async function markYoungDurable(
+  sets: readonly PaneSet[],
+  nowMs: number,
+  listJobs: () => Promise<DurableJobRecord[]>
+): Promise<number> {
+  const unmarked = sets
+    .flatMap((set) => [...set.entries.values()])
+    .filter((e) => e.kept === null && nowMs - e.firstSeenMs < DURABLE_CHECK_WINDOW_MS)
+  if (unmarked.length === 0) {
+    return 0
+  }
+  const jobs = await listJobs()
+  let marked = 0
+  for (const entry of unmarked) {
+    if (matchDurableJob(entry, jobs)) {
+      entry.kept = 'durable-job'
+      marked += 1
+    }
+  }
+  return marked
 }

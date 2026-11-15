@@ -181,7 +181,7 @@ describe('pane ownership observer (#44 stage 2)', () => {
     expect(reads).toBe(2)
   })
 
-  it('records the std fds of an entry and of the agent root in ONE helper call, at the entry SECOND sighting only (S2)', async () => {
+  it('records the std fds of an entry and of its agent root in ONE helper call, at the entry SECOND sighting only (S2, O1)', async () => {
     const calls: { pids: number[]; fds: unknown }[] = []
     let nowMs = NOW_MS
     const { obs } = observer({
@@ -190,7 +190,7 @@ describe('pane ownership observer (#44 stage 2)', () => {
         [row(10, 5), row(20, 10), row(21, 10)], // 20 and 21 recorded
         [row(10, 5), row(20, 10)], // 20 seen again: due; 21 was short-lived: never read
         [row(10, 5), row(20, 10), row(22, 10)], // 22 recorded
-        [row(10, 5), row(20, 10), row(22, 10)] // 22 due; the root was read 2 s ago: not again
+        [row(10, 5), row(20, 10), row(22, 10)] // 22 due: its root is read again in the same call (O1)
       ],
       readFds: async (pids, fds) => {
         calls.push({ pids, fds })
@@ -203,7 +203,7 @@ describe('pane ownership observer (#44 stage 2)', () => {
     }
     expect(calls).toEqual([
       { pids: [20, 10], fds: 'all' },
-      { pids: [22], fds: 'all' }
+      { pids: [22, 10], fds: 'all' }
     ])
   })
 

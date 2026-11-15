@@ -92,8 +92,9 @@ async function main(): Promise<void> {
     const tickStart = Date.now()
     await observer.tick()
     ticks += 1
+    // the observer's own pace: 1 s in process, 5 s on ps (O3), backed off on failures
     await new Promise((resolve) =>
-      setTimeout(resolve, Math.max(0, 1_000 - (Date.now() - tickStart)))
+      setTimeout(resolve, Math.max(0, observer.nextDelayMs() - (Date.now() - tickStart)))
     )
   }
   for (const root of roots) {
@@ -118,6 +119,7 @@ async function main(): Promise<void> {
       inProcess,
       seconds,
       ticks,
+      intervalMs: observer.activeIntervalMs(),
       wallMs,
       selfCpuMs: Math.round((cpu.user + cpu.system) / 1_000),
       selfCpuPercent: Number(((100 * (cpu.user + cpu.system)) / 1_000 / wallMs).toFixed(2)),

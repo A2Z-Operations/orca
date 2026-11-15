@@ -1,11 +1,13 @@
-import type { DurableJobRecord } from './pane-ownership-durable'
-import { matchDurableJob } from './pane-ownership-durable'
+import { markYoungDurable, matchDurableJob, type DurableJobRecord } from './pane-ownership-durable'
 import type { FdInfo } from './pane-ownership-fds'
+import { PaneClosing } from './pane-ownership-closing'
 import { PaneWiring } from './pane-ownership-wiring'
 import type { PaneOwnershipModeRead } from './pane-ownership-mode'
 import {
   DailySummary,
   entryLine,
+  inheritKept,
+  recordFor,
   verdictFor,
   type CloseReason,
   type Verdict
@@ -37,32 +39,19 @@ export type PaneOwnershipObserverDeps = {
 }
 
 export const SAMPLER_INTERVAL_MS = 1_000
+/** O3: when the table is read through ps (Linux, or macOS without the in-process reader), tick this slowly instead. */
+export const SAMPLER_PS_INTERVAL_MS = 5_000
 /** No agent pane: look again only this often (the cadence is not fixed when nothing changes). */
 export const SAMPLER_IDLE_INTERVAL_MS = 10_000
 /** A read that keeps failing backs off, doubling up to this. */
 export const SAMPLER_MAX_BACKOFF_MS = 60_000
 export const SAMPLER_FAILURES_BEFORE_LOG = 10
-/** Unmarked entries are matched against the durable jobs only while younger than this (and once more at close). */
-export const DURABLE_CHECK_WINDOW_MS = 60_000
-
-function inheritKept(present: { entry: OwnedEntry; row: OwnershipRow }[]): void {
-  const byPid = new Map(present.map((p) => [p.entry.pid, p]))
-  for (let changed = true; changed;) {
-    changed = false
-    for (const { entry, row } of present) {
-      const parent = byPid.get(row.ppid)?.entry
-      if (entry.kept === null && parent?.kept) {
-        entry.kept = parent.kept
-        changed = true
-      }
-    }
-  }
-}
 
 export class PaneOwnershipObserver {
   private readonly sets: PaneOwnershipSets
-  private readonly wiring = new PaneWiring()
-  private readonly closing = new Map<string, CloseReason>()
+  private readonly wiring: PaneWiring
+  private readonly closing: PaneClosing
+  private lastVia: 'in-process' | 'ps' | 'unknown' = 'unknown'
   private readonly summary = new DailySummary()
   private inFlight: Promise<void> | null = null
   private timer: ReturnType<typeof setTimeout> | null = null
@@ -75,13 +64,15 @@ export class PaneOwnershipObserver {
 
   constructor(private readonly deps: PaneOwnershipObserverDeps) {
     this.sets = new PaneOwnershipSets({ hostUid: deps.hostUid, hostPid: deps.hostPid })
+    this.wiring = new PaneWiring(deps.log)
+    this.closing = new PaneClosing(deps.log)
   }
 
   private now(): number {
     return (this.deps.now ?? Date.now)()
   }
 
-  /** A self-rescheduling timer that backs off: 1 s with agent panes, 10 s without, doubling to 60 s on failures. */
+  /** A self-rescheduling timer that backs off: 1 s with agent panes (5 s on ps), 10 s without, doubling to 60 s on failures. */
   start(): void {
     if (this.started) {
       return
@@ -98,9 +89,15 @@ export class PaneOwnershipObserver {
     }
   }
 
+  /** The tick while agent panes exist: the in-process reader's pace, or the slower ps pace (O3). */
+  activeIntervalMs(): number {
+    const base = this.deps.intervalMs ?? SAMPLER_INTERVAL_MS
+    return this.lastVia === 'ps' ? Math.max(base, SAMPLER_PS_INTERVAL_MS) : base
+  }
+
   /** The wait before the next tick, from what the last one saw. */
   nextDelayMs(): number {
-    const base = this.deps.intervalMs ?? SAMPLER_INTERVAL_MS
+    const base = this.activeIntervalMs()
     if (this.failures > 0) {
       return Math.min(SAMPLER_MAX_BACKOFF_MS, base * 2 ** Math.min(this.failures, 6))
     }
@@ -118,10 +115,19 @@ export class PaneOwnershipObserver {
   }
 
   /** Diagnostics (L11 and M4's counter). */
-  status(): { failures: number; panes: number; entries: number; dropped: number } {
+  status(): {
+    failures: number
+    fdFailures: number
+    closesUnfinished: number
+    panes: number
+    entries: number
+    dropped: number
+  } {
     const all = this.sets.all()
     return {
       failures: this.failures,
+      fdFailures: this.wiring.fdStatus().fdFailures,
+      closesUnfinished: this.closing.unfinishedCount(),
       panes: all.length,
       entries: all.reduce((n, set) => n + set.entries.size, 0),
       dropped: all.reduce((n, set) => n + set.dropped, 0)
@@ -164,11 +170,7 @@ export class PaneOwnershipObserver {
     // A closing pane stays out of the sample until its root is gone, so a graceful close (SIGTERM, then exit) is
     // logged once, not again as an exit; ids whose session is gone are dropped.
     const aliveIds = new Set(alive.map((root) => root.sessionId))
-    for (const id of this.closing.keys()) {
-      if (!aliveIds.has(id)) {
-        this.closing.delete(id)
-      }
-    }
+    this.closing.settle(aliveIds, this.now())
     const roots = alive.filter((root) => !this.closing.has(root.sessionId))
     this.lastHadRoots = roots.length > 0
     if (roots.length === 0) {
@@ -180,16 +182,18 @@ export class PaneOwnershipObserver {
       return
     }
     this.noteSuccess()
+    this.lastVia = capture.via ?? 'unknown'
     if (!this.startLogged) {
       this.startLogged = true
       this.deps.log('pane-ownership-start', {
         mode: mode.mode,
-        reader: capture.via ?? 'unknown',
+        reader: this.lastVia,
+        intervalMs: this.activeIntervalMs(),
         platform: process.platform
       })
     }
     const { newlyRecorded } = this.sets.sample(capture, roots)
-    await this.markDurable()
+    await markYoungDurable(this.sets.all(), this.now(), this.deps.listDurableJobs)
     this.wiring.noteRecorded(newlyRecorded)
     for (const { sessionId, pid } of newlyRecorded) {
       const entry = this.sets.get(sessionId)?.entries.get(pid)
@@ -200,32 +204,9 @@ export class PaneOwnershipObserver {
     await this.wiring.readDue(this.sets, roots, this.deps.readFds, this.now())
   }
 
-  /** The agent root's own fd ids and each new entry's std fds, in ONE helper call, only when something new was recorded. */
-  /** M2: unmarked entries are re-checked against the durable jobs every tick (and again at close); none unmarked, no read. */
-  private async markDurable(): Promise<number> {
-    // A job's meta file is written within milliseconds of its start, so only young entries can still become one.
-    const nowMs = this.now()
-    const unmarked = this.sets
-      .all()
-      .flatMap((set) => [...set.entries.values()])
-      .filter((e) => e.kept === null && nowMs - e.firstSeenMs < DURABLE_CHECK_WINDOW_MS)
-    if (unmarked.length === 0) {
-      return 0
-    }
-    const jobs = await this.deps.listDurableJobs()
-    let marked = 0
-    for (const entry of unmarked) {
-      if (matchDurableJob(entry, jobs)) {
-        entry.kept = 'durable-job'
-        marked += 1
-      }
-    }
-    return marked
-  }
-
   /** Called synchronously before the host starts a kill, so the next tick no longer samples that session. */
   noteClose(sessionId: string, reason: CloseReason): void {
-    this.closing.set(sessionId, reason)
+    this.closing.note(sessionId, reason, this.now())
   }
 
   /** The agent root exited by itself while its pane stayed open: log the set now (the session is reaped). */
@@ -245,7 +226,7 @@ export class PaneOwnershipObserver {
     try {
       await this.inFlight
       const set = this.sets.take(sessionId)
-      const { agentIds, atRecord } = this.wiring.take(sessionId)
+      const wiring = this.wiring.take(sessionId)
       if (!set || (await this.deps.readMode()).mode === 'off') {
         return
       }
@@ -270,15 +251,11 @@ export class PaneOwnershipObserver {
       }
       // A kept mark covers the children of a kept entry, also those recorded before the parent was marked.
       inheritKept(present)
-      const closeFds =
-        present.length > 0
-          ? await this.deps
-              .readFds(
-                present.map((p) => p.entry.pid),
-                [0, 1, 2]
-              )
-              .catch(() => new Map<number, FdInfo[]>())
-          : new Map<number, FdInfo[]>()
+      const { fds: closeFds, read: closeCall } = await this.wiring.readClose(
+        present.map((p) => p.entry.pid),
+        this.deps.readFds,
+        this.now()
+      )
       const context = {
         hostPid: this.deps.hostPid,
         liveRoots: new Set(this.deps.listAgentRoots().map((r) => r.rootPid)),
@@ -297,12 +274,12 @@ export class PaneOwnershipObserver {
             reason,
             verdict,
             nowMs,
-            agentIds,
-            atRecord:
-              atRecord.get(entry.pid)?.startedAt === entry.startedAt
-                ? atRecord.get(entry.pid)?.fds
-                : undefined,
-            atClose: closeFds.get(entry.pid)
+            agentIds: wiring.agentIds,
+            atRecord: recordFor(wiring.atRecord.get(entry.pid), entry.startedAt),
+            atClose: closeFds.get(entry.pid),
+            closeRead: closeCall === 'ok' && !closeFds.has(entry.pid) ? 'missing' : closeCall,
+            agentIdsDropped: wiring.agentIdsDropped,
+            rootReadAgeMs: wiring.rootReadAtMs === null ? null : nowMs - wiring.rootReadAtMs
           })
         )
       }
@@ -315,10 +292,15 @@ export class PaneOwnershipObserver {
         dropped: set.dropped,
         rootRecycled: set.rootRecycled,
         readFailed: set.entries.size > 0 && capture === null,
+        fdsAtCloseRead: present.length > 0 ? closeCall : null,
+        agentIdsDropped: wiring.agentIdsDropped,
+        rootReadAgeMs: wiring.rootReadAtMs === null ? null : this.now() - wiring.rootReadAtMs,
         verdicts: counts
       })
     } catch (error) {
       this.deps.log('pane-ownership-close-failed', { sessionId, reason, error: String(error) })
+    } finally {
+      this.closing.observed(sessionId, this.now())
     }
   }
 

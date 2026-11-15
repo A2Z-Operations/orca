@@ -100,7 +100,25 @@ function classifyLsofFd(fd: { fd: number; type: string; device: string; name: st
   }
 }
 
-/** macOS: ONE lsof for every pid asked about, at most once per tick; timed out and SIGKILLed after 2 s. */
+/**
+ * A helper read that did not answer (O2): timed out, could not start, was cut short, exited with an error, or exited 0
+ * with nothing printed. The caller counts and logs it and backs the fd reads off; it is never read as "no fds".
+ */
+export class FdReadFailed extends Error {
+  constructor(readonly why: 'timeout' | 'spawn' | 'truncated' | 'exit' | 'empty') {
+    super(`fd read failed: ${why}`)
+    this.name = 'FdReadFailed'
+  }
+}
+
+/** -n -P: no host or port name lookups; -l: no user name lookups; -b: never block on a file system that does not answer. */
+export const LSOF_BASE_ARGS = ['-n', '-P', '-l', '-b', '-a', '-w'] as const
+
+/**
+ * macOS: ONE lsof for every pid asked about, at most once per tick; timed out and SIGKILLed after 2 s. A pid missing
+ * from a good answer is "missing" for that pid (it exited; exit 1 with nothing printed = all of them exited); a failed
+ * answer throws FdReadFailed.
+ */
 export async function readMacFds(
   pids: readonly number[],
   fds: readonly number[] | 'all',
@@ -110,8 +128,7 @@ export async function readMacFds(
     return new Map()
   }
   const args = [
-    '-a',
-    '-w',
+    ...LSOF_BASE_ARGS,
     '-p',
     pids.join(','),
     ...(fds === 'all' ? [] : ['-d', fds.join(',')]),
@@ -121,15 +138,38 @@ export async function readMacFds(
   return parseLsofFds(await run(args))
 }
 
+/** The lsof helper's outcome as text, or FdReadFailed; exit 1 (some or all pids gone) answers for the others. */
+export function lsofOutput(result: {
+  code: number | null
+  stdout: string
+  timedOut: boolean
+  outputTruncated?: boolean
+}): string {
+  if (result.timedOut) {
+    throw new FdReadFailed('timeout')
+  }
+  if (result.outputTruncated) {
+    throw new FdReadFailed('truncated')
+  }
+  if (result.code !== 0 && result.code !== 1) {
+    throw new FdReadFailed('exit')
+  }
+  if (result.code === 0 && result.stdout.trim() === '') {
+    throw new FdReadFailed('empty')
+  }
+  return result.stdout
+}
+
 async function runLsof(args: string[]): Promise<string> {
-  // lsof exits 1 when one of the pids is gone; whatever it printed is still the answer for the others.
   const result = await runProcess({
     program: 'lsof',
     args,
     timeoutMs: FD_HELPER_TIMEOUT_MS,
     maxOutputBytes: 8 * 1024 * 1024
-  }).catch(() => null)
-  return result?.stdout ?? ''
+  }).catch(() => {
+    throw new FdReadFailed('spawn')
+  })
+  return lsofOutput(result)
 }
 
 /** Linux: readlink of /proc/<pid>/fd/N; a process that is gone reads as closed. */
