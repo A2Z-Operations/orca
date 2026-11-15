@@ -1,123 +1,209 @@
 # Pane process ownership (issue #44)
 
-Status: proposed. This change is the decision only. No product code yet.
+Status: proposed, revision 2. This change is the decision only. No product code yet.
 
 Refs #5 and #44. PR #43 is the heartbeat half and stays as it is: a rejected heartbeat is withheld only for a released or stopped dispatch. This note is the process-ownership half. #5 stays open until both halves have landed. The session reap reviewed in `fable-arch-43` is not part of this design, and `agent-pane-session-reap.ts` is not on `blowzer/fork-only`.
 
 Line numbers are `origin/blowzer/fork-only` at `453edb37dad58b78f52f5b7f27bbce7158d34481`.
 
+**Revision 2** follows the Fable architecture review of revision 1 (`a79e161c`, 2026-11-15; corrected by the reviewer at 09:50Z). The review held the mechanism sound and the ownership rule too wide, with 1 HIGH, 6 MED and 5 LOW findings:
+- **H1:** "was once under this pane" is not "belongs to this pane". Shared per-user servers that an agent pane happened to start first (tmux, an ssh master, Gradle/Bazel/watchman/sccache/adb, `gpg-agent`), and processes a user detached on purpose, would be killed.
+- **M2:** an Orca durable job whose waiter is gone would get a random answer at close (killed when a sample happened to land in the few milliseconds it sat under the pane), and a certain kill once M3 or M5 is in. Revision 2 decides the answer: kept (section 4).
+
+Revision 1 turned the kill on by default. Revision 2 does not kill anything until a week of observation has chosen a narrower rule. Each finding is answered where it is named below (H1 … L12).
+
 ## Decision
 
-While a `launchAgent` pane is alive, remember every process whose parent chain still reaches that pane's root. On close, run today's descendant sweep and root signal unchanged. After that sweep returns, signal the remembered processes that are still the same pid, start time, and uid. A failed process-table read adds nothing and kills nothing beyond what today already kills.
+One switch, `ORCA_PANE_DESCENDANT_OWNERSHIP`, with three values:
 
-The feature applies only to panes with `session.launchAgent` set. A plain user terminal is unchanged. `ORCA_PANE_DESCENDANT_OWNERSHIP=0` turns the sampler and the extra kill off. Any other value, including unset, leaves it on.
+| Value | What it does |
+|---|---|
+| `off` | No sampler, no set, no log. Close is exactly today's. |
+| `observe` (**the default**, also when unset or unknown) | The sampler keeps the set. At close it **logs** every recorded process it would have signalled, and every one it kept and why. It sends **no signal** beyond today's sweep. |
+| `kill` | The same, and it signals what the narrowed rule (section 6) selects. Available only in stage 4. Until then `kill` behaves as `observe` and logs once that it did. |
+
+The feature applies only to panes with `session.launchAgent` set. A plain user terminal is unchanged in every mode. Windows is unchanged (section 2).
+
+**Stages.** Each stage is its own PR, and each needs the Leader's word to start:
+1. This note.
+2. **Observe only:** the sampler; the set with M3, M4, M7, L8, L10 and L11; the durable-job answer (M2); the close vs restart reason; the observe log. Then **one week of logs from the fleet**, on the MacBook and the Dells.
+3. **Choose the rule from the logs (H1)**, per OS (M6), with fork events on macOS (M5). A written decision, reviewed again.
+4. **The kill mode**, behind the switch, with the tests in section 9 and the pidfd signal on Linux (L9). The default stays `observe` until the owner says otherwise.
 
 ## 1. Where a pane's root and descendants are already tracked
 
 The daemon already knows the pane root and can list the processes still linked under it. It learns that list at close, from one `ps`, and then forgets it. Nothing keeps the list while the agent is alive, so a tool shell that called `setsid` and whose parent then exited is already gone from the walk.
 
-| Fact                                  | Where                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pane root pid                         | `Session.pid` reads `subprocess.pid` (`src/main/daemon/sessions/session.ts:133`).                                                                                                                                                                                                                                                                                                                                                       |
-| Agent vs plain terminal               | `Session.launchAgent` is set from spawn options (`session.ts:29`, `session.ts:52`). Null means a plain terminal.                                                                                                                                                                                                                                                                                                                        |
-| One shared process table              | `readFreshProcessTable` runs `ps -axo pid=,ppid=,pgid=,tpgid=,lstart=` with a 1s budget (`pty-descendant-fresh-table.ts:9`, `pty-descendant-fresh-table.ts:25`, `pty-descendant-fresh-table.ts:31`). `createProcessTableSnapshotReader` shares a scan that has not started yet (`pty-descendant-termination.ts:34`). Shutdown shares an in-flight scan for 25ms (`terminal-descendant-shutdown.ts:14`).                                 |
-| Descendant walk                       | `collectDescendantRows` (`pty-descendant-termination.ts:99`) builds the ppid tree. A missing root row, or two rows for the root pid, yields no descendants (`pty-descendant-termination.ts:122`).                                                                                                                                                                                                                                       |
-| Snapshot before the root is signalled | `captureDescendantSnapshot` (`pty-descendant-termination.ts:155`) and `killWithDescendantSweep` (`pty-descendant-termination.ts:187`) take the table, then call `killRoot` in `finally` (`pty-descendant-termination.ts:242`).                                                                                                                                                                                                          |
-| Ownership of the live root            | Callers pass `ownsRoot`. Teardown uses `sessions.get(sessionId) === session && session.isAlive` (`terminal-session-teardown.ts:124`, `terminal-session-teardown.ts:173`). The sweep skips descendant signals when that returns false (`pty-descendant-termination.ts:224`, `pty-descendant-termination.ts:237`).                                                                                                                        |
-| Start-time identity                   | Each row carries verbatim `lstart` (`pty-process-table-parser.ts:1`). `hasUnambiguousStartTime` refuses a start time in the same second as the capture (`pty-descendant-termination.ts:264`). Shutdown re-reads and requires the same `startedAt` and `pgid` before SIGKILL (`pty-descendant-exit-verification.ts:52`, `pty-descendant-termination.ts:303`).                                                                            |
-| Close order today                     | `killSession` sends `launchAgent` panes, and any non-immediate close, through `killAfterDescendantSnapshot` (`terminal-session-teardown.ts:81`). That calls `killWithDescendantSweep` (`terminal-session-teardown.ts:157`), then `signalTerminationRoot` for a graceful close (`terminal-session-teardown.ts:168`, `session-termination-controller.ts:54`).                                                                             |
-| Signals and the 5s timeout            | Graceful POSIX close sends the root SIGTERM (`local-pty-termination.ts:66`). `scheduleForceDisposeFallback` arms SIGKILL at `KILL_TIMEOUT_MS` = 5s (`session-termination-controller.ts:8`, `session-termination-controller.ts:68`). The local PTY uses the same 5s (`LOCAL_PTY_GRACEFUL_FORCE_TIMEOUT_MS`, `local-pty-termination.ts:32`). node-pty can also SIGHUP when the pty socket closes (`local-pty-session-activation.ts:169`). |
-| Windows                               | An owned job already contains descendants that have been reparented (`pty-descendant-termination.ts:196`). If the job is unavailable, a PID walk runs only after `verifyWindowsTreeKillTarget` returns `own`, and that check refuses the daemon pid and Orca's Chromium pids (`windows-pty-root-identity.ts:22`).                                                                                                                       |
+| Fact | Where |
+|---|---|
+| Pane root pid | `Session.pid` reads `subprocess.pid` (`src/main/daemon/sessions/session.ts:133`). |
+| Agent vs plain terminal | `Session.launchAgent` is set from spawn options (`session.ts:29`, `session.ts:52`). Null means a plain terminal. |
+| One shared process table | `readFreshProcessTable` runs `ps -axo pid=,ppid=,pgid=,tpgid=,lstart=` with a 1s budget (`src/main/pty/process-retirement/pty-descendant-fresh-table.ts:9`, `:25`, `:31`), under `LANG=C LC_ALL=C` and **not** a fixed `TZ` (`:37`, see L8). `createProcessTableSnapshotReader` shares a scan that has not started yet (`pty-descendant-termination.ts:34`). Shutdown shares an in-flight scan for 25ms (`terminal-descendant-shutdown.ts:14`). |
+| The in-process reader (macOS) | `src/shared/libproc-process-table.ts:205-245` returns stat, tdev, tty, lstart, command, pid, ppid, pgid, tpgid. It has **no uid** column, so an ownership read through it would fall back to `ps` (M5). |
+| Descendant walk | `collectDescendantRows` (`pty-descendant-termination.ts:99`) builds the ppid tree. A missing root row, or two rows for the root pid, yields no descendants (`pty-descendant-termination.ts:122`). |
+| Snapshot before the root is signalled | `captureDescendantSnapshot` (`pty-descendant-termination.ts:155`) and `killWithDescendantSweep` (`pty-descendant-termination.ts:187`) take the table, then call `killRoot` in `finally` (`pty-descendant-termination.ts:242`). |
+| Ownership of the live root | Callers pass `ownsRoot`. Teardown uses `sessions.get(sessionId) === session && session.isAlive` (`terminal-session-teardown.ts:124`, `:173`). The sweep skips descendant signals when that returns false (`pty-descendant-termination.ts:224`, `:237`). |
+| Start-time identity | Each row carries verbatim `lstart` (`pty-process-table-parser.ts:1`). `hasUnambiguousStartTime` refuses a start time in the same second as the capture (`pty-descendant-termination.ts:264`). Shutdown re-reads and requires the same `startedAt` and `pgid` before SIGKILL (`pty-descendant-exit-verification.ts:52`, `pty-descendant-termination.ts:303`). |
+| Close order today | `killSession(sessionId, session, immediate)` (`terminal-session-teardown.ts:71`) is called only from `TerminalHost.kill` (`terminal-host.ts:179`). It sends `launchAgent` panes, and any non-immediate close, through `killAfterDescendantSnapshot` (`terminal-session-teardown.ts:81`), then `killWithDescendantSweep` (`:157`), then `signalTerminationRoot` for a graceful close (`:168`, `session-termination-controller.ts:54`). **It carries no reason**: only `immediate` (section 4). |
+| Signals and the 5s timeout | Graceful POSIX close sends the root SIGTERM (`local-pty-termination.ts:66`). `scheduleForceDisposeFallback` arms SIGKILL at `KILL_TIMEOUT_MS` = 5s (`session-termination-controller.ts:8`, `:68`). The local PTY uses the same 5s (`LOCAL_PTY_GRACEFUL_FORCE_TIMEOUT_MS`, `local-pty-termination.ts:32`). node-pty can also SIGHUP when the pty socket closes (`local-pty-session-activation.ts:169`). |
+| Durable jobs | `resources/durable-jobs/durable-background-job.mjs`. The waiter (`orca-durable-job run --id …`) stays under the agent's tool shell and follows the log. On SIGTERM or SIGINT it forwards the signal to the job (`armWaiterStop`, `:250-270`), so **today's close-time sweep already stops a job whose waiter is attached**. It does not forward SIGHUP, which is what a Claude restart sends: that is how the job "keeps running if Claude restarts" (`:132-139`). The detach helper (`:272-362`, spawned `detached: true` at `:361-368`) starts the job in its own session and exits at once, so the job sits under the pane root for a few milliseconds and then belongs to pid 1. The job's pid and an ISO `startedAt` go to its meta file (`:347-357`). |
+| Windows | An owned job already contains descendants that have been reparented (`pty-descendant-termination.ts:196`). If the job is unavailable, a PID walk runs only after `verifyWindowsTreeKillTarget` returns `own`, and that check refuses the daemon pid and Orca's Chromium pids (`windows-pty-root-identity.ts:22`). |
 
-`ProcessTableRow` has pid, ppid, pgid, optional tpgid, and `startedAt`. It has no uid (`pty-process-table-parser.ts:1`).
+`ProcessTableRow` has pid, ppid, pgid, optional tpgid, and `startedAt`. It has no uid and no command name (`pty-process-table-parser.ts:1`).
 
-## 2. Keeping an owned set while the agent is alive
+## 2. Keeping an owned set while the agent is alive (stage 2)
 
 `setsid` does not change ppid. The parent link disappears when that parent exits, which may be a short-lived wrapper while the pane root is still alive. A walk at close time cannot see the shell after that. The #5 orphan is that shape: a bash started from a Claude tool snapshot, reparented to pid 1, with a `sleep` child.
 
-Record the set from the terminal host, in a new `pane-descendant-ownership` module beside `pty-descendant-termination.ts`. Key it by session id. Reuse `readProcessTable` and `collectDescendantRows`. Do not add a second `ps` per pane, and do not revive a session or process-group reap.
+Record the set from the terminal host, in a new `pane-descendant-ownership` module beside `pty-descendant-termination.ts`. Key it by session id. Reuse the shared reader and `collectDescendantRows`. Do not add a second `ps` per pane, and do not revive a session or process-group reap.
 
-Sampling, not hooks, is the source of the set:
+**The read.**
+- The ownership read is the existing column list plus `uid` and the command name (`comm`), so the log and any later rule can name what they act on (H1 fix 4).
+- It runs under `TZ=UTC` (L8). On Linux the start time is read as clock ticks from `/proc/<pid>/stat` field 22, which is exact and independent of time zone and locale. The `lstart` text stays for macOS, read in UTC.
+- The in-process macOS reader gains `uid` and `comm`, so the ownership read never falls back to running `ps` (M5).
 
-- Run one shared read on a 200ms timer, and only while at least one `launchAgent` session is alive. The timer is unref'd. If a read is already in flight, skip the tick.
-- The ownership read is the existing column list plus `uid=`. The close-time sweep keeps its current columns and its pgid check.
-- For each live `launchAgent` session, walk from `session.pid`. When the root row's `startedAt` matches the start time recorded for that session, add every descendant as `{ pid, startedAt, uid, capturedAtMs }`.
-- A descendant stays in the set after it leaves the tree. A later successful read removes it only when that pid is present with a different start time or uid. Absence does not remove it. A short-lived command leaves a small record; kill time re-checks identity, so an exited pid is not signalled.
-- The first sample runs when the `launchAgent` root pid is known. Pty output from such a pane may request one extra shared read, coalesced so two requests inside 50ms produce one read. Output is only a hint to sample sooner. It is not an identity.
+**Sampling.**
+- One shared read per tick, and only while at least one `launchAgent` session is alive. The timer is unref'd. A tick is skipped while a read is in flight.
+- Stage 2 keeps a 1s base tick: the observe log needs the shape of what is out there, not every process. Stage 3 decides the event-driven sampler (M5).
+- For each live `launchAgent` session, walk from `session.pid`. When the root row's start time matches the one recorded for that session, add every descendant as `{ pid, startedAt, uid, comm, capturedAtMs, how, wiring }`, where `how` is `under-root` or `under-recorded`.
+- **The agent's own wiring, recorded while it is alive.** "A pipe that belonged to the agent" cannot be read at close: by then the sweep has signalled the root. So each tick also records the identities of the pipes and ptys the agent root holds (Linux: `readlink /proc/<root>/fd/*`, pipe inodes and pty paths; macOS: the in-process libproc reader extended with `PROC_PIDLISTFDS` and pipe/vnode info for the **pane roots only**), and each entry's `wiring` at record time: its stdout and stderr targets (pipe inode, pty or path) and its controlling terminal. The per-session record is a small set of ids, not a history.
+- **Only processes of the terminal host's own uid are recorded (L10).** A `sudo` child is not in the set, by rule rather than by an accident of `EPERM`.
+- **Closed under children (M3).** Each tick also walks from every recorded entry that is present with its recorded start time, and adds its children. A `sleep` started by the #5 bash after the bash was reparented is recorded. In stage 2 this only widens what is logged.
+- **The set shrinks (M4).** An entry is removed after K = 25 consecutive *complete* reads without its pid. A complete read is one that contains the terminal host's own pid and every live pane root, so a truncated read never removes anything. An entry whose pid is seen again with another start time or uid is replaced. A hard cap of 4,096 entries per pane drops, first, entries absent from the latest complete read, and only then the oldest. Dropping the oldest first would drop the long-lived processes this feature exists for. Each drop is counted; the counter shows in diagnostics.
+- **A recycled root keeps the set (M7).** When the root row's start time no longer matches the session, sampling of that session stops and its set is kept until close. Kill-time identity (section 5) checks each entry on its own, so clearing would protect nothing and lose the orphans the set was built for.
+- **A failing sampler is visible (L11).** Consecutive failed reads are counted. At 10 in a row it logs once (`pane ownership sampler failing: <reason>`) and diagnostics show the count and the last error. The first good read resets the count and logs the recovery.
 
-Bound. A process is missed when its parent chain to the pane root both appears and breaks between two samples, so no sample ever sees the link. A 200ms poll does not close that gap. A silent `sleep` whose parent is the pane itself, which is the #5 shell while the pane lives, is seen on the next tick. A wrapper that exits in a few milliseconds can still be missed. That miss is reported by the tests below and is not papered over.
+**Bound.** A process is missed when its parent chain to the pane root both appears and breaks between two samples, so no sample ever sees the link. A timer does not close that gap; stage 3 decides how much of it to close per OS (M5, M6). The miss is reported by the tests in section 9 and is not papered over.
 
-On Windows the sampler does not run. The owned job is the recorded set.
+On Windows the sampler does not run. The owned job is the recorded set, and close is unchanged.
 
-## 3. Identity at capture and at kill
+## 3. What observe logs (stage 2)
 
-At capture, store pid, `lstart`, and uid for the pane root and for each descendant.
+At every close of a `launchAgent` pane in `observe` (or `kill`) mode, after today's sweep has run, one JSON line per recorded entry goes to `pane-ownership.log` in the Orca logs folder (rotated like `account-moves.log`). Nothing is signalled. Each line holds:
 
-At kill, read the table again. Signal a recorded descendant only when all of these hold:
+- **The process:** pane, session id, close reason (section 4), pid, `comm`, uid, age, `how` it was recorded, and whether it is still present with its recorded start time.
+- **How it left the tree:** reparented to pid 1 or to another pid, and its session and process group compared with the pane root's.
+- **Whether it is still wired to the pane** (the evidence H1's narrowed rule needs), at record time and again at close:
+  - its controlling terminal compared with the pane's pty;
+  - where its stdout and stderr point (pipe inode, pty or path), and whether that pipe or pty is one the agent root was recorded holding (section 2). Linux reads `/proc/<pid>/fd/1` and `/fd/2`. macOS reads fd 1 and 2 of the entries logged at that close (a handful of processes, once per close, not per tick) through the same libproc reader.
+  - **Why macOS needs the fds, not only the terminal:** a `setsid` tool shell (the #5 shape) has **no** controlling terminal. On the controlling terminal alone it is indistinguishable from a detached daemon, and most agent panes run on macOS. Its pipes are what tell it apart.
+- **The verdict the kill mode would reach under revision 1's rule:** `would-signal`, or `kept: <reason>`. The reasons are `durable-job` (section 4), `protected-pid`, `two-panes`, `other-uid`, `gone`, `same-second` and `restart`.
+
+A daily summary line counts entries per verdict and lists the ten most common `comm` values that would have been signalled. That is what stage 3 reads.
+
+## 4. Durable jobs (M2), and close vs restart
+
+**The decided answer (M2): a durable job whose waiter is gone is KEPT at pane close.** That matches what the product already promises ("It keeps running if Claude restarts"; "Detached Orca jobs still running after this restart"), and it is the only answer that does not need the job's own message changed. A job whose waiter is still attached is stopped exactly as today: the sweep signals the waiter, and the waiter forwards SIGTERM. #44 changes neither case.
+- **Kept by construction, not by name.** The detach helper registers the job as kept: next to the pid and ISO `startedAt` it already writes, it records the job's start time in the sampler's own form (clock ticks on Linux, `lstart` in UTC on macOS).
+- **When the match is made.** Not only at record time: the detach helper writes `meta.json` after it spawns the job, and the job is under the pane root only during those few milliseconds, so a sample (or a fork event) can record the job before its meta file exists. So the daemon re-checks every unmarked entry against the durable-job root each tick, and again at close, when entries are selected or logged. A match marks the entry `kept: durable-job` for good, and it is never selected by any rule. Its descendants inherit `kept` through M3's walk.
+- **This must hold once M3 or M5 records the job every time.** The reviewer's point is that it then becomes certain, not merely likely, that the job is in the set. So the mark is what decides, never the sampling luck.
+- The test in section 9: a durable job whose waiter is gone, recorded under a pane, is `kept: durable-job` and not signalled at close, in every mode and on every run. A second test: with its waiter attached, today's sweep still stops it.
+- The alternative of having the daemon start the job, so it is never under a pane, is rejected. It moves the job's launch into the daemon, and the product's contract is that a tool shell starts it.
+
+**A close says why.** This is an addition of this note, not a review finding: the corrected M2 no longer depends on it. `TerminalHost.kill` gains `reason: 'close' | 'restart'`, passed down to `killSession`. Today every call is a close: the field defaults to `close`, and the callers that end a pane in order to replace it pass `restart`. These are a session move to another account, a pane restart and a resume into a new terminal. The stage 2 PR names each caller and its reason in a table, read from the code; revision 1 did not verify the move path.
+- A `restart` never signals anything from the recorded set, in any mode. In `observe` it logs, per entry, **the verdict a close would have reached**, plus `reason=restart`, so the logs show how much a move leaves behind.
+- **The set survives the restart.** The set is keyed by the pane, not only the session id. When a restart replaces the session (an account move, a pane restart), the old session's entries are carried into the replacement session's set, still with their own recorded identities. The pane's later close covers them, so orphans from account moves are logged (and, in stage 4, selected by the rule) instead of being forgotten. Moves are frequent on this fleet.
+- **Open:** whether a move goes through `killSession` at all. The stage 2 PR answers it from the code before the reason is wired.
+
+## 5. Identity at kill (stage 4 only)
+
+At kill, read the table again. Signal a selected entry only when all of these hold:
 
 - The kill-time table contains exactly one row for that pid.
-- `startedAt` and uid equal the recorded values.
-- `hasUnambiguousStartTime` is true for the recorded start time against the kill-time capture. `lstart` cannot tell two processes apart inside one second (`pty-descendant-termination.ts:269`).
+- Its start time and uid equal the recorded values. On Linux the start time is clock ticks, so the same-second ambiguity does not arise. On macOS `hasUnambiguousStartTime` must be true for the recorded start time against the kill-time capture, because `lstart` cannot tell two processes apart inside one second (`pty-descendant-termination.ts:269`).
 - The pid is greater than 1 and is not the terminal host (`process.pid`).
 - The pid is not any pane root, and it is not in another pane's recorded set. A pid that sits in two panes' sets is signalled by neither.
 - The pid is not in the Orca Chromium set used by `windows-pty-root-identity.ts:22`.
+- It is not `kept` (section 4) and does not carry the keep marker (section 6).
+
+**L9, the gap between the read and the signal.** On Linux, open a pidfd for the pid, re-read `/proc/<pid>/stat` start ticks through it, and signal with `pidfd_send_signal`, so the pid cannot change hands in between. macOS has no equivalent. There the window is the time between the kill-time read and `kill(2)`, which is milliseconds, and the note says so rather than claiming a guarantee.
 
 Do not require pgid. `setsid` changes the process group, so the pgid match in `matchingSnapshotRows` (`pty-descendant-exit-verification.ts:52`) would spare the shell this design exists to reach. The close-time sweep keeps that pgid match for the processes it found itself.
 
-`ownsRoot` stays the gate for the live sweep. It is not a gate for the recorded set. The recorded set is what remains after the root has died, and the start-time check is what makes that safe. A recycled root pid clears that session's set and stops sampling it: the root row's `startedAt` no longer matches the session.
+`ownsRoot` stays the gate for the live sweep. It is not a gate for the recorded set. The recorded set is what remains after the root has died, and the identity check is what makes that safe.
 
-## 4. Close order
+## 6. The narrowed rule and the keep marker (stage 3, decided from the logs)
 
-For a `launchAgent` pane with the switch on, `killAfterDescendantSnapshot` (`terminal-session-teardown.ts:132`) keeps today's body and then appends one step. `killWithDescendantSweep` is not edited.
+**The rule (H1).** The proposal stage 3 starts from, to be confirmed or changed by the week of logs: signal a re-parented process **only while it is still wired to the pane**. That means its controlling terminal is the pane's pty, or its stdout or stderr is a pipe or pty that belonged to the agent. The #5 orphan matches: a tool shell whose pipes went to Claude. A daemon that moved its output to `/dev/null` or a file does not match; it is reported and not killed. Shared per-user servers detach their output in exactly this way, which is why they fall outside the rule.
+
+**The keep marker.** `ORCA_PANE_KEEP=1` in a process's environment, set by the user or by a tool, is read at record time and marks the entry `kept: marker` for good, including its later children. It is read from `/proc/<pid>/environ` on Linux. On macOS the intended source is `KERN_PROCARGS2`, which should be readable for the host's own uid; to be proven in stage 3, like kqueue. It is documented in the user guide next to the switch.
+
+**Per OS (M5, M6).**
+- **Linux:** a per-pane launcher calls `prctl(PR_SET_CHILD_SUBREAPER)` and then starts the agent. It becomes the parent of every orphan under the pane, however that orphan detached, and today's close-time parent walk then sees all of them: no timer, no miss, no start-time matching. The alternative is one systemd user scope (one cgroup) per pane. The rule and the keep marker still decide what is signalled.
+- **macOS:** the sampler stays, driven by fork events. kqueue `EVFILT_PROC` with `NOTE_FORK` and `NOTE_EXIT` on the pane root and on each recorded pid triggers one shared read at once, and the base tick drops to about 1s. This needs a native module, and works for processes of the same uid; to be proven in stage 3. CPU is measured with 20 agent panes before merging.
+
+## 7. Close order (kill mode, stage 4)
+
+For a `launchAgent` pane, `killAfterDescendantSnapshot` (`terminal-session-teardown.ts:132`) keeps today's body and then appends one step. `killWithDescendantSweep` is not edited.
 
 1. Today's sweep, unchanged and first. It snapshots the live tree, signals those descendants, and in `finally` signals the root: SIGTERM on a graceful close (`local-pty-termination.ts:66`), or the immediate force-kill path when `entry.immediate` is set (`terminal-session-teardown.ts:165`).
-2. After that sweep promise settles, SIGTERM each recorded descendant that still matches section 3.
+2. After that sweep promise settles: in `observe`, write the log of section 3 and stop. In `kill` with reason `close`, SIGTERM each entry the rule selects that still matches section 5.
 3. SIGKILL the ones that still match when the existing 5s deadline fires (`KILL_TIMEOUT_MS`, `LOCAL_PTY_GRACEFUL_FORCE_TIMEOUT_MS`). If the sweep outlived that deadline, SIGKILL follows the recorded SIGTERM by `DESCENDANT_KILL_GRACE_MS` (2s, `pty-descendant-termination.ts:15`), not in the same turn. No new timeout constant.
 
-The root is not a member of the recorded kill. Plain terminals, and a `launchAgent` pane with the switch off, never reach step 2. Their background-job exclusion (`terminal-session-teardown.ts:176`) stays as it is.
+The root is not a member of the recorded kill. Plain terminals, a `restart`, and modes `off`/`observe` never reach the signal in step 2. Their background-job exclusion (`terminal-session-teardown.ts:176`) stays as it is.
 
-## 5. Failure behaviour
+## 8. Failure behaviour
 
-A sampler tick whose read throws, times out, or returns null changes nothing. `collectDescendantRows` returning no descendants because the root row is missing or duplicated is the same kind of failure for that pane: do not add, and do not clear.
+- **A sampler tick that fails** (its read throws, times out or returns null) changes nothing and counts toward L11. `collectDescendantRows` returning no descendants because the root row is missing or duplicated is the same kind of failure for that pane: do not add, and do not clear.
+- **A kill-time read that fails** signals nothing from the recorded set; the sweep has already run. A failed re-read before SIGKILL skips SIGKILL. An empty or unreadable table is not evidence that the recorded processes exited.
+- **An incomplete read** (one without the host's pid or a live pane root) never removes an entry (M4).
 
-A kill-time read that fails signals nothing in the recorded set. The sweep has already run. A failed re-read before SIGKILL skips SIGKILL. An empty or unreadable table is not evidence that the recorded processes exited.
+## 9. Tests
 
-## 6. Tests that would have caught `fable-arch-43`
+These are unit tests with a fake process table and a fake `sendSignal`. They do not compile a helper or call `getsid`. The first eight carry over from revision 1 and run in `kill` mode in stage 4; the rest are new (L12) and run from stage 2 unless marked.
 
-These are unit tests with a fake process table and a fake `sendSignal`. They do not compile a helper or call `getsid`.
+| Finding | Test |
+|---|---|
+| HIGH 1 (`fable-arch-43`). Daemon session id 1 made the reap return before it signalled anything. | The host pid's session id is 1. A child with another session id is recorded from ppid. In `kill` it is signalled on close by start time. The implementation has no `getsid` and no `process.kill(-pgid)`. |
+| HIGH 2 (`fable-arch-43`). A `setsid` tool shell is a different session from the pane. | Sample 1: root 10, shell 20 with ppid 10 and its own pgid. Sample 2: shell 20 has ppid 1, the same start and uid. `collectDescendantRows(10)` on sample 2 does not contain 20; the recorded set does. |
+| HIGH 3 (`fable-arch-43`). Killing the session first made the sweep see no children. | Call order is sweep terminate, then root SIGTERM, then the recorded step. A test that moves the recorded step ahead of `killWithDescendantSweep` fails. The root pid is never in the recorded signals. |
+| MEDIUM 4 (`fable-arch-43`). No start-time recheck. | Record pid 20 at start T1, uid 501. The kill-time row is pid 20 at T2: `sendSignal` is not called. The same for a different uid, a second row with the same pid, and (macOS) a start inside the capture second. |
+| Protected pids. | pid 1, `process.pid`, another pane's root, a pid in another pane's set, and an Orca Chromium pid are never signalled. |
+| Read failure does not widen the kill. | The kill-time reader returns null: the sweep still runs, the extra `sendSignal` count is 0. A sampler read that throws leaves the set in place. |
+| The stated miss. | A process exists only between two samples, and the later sample shows ppid 1: it is not recorded and not signalled. |
+| Scope. | `launchAgent == null` never fills a set. `off` runs the sweep and nothing else. On Windows with `terminateOwnedTree() === 'terminated'` the sampler does not start. |
+| **H1: observe sends no signal.** | Mode unset and mode `observe`: a recorded, still-present, matching orphan is logged as `would-signal`, and the extra `sendSignal` count is 0. |
+| **H1: `kill` is inert before stage 4.** | Mode `kill` on a stage 2 build behaves as `observe` and logs that it did, once. |
+| **M2: a durable job whose waiter is gone is kept, every time.** | A job recorded under a pane, its waiter gone, matching its meta file's pid and start: `kept: durable-job` in every mode, also for its children, and the same verdict over 100 runs with different sample timing. Never signalled. |
+| **M2: recorded before its meta file exists.** | The sample records the job before `meta.json` is written; the next tick (or the close) finds the meta file and marks it `kept: durable-job`. Closing in between, with no meta file yet, is not a durable job by any record, and observe logs it as such. |
+| **M2: a durable job whose waiter is attached is stopped as today.** | The close-time sweep signals the waiter; the waiter forwards SIGTERM to the job. #44's recorded step adds nothing. |
+| **Restart is not a close (this note's addition).** | `reason: 'restart'` with mode `kill`: nothing from the set is signalled. In `observe` each entry is logged with the verdict a close would reach and `reason=restart`. The entries are carried into the replacement session's set, and the pane's later close covers them. |
+| **M3: closed under children.** | Bash 20 reparented to 1, then `sleep` 30 with ppid 20 appears: 30 is recorded, `how = under-recorded`. |
+| **M4: the set shrinks.** | After 25 complete reads without pid 30 it is removed. After 25 incomplete reads (no host pid) it stays. At the cap, an entry absent from the latest complete read is dropped before any present one, and the counter rises. |
+| **L8 + M7: a time-zone change.** | The TZ changes between record and close: nothing is signalled that should not be and nothing is cleared (Linux ticks are unaffected; macOS reads in UTC). |
+| **M7: a recycled root.** | The root dies and its pid is reused: sampling stops and the set is kept until close. |
+| **L10: own uid only.** | A child with another uid is never recorded. |
+| **L11: a failing sampler.** | 10 failed reads log once and set the diagnostic count. A good read resets it. |
+| **Keep marker (stage 3).** | A process with `ORCA_PANE_KEEP=1` is `kept: marker`, also its later children. |
+| **Narrowed rule (stage 4).** | A re-parented process whose stdout is `/dev/null` is logged, not signalled. One whose controlling terminal is the pane's pty, or whose stdout is the agent's pipe, is signalled. |
 
-| Finding                                                                                                           | Test                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| HIGH 1. Daemon session id 1 made the reap return before it signalled anything.                                    | The host pid's session id is 1. A child with another session id is recorded from ppid and signalled on close by start time. The implementation has no `getsid` and no `process.kill(-pgid)`.                                                                    |
-| HIGH 2. A `setsid` tool shell is a different session from the pane, so a session filter skipped it.               | Sample 1: root 10, shell 20 with ppid 10 and its own pgid. Sample 2: shell 20 has ppid 1, the same `lstart` and uid. `collectDescendantRows(10)` on sample 2 does not contain 20. The recorded set does, and close signals 20.                                  |
-| HIGH 3. Killing the session, including the root, before `killWithDescendantSweep` made the sweep see no children. | Call order is sweep terminate, then root SIGTERM, then recorded-set SIGTERM. A test that moves the recorded kill ahead of `killWithDescendantSweep` fails. The root pid is absent from the recorded signals.                                                    |
-| MEDIUM 4. No start-time recheck, so a reused pid could be signalled seconds later.                                | Record pid 20 at start T1, uid 501. The kill-time row is pid 20 at start T2. `sendSignal` is not called. The same for a matching start time with a different uid, for a second row with the same pid, and for a start time inside the kill-time capture second. |
-| Protected pids, which the reap's exclusion list did not cover across panes.                                       | pid 1, `process.pid`, another pane's root, a pid in another pane's recorded set, and an Orca Chromium pid are not signalled even when this pane recorded them.                                                                                                  |
-| Read failure must not widen the kill.                                                                             | The kill-time reader returns null. The sweep still runs. The extra `sendSignal` count is 0. A sampler read that throws leaves the previous set in place.                                                                                                        |
-| The stated miss.                                                                                                  | The process exists only between two samples, and the later sample shows ppid 1. It is not recorded and not signalled.                                                                                                                                           |
-| Scope.                                                                                                            | `launchAgent == null` never fills a set. `ORCA_PANE_DESCENDANT_OWNERSHIP=0` runs the sweep and does not call the extra kill. The Windows path with `terminateOwnedTree() === 'terminated'` does not start the sampler.                                          |
+## 10. Alternatives considered
 
-## 7. Alternatives considered
+**Session reap at close.** This is the design `fable-arch-43` rejected. On the macOS terminal host `getsid()` is 1, so the guard signalled nothing. A `setsid` shell is not in the pane's session. Killing the session first, including the root's group, runs before the sweep and turns a graceful close into SIGKILL.
 
-Session reap at close. This is the design `fable-arch-43` rejected. On the macOS terminal host `getsid()` is 1, so the guard signalled nothing. A `setsid` shell is not in the pane's session. Killing the session first, including the root's group, runs before the sweep and turns a graceful close into SIGKILL.
+**Walk ppid only at close.** This is today's sweep. It is necessary and stays first. It cannot see a shell whose parent link broke while the agent was still alive.
 
-Walk ppid only at close. This is today's sweep. It is necessary and stays first. It cannot see a shell whose parent link broke while the agent was still alive.
+**A default-on kill of everything ever recorded (revision 1).** Rejected by the review (H1, M2). Ancestry at one moment in the past is not ownership; observation first, then a rule that requires the process to still be wired to the pane.
 
-Agent hook events as the identity. Claude `PreToolUse` does not carry the tool shell's pid, and it does not run before `setsid`. A hook can request the same shared sample. It cannot replace the sample.
+**Agent hook events as the identity.** Claude `PreToolUse` does not carry the tool shell's pid, and it does not run before `setsid`. A hook can request the same shared sample. It cannot replace the sample.
 
-Pty bytes as the identity. Output says a child might have started. It does not name the pid. The design uses output only to coalesce an extra shared read.
+**Pty bytes as the identity.** Output says a child might have started. It does not name the pid.
 
-Endpoint Security, `cn_proc`, or a pidfd monitor. Any of these could shrink the miss in section 2. Each is a privileged or per-OS subscription, and the daemon is not the parent of the tool shell, so it cannot take `NOTE_FORK` on that shell. One `ps` sampler covers macOS and Linux. A later design can replace the timer without changing the recorded identity or the close order.
+**Endpoint Security or `cn_proc`.** These are privileged subscriptions. Rejected in favour of the per-OS choice in section 6: a subreaper or cgroup on Linux needs no privilege, and kqueue process events on macOS work for the same uid.
 
-Require pgid at kill time. The existing SIGKILL check does this for processes the close-time walk just saw. Copying it onto the recorded set would skip a shell that had already called `setsid`.
+**Require pgid at kill time.** The existing SIGKILL check does this for processes the close-time walk just saw. Copying it onto the recorded set would skip a shell that had already called `setsid`.
 
-Put the extra kill inside `killWithDescendantSweep`, or gate it on `ownsRoot`. That couples the new set to a function whose contract is "the root is still alive, so the walk is valid." The recorded set is valid after the root is gone. Appending it after the sweep keeps the sweep reviewable on its own.
+**Put the extra step inside `killWithDescendantSweep`, or gate it on `ownsRoot`.** That couples the new set to a function whose contract is "the root is still alive, so the walk is valid". The recorded set is valid after the root is gone. Appending it after the sweep keeps the sweep reviewable on its own.
 
-Sample with one `ps` per pane. Cost grows with the number of agent panes and races the shared reader the sweep already uses. One read per tick is enough, because every pane is a walk over that same table.
+**Sample with one `ps` per pane.** Cost grows with the number of agent panes and races the shared reader the sweep already uses. One read per tick is enough, because every pane is a walk over that same table.
 
-Run the sampler on Windows. The job object already owns reparented descendants and survives pid reuse (`pty-descendant-termination.ts:196`). A second kill list would race `taskkill`.
+**Run the sampler on Windows.** The job object already owns reparented descendants and survives pid reuse (`pty-descendant-termination.ts:196`). A second kill list would race `taskkill`.
 
-Drop a recorded pid when a later table omits it. A truncated or partial `ps` would forget a live shell just before it reparented. Kill time already ignores a pid that is gone. The set is allowed to remember exited commands.
+**Never remove an entry on absence (revision 1).** Replaced by M4. A pid missing from 25 *complete* reads has exited, and an exited process is never signalled anyway. A truncated read still removes nothing.
+
+**Stop a durable job whose waiter is gone at pane close.** The other answer M2 allows. Rejected: it breaks the job's own promise to survive a restart, and the job's message would have to say it does not survive a close. Kept is the answer, and it is the same every time.
+
+**Have the daemon start durable jobs.** Rejected in section 4: the product's contract is that a tool shell starts them. They are kept by recorded identity instead.
 
 ## Out of scope
 
