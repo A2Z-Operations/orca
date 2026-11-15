@@ -1,3 +1,4 @@
+import { dirname, join } from 'node:path'
 import '../memory/host-malloc-tunables-claim'
 import { parseArgs } from './launch/daemon-command-arguments'
 import { readFileSync } from 'node:fs'
@@ -51,6 +52,14 @@ async function main(): Promise<void> {
   void leaseAppImageGenerationForCurrentProcess()
   const readyIdentity = await readCurrentDaemonReadyIdentity(startedAtMs)
   const daemonLog = logFilePath ? createDaemonFileLog(logFilePath) : createNoopDaemonFileLog()
+  // #44 stage 2 (observe only): its own rotated log beside daemon.log; the mode file beside the PID record.
+  const paneOwnershipLog =
+    logFilePath && pidPath
+      ? createDaemonFileLog(join(dirname(logFilePath), 'pane-ownership.log'))
+      : null
+  if (paneOwnershipLog) {
+    process.once('exit', () => paneOwnershipLog.close())
+  }
   daemonLog.log('startup', { protocolVersion: PROTOCOL_VERSION, socketPath })
   // Log writes are async; every exit, including process.exit below, flushes the queued tail.
   process.once('exit', () => daemonLog.close())
@@ -174,6 +183,15 @@ async function main(): Promise<void> {
       : null
 
   daemon = await startDaemon({
+    ...(paneOwnershipLog && pidPath
+      ? {
+          paneOwnership: {
+            log: (event: string, details: Record<string, unknown>) =>
+              paneOwnershipLog.log(event, details),
+            modeFilePath: join(dirname(pidPath), 'pane-ownership.mode')
+          }
+        }
+      : {}),
     socketPath,
     tokenPath,
     ...(pidPath ? { pidPath } : {}),

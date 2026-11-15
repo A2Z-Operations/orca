@@ -147,7 +147,7 @@ describe('runPsInProcess', () => {
   it('keeps the real ps for invocations it cannot reproduce, and answers a failing addon with /bin/ps', async () => {
     installAddon()
     expect(await runPsInProcess(['-axo', 'pid=PROCESS_ID'], BUDGET)).toBeNull()
-    expect(await runPsInProcess(['-axo', 'pid=,uid='], BUDGET)).toBeNull()
+    expect(await runPsInProcess(['-axo', 'pid=,rss='], BUDGET)).toBeNull()
     expect(await runPsInProcess(['-e', '-o', 'pid='], BUDGET)).toBeNull()
     expect(await runPsInProcess(['-p', '1', '-t', 'ttys004', '-o', 'pid='], BUDGET)).toBeNull()
     expect(
@@ -651,5 +651,20 @@ describe('runPsInProcess', () => {
       expect(snapshot.value).toContain('/srv/server.js')
       expect(runProcess).toHaveBeenCalledTimes(2)
     })
+  })
+})
+
+describe('pane ownership columns (#44 stage 2)', () => {
+  it('prints uid and comm from the addon, and ? for a uid an older addon does not report', async () => {
+    installAddon({
+      readProcessTable: vi.fn(async () => [
+        row({ pid: 4300, ppid: 1, uid: 501, comm: 'node' }),
+        row({ pid: 4301, ppid: 1, comm: 'old' })
+      ])
+    })
+    const result = await runPsInProcess(['-axo', 'pid=,uid=,comm='], BUDGET)
+    const lines = (result?.stdout ?? '').trim().split('\n')
+    expect(lines).toContain('4300 501 node')
+    expect(lines).toContain('4301 ? old')
   })
 })

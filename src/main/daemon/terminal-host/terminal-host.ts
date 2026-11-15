@@ -8,12 +8,13 @@ import type { SessionInfo } from '../protocol/daemon-session-info'
 import type { TakePendingOutputResult } from '../protocol/daemon-rpc-contract'
 import type { TerminalSnapshot } from '../protocol/terminal-snapshot'
 import type { CreateOrAttachResult } from './terminal-host-create-contract'
-import type { TerminalHostOptions } from './terminal-host-options'
+import type { TerminalHostKillOptions, TerminalHostOptions } from './terminal-host-options'
 import { recordTerminalHostSessionExit } from './terminal-host-session-exit'
 import { disposeTerminalHostSessions, killLiveSessionGroupsSync } from './terminal-host-disposal'
 import { getAliveTerminalHostSession } from './terminal-host-session-access'
 import { writeSessionInput } from '../sessions/session-input-path'
 import { TerminalSessionTeardown } from './terminal-session-teardown'
+import * as ownership from './terminal-host-pane-ownership'
 import { ClaimedAgentPtyOwnerRegistry } from '../../../shared/claimed-agent-pty-owner'
 import {
   createOrAttachClaimedAgentSession,
@@ -57,6 +58,9 @@ export class TerminalHost {
   private onSessionReaped: TerminalHostOptions['onSessionReaped']
   private reportReadinessEvent: TerminalHostOptions['reportReadinessEvent']
   private onFinalCheckpoint: TerminalHostOptions['onFinalCheckpoint']
+  private readonly paneOwnership: TerminalHostOptions['paneOwnership']
+  /** Agent panes whose root is alive, for the #44 ownership sampler. */
+  readonly listAgentRoots = () => ownership.listAgentRoots(this.sessions)
   private creationFenced = false
   private disposePromise: Promise<void> | null = null
   private readonly agentSessionOwners = new ClaimedAgentPtyOwnerRegistry()
@@ -73,6 +77,7 @@ export class TerminalHost {
     this.onSessionReaped = opts.onSessionReaped
     this.reportReadinessEvent = opts.reportReadinessEvent
     this.onFinalCheckpoint = opts.onFinalCheckpoint
+    this.paneOwnership = opts.paneOwnership
     this.killedTombstones = new TerminalHostTombstones(opts.maxTombstones ?? DEFAULT_MAX_TOMBSTONES)
   }
 
@@ -123,6 +128,7 @@ export class TerminalHost {
   }
 
   private handleSessionExit(sessionId: string, generation: string | undefined): void {
+    ownership.reportAgentRootExit(this.paneOwnership, this.sessions.get(sessionId), sessionId)
     recordTerminalHostSessionExit(
       sessionId,
       this.sessions.get(sessionId),
@@ -168,7 +174,7 @@ export class TerminalHost {
     this.sessions.get(sessionId)?.resumeProducer(source)
   }
 
-  kill(sessionId: string, opts: { immediate?: boolean } = {}): Promise<void> {
+  kill(sessionId: string, opts: TerminalHostKillOptions = {}): Promise<void> {
     const pending = this.sessionTeardown.get(sessionId)
     if (pending) {
       return Promise.resolve(
@@ -176,9 +182,10 @@ export class TerminalHost {
       )
     }
     const session = getAliveTerminalHostSession(this.sessions, sessionId)
-    const killed = this.sessionTeardown.killSession(sessionId, session, opts.immediate === true)
+    const kill = () => this.sessionTeardown.killSession(sessionId, session, opts.immediate === true)
+    const killed = ownership.observedKill(this.paneOwnership, session, sessionId, opts, kill)
     this.killedTombstones.record(sessionId)
-    return Promise.resolve(killed)
+    return killed
   }
 
   beginFencedTermination(request: PtyFencedTerminationRequest) {

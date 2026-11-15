@@ -72,10 +72,24 @@ const COLUMN_ALIASES: Readonly<Record<string, Column>> = {
   tty: 'tty',
   lstart: 'lstart',
   command: 'command',
-  args: 'command'
+  args: 'command',
+  // Pane process ownership (#44) reads the owner and the short name; the addon already returns both.
+  uid: 'uid',
+  comm: 'comm'
 }
 
-type Column = 'pid' | 'ppid' | 'pgid' | 'tpgid' | 'stat' | 'tdev' | 'tty' | 'lstart' | 'command'
+type Column =
+  | 'pid'
+  | 'ppid'
+  | 'pgid'
+  | 'tpgid'
+  | 'stat'
+  | 'tdev'
+  | 'tty'
+  | 'lstart'
+  | 'command'
+  | 'uid'
+  | 'comm'
 
 export type PsQuery = {
   columns: Column[]

@@ -1,3 +1,4 @@
+import { restartReason, type PtyShutdownOptions } from '../../../providers/pty-shutdown-options'
 import {
   coldRestorePayloadFromInfo,
   type ColdRestorePayload
@@ -105,10 +106,7 @@ export abstract class DaemonPtySessionControl extends DaemonPtySessionInput {
     this.listingDaemons = daemons
   }
 
-  async shutdown(
-    id: string,
-    opts: { immediate?: boolean; keepHistory?: boolean; deadlineMs?: number }
-  ): Promise<void> {
+  async shutdown(id: string, opts: PtyShutdownOptions): Promise<void> {
     if (opts.keepHistory && this.disconnectOnlyPromise) {
       throw new Error('Cannot keep history after daemon disconnect has started')
     }
@@ -130,10 +128,7 @@ export abstract class DaemonPtySessionControl extends DaemonPtySessionInput {
     }
   }
 
-  protected async shutdownWithHistoryLock(
-    id: string,
-    opts: { immediate?: boolean; keepHistory?: boolean; deadlineMs?: number }
-  ): Promise<void> {
+  protected async shutdownWithHistoryLock(id: string, opts: PtyShutdownOptions): Promise<void> {
     // Connect lazily, sharing one deadline with checkpoint waits and kill; durable writes themselves remain unbounded.
     await this.ensureConnected(opts.deadlineMs)
     // Sleep may precede the first periodic checkpoint; persist the screen before killing.
@@ -209,7 +204,7 @@ export abstract class DaemonPtySessionControl extends DaemonPtySessionInput {
     try {
       await this.client.request(
         'kill',
-        { sessionId: id, immediate: opts.immediate ?? false },
+        { sessionId: id, immediate: opts.immediate ?? false, ...restartReason(opts) },
         remainingDaemonRequestTimeoutMs(opts.deadlineMs)
       )
     } catch (error) {
