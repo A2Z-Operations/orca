@@ -54,7 +54,8 @@ it('fetches only upstream v* tags, including ones on a release branch the clone 
     before: 0,
     after: 2,
     fetched: true,
-    missing: []
+    missing: [],
+    stillMissing: []
   })
   expect(git(fork, 'tag', '--list').split('\n')).toEqual(['v1.0.0', 'v1.0.1'])
   expect(git(fork, 'rev-parse', 'v1.0.1^{commit}')).toBe(
@@ -70,7 +71,8 @@ it('is idempotent', () => {
     before: 2,
     after: 2,
     fetched: true,
-    missing: []
+    missing: [],
+    stillMissing: []
   })
 })
 
@@ -89,7 +91,8 @@ it('--if-missing leaves a clone that already has release tags alone, without rea
     before: 2,
     after: 2,
     fetched: false,
-    missing: []
+    missing: [],
+    stillMissing: []
   })
 })
 
@@ -99,7 +102,8 @@ it('--if-missing still fetches into a clone with no release tags', () => {
     before: 0,
     after: 2,
     fetched: true,
-    missing: []
+    missing: [],
+    stillMissing: []
   })
 })
 
@@ -134,7 +138,7 @@ it('--if-missing leaves a clone alone when every pinned release ref is there', (
   pin(fork, '1.0.1', ['v1.0.0', 'v1.0.1'])
   expect(
     fetchUpstreamReleaseTags({ repo: fork, upstream: join(fork, 'missing'), ifMissing: true })
-  ).toMatchObject({ fetched: false, missing: [] })
+  ).toMatchObject({ fetched: false, missing: [], stillMissing: [] })
 })
 
 it('reads the pinned refs from the cross-version tests, never one newer than the checkout', () => {
@@ -149,4 +153,27 @@ it('refuses an upstream that starts with a dash, before git sees it', () => {
   expect(() => fetchUpstreamReleaseTags({ repo: fork, upstream: '--upload-pack=touch x' })).toThrow(
     /upstream must not start with "-"/
   )
+})
+
+// orca #61 (PR 57 review nit): a clone with no release tag at all lacks every pin, and says so.
+it('lists every pinned ref as missing on a clone with no release tag', () => {
+  const { upstream, fork } = repos()
+  pin(fork, '1.0.1', ['v1.0.0', 'v1.0.1'])
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream, ifMissing: true })).toMatchObject({
+    before: 0,
+    fetched: true,
+    missing: ['v1.0.0', 'v1.0.1'],
+    stillMissing: []
+  })
+})
+
+// orca #61 (PR 57 review nit): a pin upstream does not have either (a typo, for example) is reported after the
+// fetch instead of silently costing an upstream contact on every run.
+it('reports a pinned ref that is still missing after the fetch', () => {
+  const { upstream, fork } = repos()
+  pin(fork, '1.0.9', ['v1.0.0', 'v1.0.9'])
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream, ifMissing: true })).toMatchObject({
+    fetched: true,
+    stillMissing: ['v1.0.9']
+  })
 })

@@ -79,7 +79,8 @@ function hasTag(repo, ref) {
 
 /**
  * Fetches upstream's v* tags into `repo` (no other refs, no tag that moved is overwritten); returns the counts.
- * `ifMissing` fetches only when the clone has no release tag or lacks a pinned release ref (`missing` lists them).
+ * `ifMissing` fetches only when the clone has no release tag or lacks a pinned release ref. `missing` lists the pins
+ * absent before (all of them on a clone with no release tag), `stillMissing` those a fetch did not bring (#61).
  */
 export function fetchUpstreamReleaseTags({ repo, upstream = DEFAULT_UPSTREAM, ifMissing = false }) {
   // Passed to git positionally: a leading dash would be read as an option (#55).
@@ -87,12 +88,13 @@ export function fetchUpstreamReleaseTags({ repo, upstream = DEFAULT_UPSTREAM, if
     throw new Error(`upstream must not start with "-": ${upstream}`)
   }
   const before = releaseTagCount(repo)
-  const missing = before === 0 ? [] : pinnedReleaseRefs(repo).filter((ref) => !hasTag(repo, ref))
+  const missing = pinnedReleaseRefs(repo).filter((ref) => !hasTag(repo, ref))
   if (ifMissing && before > 0 && missing.length === 0) {
-    return { before, after: before, fetched: false, missing }
+    return { before, after: before, fetched: false, missing, stillMissing: [] }
   }
   git(repo, ['fetch', '--quiet', '--no-tags', upstream, RELEASE_TAG_REFSPEC])
-  return { before, after: releaseTagCount(repo), fetched: true, missing }
+  const stillMissing = missing.filter((ref) => !hasTag(repo, ref))
+  return { before, after: releaseTagCount(repo), fetched: true, missing, stillMissing }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -105,7 +107,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   })
   const repo = resolve(values.repo ?? '.')
   const upstream = values.upstream ?? process.env.ORCA_UPSTREAM_URL ?? DEFAULT_UPSTREAM
-  const { before, after, fetched } = fetchUpstreamReleaseTags({
+  const { before, after, fetched, stillMissing } = fetchUpstreamReleaseTags({
     repo,
     upstream,
     ifMissing: values['if-missing']
@@ -115,4 +117,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       ? `release tags in ${repo}: ${before} -> ${after} (from ${upstream})`
       : `release tags in ${repo}: ${before}, every pinned release ref present; nothing fetched`
   )
+  if (stillMissing.length > 0) {
+    // A pin upstream does not have (a typo in a test, say) would otherwise cost an upstream contact on every run.
+    console.warn(`pinned release refs still missing after the fetch: ${stillMissing.join(', ')}`)
+  }
 }
