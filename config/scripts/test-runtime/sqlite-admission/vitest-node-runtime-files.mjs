@@ -175,7 +175,11 @@ const NODE_RUNTIME_INCLUDE = [
   'src/main/claude/claude-agent-sdk-contract-pins.test.ts',
   'config/scripts/orcad-distribution/server-bundle/profile-state-worker-smoke.test.mjs',
   'config/scripts/desktop-distribution/runtime-verification/process-host-dev-rebuild.test.ts',
-  'config/scripts/test-runtime/node-worker/vitest-node-runtime-pool.test.ts'
+  'config/scripts/test-runtime/node-worker/vitest-node-runtime-pool.test.ts',
+  // Node-only build scripts (orca #48): Bun's fs.rm on a read-only directory throws ENOTEMPTY, not EACCES, so the
+  // reclaim retry never ran; Bun's resolver misses a node_modules made after a first lookup in that directory.
+  'config/scripts/worktree-storage/reclaim-worktree-generated-files.test.mjs',
+  'config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs'
 ]
 
 /** `filters` limits the SQLite import scan to the tests a filtered CLI run can select. */
