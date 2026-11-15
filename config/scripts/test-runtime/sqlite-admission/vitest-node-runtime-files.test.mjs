@@ -24,3 +24,18 @@ it('runs every agent-hook server test on the Node runtime', () => {
   const onBun = files.filter((file) => !include.some((pattern) => posix.matchesGlob(file, pattern)))
   expect(onBun).toEqual([])
 })
+
+// orca #48 slice 3: the same read-only open of a closed WAL file, reached through product modules the scan did not name
+// (the mobile notification dismissal store and its controller, through KeyedJsonRowCache; the profile state database).
+it('runs tests that import a module opening SQLite read-only on the Node runtime', () => {
+  const files = [
+    'src/main/ipc/notifications-subject-retirement.test.ts',
+    'src/main/ipc/notifications-external-acknowledgement.test.ts',
+    'src/main/runtime/push/notifications/mobile-notification-dismissal-store.test.ts',
+    'src/main/runtime/push/notifications/mobile-notification-dismissal-read-failure.test.ts',
+    'tests/e2e/helpers/persisted-profile-state.unit.test.ts'
+  ]
+  const include = getNodeRuntimeInclude({ filters: files })
+  const onBun = files.filter((file) => !include.some((pattern) => posix.matchesGlob(file, pattern)))
+  expect(onBun).toEqual([])
+})

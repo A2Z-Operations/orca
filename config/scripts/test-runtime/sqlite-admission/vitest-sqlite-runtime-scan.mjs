@@ -35,7 +35,12 @@ export const SQLITE_MODULES = [
   'src/main/runtime/orchestration/db',
   'src/main/runtime/orchestration/db/orchestration-db',
   'src/main/runtime/agent-session/structured-agent-session-runtime',
-  'src/main/runtime/agent-session/records/agent-session-record-store-slot'
+  'src/main/runtime/agent-session/records/agent-session-record-store-slot',
+  // These open SQLite read-only after a writer closed it; Bun's macOS SQLite refuses a WAL file then (orca #48).
+  'src/main/sqlite/row-cache/keyed-json-row-cache',
+  'src/main/runtime/push/notifications/mobile-notification-dismissal-store',
+  'src/main/runtime/push/notifications/runtime-mobile-notification-controller',
+  'src/main/persistence/profile-state/profile-state-database'
 ]
 const SQLITE_MODULE_PATHS = new Set(SQLITE_MODULES.map((module) => resolve(root, module)))
 // A cheap superset of the parse below; a bare 'db' would match nearly every file.
