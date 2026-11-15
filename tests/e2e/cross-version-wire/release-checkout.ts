@@ -30,6 +30,9 @@ export const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..')
 const DEFAULT_CACHE_ROOT = join(REPO_ROOT, 'tests', 'e2e', '.cross-version-checkouts')
 
 const BASELINE_REF_ENV = 'ORCA_CROSS_VERSION_BASELINE_REF'
+// Fork (#61): the fork repo carries no release tags; this script fetches upstream's into the clone.
+const FETCH_RELEASE_TAGS_HINT =
+  'On a fork clone, run `node config/scripts/orca-fork/fetch-upstream-release-tags.mjs` to fetch them.'
 
 export type ReleaseCheckout = {
   ref: string
@@ -100,7 +103,7 @@ export function resolveBaselineReleaseRef(): string {
     throw new Error(
       `Cross-version harness found no stable desktop release tags matching vX.Y.Z (saw ${tags.length} tag(s) total). ` +
         'CI checkouts default to a shallow clone with no tags: use `actions/checkout` with `fetch-depth: 0`, ' +
-        `or pin a ref with ${BASELINE_REF_ENV}.`
+        `or pin a ref with ${BASELINE_REF_ENV}. ${FETCH_RELEASE_TAGS_HINT}`
     )
   }
   return latest
@@ -115,7 +118,7 @@ export function resolveRecentStableReleaseRefs(count: number): string[] {
     if (!latest) {
       throw new Error(
         `Cross-version harness found ${recent.length} of ${count} stable desktop release tags; ` +
-          'a shallow CI clone needs `fetch-depth: 0`.'
+          `a shallow CI clone needs \`fetch-depth: 0\`. ${FETCH_RELEASE_TAGS_HINT}`
       )
     }
     recent.push(latest)
@@ -130,7 +133,7 @@ function resolveCommit(ref: string): string {
   } catch (error) {
     throw new Error(
       `Cross-version harness could not resolve ref "${ref}" to a commit: ${String(error)}. ` +
-        'The ref must exist locally; a shallow CI clone needs `fetch-depth: 0`.'
+        `The ref must exist locally; a shallow CI clone needs \`fetch-depth: 0\`. ${FETCH_RELEASE_TAGS_HINT}`
     )
   }
 }
