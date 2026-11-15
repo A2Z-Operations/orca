@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,7 +8,9 @@ import { runProcess } from '@orca/process-host'
 import { electronViteConfig } from '../../../../electron.vite.config'
 
 it('keeps main code and asset paths working after a CLI build replaces its public entry', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'orca-main-entry-facade-'))
+  // orca #48: the child reports real paths (cwd, __dirname, a launcher's own location); on macOS the temp folder is
+  // a symlink into /private, so the test makes its root under the real temp path and compares like with like.
+  const root = await mkdtemp(join(realpathSync(tmpdir()), 'orca-main-entry-facade-'))
   try {
     await writeFile(join(root, 'package.json'), '{"type":"commonjs"}')
     await writeFile(join(root, 'tracker.ts'), 'export const createTracker = () => ({ count: 0 })')
