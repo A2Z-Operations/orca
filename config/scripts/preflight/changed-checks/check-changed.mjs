@@ -52,6 +52,23 @@ function parseArgs(argv) {
   return options
 }
 
+/**
+ * Fork (#48): the cross-version wire tests need upstream's release tags and the fork repo carries none, so the unit step
+ * first fetches them into a clone that has none (a no-op otherwise); then the native runtime, as upstream does.
+ */
+export function unitTestPrelude(node) {
+  return [
+    {
+      program: node,
+      args: ['config/scripts/orca-fork/fetch-upstream-release-tags.mjs', '--if-missing']
+    },
+    {
+      program: node,
+      args: ['config/scripts/native-build/node-addons/ensure-native-runtime.mjs', '--runtime=node']
+    }
+  ]
+}
+
 function git(root, args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 }
@@ -147,10 +164,7 @@ function buildTasks(root, plan, { files, mergeBase, maxWorkers, bun }) {
     tasks.push({
       name: 'unit tests',
       steps: [
-        step(node, [
-          'config/scripts/native-build/node-addons/ensure-native-runtime.mjs',
-          '--runtime=node'
-        ]),
+        ...unitTestPrelude(node),
         ...(related.length > 0
           ? [
               vitest(

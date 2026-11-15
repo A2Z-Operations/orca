@@ -1,7 +1,11 @@
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { selectLatestStableReleaseTag } from '../../../config/scripts/release/versioning/stable-release-tags.mjs'
+import {
+  compareReleaseTags,
+  selectLatestStableReleaseTag
+} from '../../../config/scripts/release/versioning/stable-release-tags.mjs'
 import {
   populateReleaseCheckoutSource,
   resolveSharedReleaseCacheRoot
@@ -50,6 +54,32 @@ function git(args: string[]): string {
   }).trim()
 }
 
+/**
+ * Releases newer than the checkout are not releases it can be downgraded to, so they are never a baseline. A checkout at
+ * or past the newest release (upstream main) keeps every tag; a fork based on an older release (orca #48) does not take a
+ * later upstream tag. An unreadable version caps nothing.
+ */
+export function releaseTagsUpToVersion(tags: readonly string[], version: string): string[] {
+  const own = /^v?(\d+\.\d+\.\d+)/.exec(version.trim())?.[1]
+  return own ? tags.filter((tag) => compareReleaseTags(tag, `v${own}`) <= 0) : [...tags]
+}
+
+function checkoutVersion(): string {
+  try {
+    const manifest: unknown = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'))
+    return manifest && typeof manifest === 'object' && 'version' in manifest
+      ? String(manifest.version)
+      : ''
+  } catch {
+    return ''
+  }
+}
+
+function listReleaseTags(): string[] {
+  const tags = git(['tag', '--list', 'v[0-9]*']).split('\n').filter(Boolean)
+  return releaseTagsUpToVersion(tags, checkoutVersion())
+}
+
 // Prefer the explicit baseline override, then the newest stable desktop tag; missing baselines must fail rather than skip.
 export function resolveBaselineReleaseRef(): string {
   const override = process.env[BASELINE_REF_ENV]?.trim()
@@ -58,7 +88,7 @@ export function resolveBaselineReleaseRef(): string {
   }
   let tags: string[]
   try {
-    tags = git(['tag', '--list', 'v[0-9]*']).split('\n').filter(Boolean)
+    tags = listReleaseTags()
   } catch (error) {
     throw new Error(
       `Cross-version harness could not list git tags in ${REPO_ROOT}: ${String(error)}. ` +
@@ -78,7 +108,7 @@ export function resolveBaselineReleaseRef(): string {
 
 /** The newest `count` stable desktop releases, newest first: the ones a downgrade can reach. */
 export function resolveRecentStableReleaseRefs(count: number): string[] {
-  let tags = git(['tag', '--list', 'v[0-9]*']).split('\n').filter(Boolean)
+  let tags = listReleaseTags()
   const recent: string[] = []
   while (recent.length < count) {
     const latest = selectLatestStableReleaseTag(tags)
