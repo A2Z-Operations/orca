@@ -32,7 +32,12 @@ export type PtyKillIpcDeps = {
   shutdownProviderAndDetectExit: (
     provider: IPtyProvider,
     id: string,
-    opts: { immediate?: boolean; keepHistory?: boolean; deadlineMs?: number }
+    opts: {
+      immediate?: boolean
+      keepHistory?: boolean
+      deadlineMs?: number
+      reason?: 'close' | 'restart'
+    }
   ) => Promise<boolean>
   rememberSyntheticKillExit: (id: string, incarnationId?: string) => void
   sendPtyExitToRenderer: (payload: { id: string; code: number; incarnationId?: string }) => void
@@ -79,7 +84,11 @@ async function stopRendererOwnedPtyAs(
     : undefined
   let stopped = false
   try {
-    await stopRendererOwnedPtyProcess(deps, args)
+    // #44: a replacement stop ends the pane to start its successor; the daemon logs it as a restart, not a close.
+    await stopRendererOwnedPtyProcess(deps, {
+      ...args,
+      ...(intentionalStop === 'replaced' ? { reason: 'restart' as const } : {})
+    })
     stopped = true
   } finally {
     settleStop?.(stopped)
@@ -92,7 +101,7 @@ async function stopRendererOwnedPtyAs(
 
 async function stopRendererOwnedPtyProcess(
   deps: PtyKillIpcDeps,
-  args: { id: string; keepHistory?: boolean }
+  args: { id: string; keepHistory?: boolean; reason?: 'close' | 'restart' }
 ): Promise<void> {
   const { store, runtime, getLocalPtyProviderStartupPromise, shutdownProviderAndDetectExit } = deps
   runtime?.markPtyStopRequested?.(args.id)
@@ -121,7 +130,8 @@ async function stopRendererOwnedPtyProcess(
   try {
     const providerExitObserved = await shutdownProviderAndDetectExit(shutdownProvider, args.id, {
       immediate: true,
-      keepHistory: args.keepHistory ?? false
+      keepHistory: args.keepHistory ?? false,
+      ...(args.reason ? { reason: args.reason } : {})
     })
     proof = PtyExitProof.from(
       providerExitObserved ? 'exit-observed' : 'shutdown-acknowledged',

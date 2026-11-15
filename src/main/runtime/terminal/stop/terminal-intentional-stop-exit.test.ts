@@ -99,12 +99,14 @@ function createHarness(opts: { lateProviderExit?: boolean; folder?: boolean } = 
   const session = createPtyIpcSession({ mainWindow: window as unknown as BrowserWindow, runtime })
   wirePtyIpcSession(session)
   bindProviderListeners(session)
+  const shutdownOpts: unknown[] = []
   const deps: PtyKillIpcDeps = {
     store,
     runtime,
     getLocalPtyProviderStartupPromise: () => undefined,
     // The provider's own exit, delivered the way its listener delivers it.
-    shutdownProviderAndDetectExit: async (_provider, id) => {
+    shutdownProviderAndDetectExit: async (_provider, id, shutdownOptions) => {
+      shutdownOpts.push(shutdownOptions)
       if (opts.lateProviderExit) {
         return false
       }
@@ -119,6 +121,7 @@ function createHarness(opts: { lateProviderExit?: boolean; folder?: boolean } = 
     store,
     runtime,
     deps,
+    shutdownOpts,
     emitProviderExit: (incarnationId: string) =>
       emitProviderExit?.({ id: PTY_ID, code: 0, incarnationId }),
     /** The exit main synthesizes for each session when it restarts the daemon. */
@@ -146,6 +149,18 @@ describe('intentional stops keep the pane through the exit', () => {
     expect(harness.boundPtyId()).toBeNull()
     expect(harness.rendererExits()).toEqual([
       { id: PTY_ID, code: 0, incarnationId: INCARNATION_ID, hostId: 'local' }
+    ])
+  })
+
+  it('#44: an ordinary close sends no reason; a replacement stop tells the provider it is a restart', async () => {
+    const close = createHarness()
+    await stopRendererOwnedPty(close.deps, { id: PTY_ID })
+    expect(close.shutdownOpts).toEqual([{ immediate: true, keepHistory: false }])
+
+    const restart = createHarness()
+    await stopReplacedPanePty(restart.deps, PTY_ID)
+    expect(restart.shutdownOpts).toEqual([
+      { immediate: true, keepHistory: false, reason: 'restart' }
     ])
   })
 

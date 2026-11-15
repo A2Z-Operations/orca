@@ -16,11 +16,13 @@ export async function handleDaemonTerminalKill(
   }
 ): Promise<Record<string, never>> {
   const { sessionId, immediate } = payload
+  // #44: only a restart is named; an absent or unknown reason is the host's default, a close.
+  const reason = payload.reason === 'restart' ? { reason: 'restart' as const } : {}
   const canceledPendingSpawn = deps.preparations.cancel(sessionId)
   deps.attachments.clearInput(sessionId)
   const attribution = { sessionId, immediate: immediate === true, clientId }
   try {
-    await deps.host.kill(sessionId, { immediate })
+    await deps.host.kill(sessionId, { immediate, ...reason })
   } catch (error) {
     if (!(canceledPendingSpawn && error instanceof SessionNotFoundError)) {
       deps.log.log('session-kill-failed', {

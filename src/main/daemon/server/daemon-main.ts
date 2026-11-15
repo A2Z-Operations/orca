@@ -25,6 +25,7 @@ export type DaemonStartOptions = {
   spawnAdmission?: DaemonServerOptions['spawnAdmission']
   automaticWorkMarkerPath?: string
   hostTerminalLedgerDir?: string
+  paneOwnership?: DaemonServerOptions['paneOwnership']
   onIdleShutdown?: () => void
   onRpcShutdown?: () => void
   onShutdownRequested?: () => void
@@ -46,6 +47,7 @@ export async function startDaemon(opts: DaemonStartOptions): Promise<DaemonHandl
   const hostTerminalLedgerDir =
     opts.hostTerminalLedgerDir ?? (opts.pidPath ? defaultHostTerminalLedgerDir() : null)
   const server = new DaemonServer({
+    ...(opts.paneOwnership ? { paneOwnership: opts.paneOwnership } : {}),
     socketPath: opts.socketPath,
     tokenPath: opts.tokenPath,
     ...(opts.pidPath ? { pidPath: opts.pidPath } : {}),

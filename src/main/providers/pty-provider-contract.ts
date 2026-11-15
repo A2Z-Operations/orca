@@ -181,6 +181,8 @@ export type IPtyProvider = {
       immediate?: boolean
       keepHistory?: boolean
       deadlineMs?: number
+      /** #44: 'restart' when the pane is being replaced; absent = an ordinary close. Providers may ignore it. */
+      reason?: 'close' | 'restart'
       expectedIncarnationId?: PtyIncarnationId
       /** Require the host-attested creator and current authenticated client to match before destructive ownership-based stops.
        * Optional/ignored on older hosts; ordinary teardown and unattested revived PTYs may omit it. */

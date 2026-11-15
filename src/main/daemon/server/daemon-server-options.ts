@@ -4,6 +4,14 @@ import type { TerminalSpawnAdmissionMode } from '../admission/terminal-spawn-adm
 import type { HostTerminalPolicy } from '../admission/host-terminal-policy'
 
 export type DaemonServerOptions = {
+  /**
+   * Pane process ownership (#44), stage 2, observe only: where its log lines go and the one-word mode file
+   * (`off` / `observe`; missing or unknown = observe). Absent: no sampler (direct-construction tests).
+   */
+  paneOwnership?: {
+    log: (event: string, details: Record<string, unknown>) => void
+    modeFilePath: string | null
+  }
   socketPath: string
   tokenPath: string
   pidPath?: string

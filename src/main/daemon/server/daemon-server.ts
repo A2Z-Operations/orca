@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { paneOwnershipFor } from '../../pty/process-retirement/pane-ownership/pane-ownership-factory'
 import type { Socket } from 'node:net'
 import { setImmediate as waitForImmediate } from 'node:timers/promises'
 import { salvageDroppedDaemonStreamQueries } from '../transport/stream/daemon-stream-query-salvage'
@@ -38,6 +39,7 @@ export class DaemonServer {
   private readonly log: DaemonFileLog
   readonly automaticWork: DaemonAutomaticWorkGuard
   readonly host: TerminalHost
+  private readonly paneOwnership: ReturnType<typeof paneOwnershipFor>
   private readonly transientFactRelay: BackgroundTransientFactRelay
   private readonly streamDataBatcher: DaemonStreamDataBatcher
   private readonly attachments: DaemonSessionAttachments
@@ -64,7 +66,9 @@ export class DaemonServer {
       listSessions: () => this.host.listSessions(),
       ownsEndpoint: () => !this.endpoint.lost
     })
+    this.paneOwnership = paneOwnershipFor(options.paneOwnership, () => this.host.listAgentRoots())
     this.host = new TerminalHost({
+      ...(this.paneOwnership ? { paneOwnership: this.paneOwnership } : {}),
       spawnSubprocess: options.spawnSubprocess,
       spawnGate: this.automaticWork.gate,
       reportReadinessEvent: (event, details) => this.log.log(event, details),
@@ -246,9 +250,12 @@ export class DaemonServer {
     }
     // Only the endpoint winner may inspect or rewrite the automatic-work marker.
     this.automaticWork.start()
+    // Only the endpoint winner samples, so two daemons never log the same panes (#44 stage 2, observe only).
+    this.paneOwnership?.start()
   }
 
   shutdown(): Promise<void> {
+    this.paneOwnership?.stop()
     return this.lifecycle.shutdown()
   }
 

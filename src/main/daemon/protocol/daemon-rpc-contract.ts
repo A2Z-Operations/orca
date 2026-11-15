@@ -124,6 +124,9 @@ export type KillRequest = {
   payload: {
     sessionId: string
     immediate?: boolean
+    /** #44: why the pane ends; 'restart' = replaced by a new session (an account move, a pane restart). Absent = close.
+     * Optional both ways: an older daemon ignores it, an older app omits it. */
+    reason?: 'close' | 'restart'
     expectedIncarnationId?: string
     requireNoAgentOwner?: boolean
     requireUnattached?: boolean

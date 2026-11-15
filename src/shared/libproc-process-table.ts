@@ -223,6 +223,11 @@ export async function runPsInProcess(
             return formatLstart(row.startSec, utc === true)
           case 'command':
             return row.command ?? `(${row.comm})`
+          // An older addon without uid prints '?', which the ownership reader answers by running ps instead.
+          case 'uid':
+            return row.uid === undefined ? '?' : String(row.uid)
+          case 'comm':
+            return row.comm
           case 'pid':
           case 'ppid':
           case 'pgid':
