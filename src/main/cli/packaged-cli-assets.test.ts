@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
-import { globSync } from 'node:fs'
+import { globSync, realpathSync } from 'node:fs'
 import { copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -193,7 +193,9 @@ server.listen(0, '127.0.0.1', () => {
   itRunsUnixShell.each(unixLauncherFixtures)(
     'sanitizes node env and forwards argv verbatim through the $name launcher',
     async (launcherFixture) => {
-      const root = await mkdtemp(join(tmpdir(), 'orca-unix-cli-env-'))
+      // orca #48: the macOS launcher resolves its own location to the real path; on macOS the temp folder is a
+      // symlink into /private, so the root is made under the real temp path and compared like with like.
+      const root = await mkdtemp(join(realpathSync(tmpdir()), 'orca-unix-cli-env-'))
       try {
         const appDir = join(root, ...launcherFixture.appDir)
         const launcherPath = join(appDir, ...launcherFixture.launcher)

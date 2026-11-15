@@ -1,4 +1,12 @@
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync, mkdtempSync } from 'node:fs'
+import {
+  chmodSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+  mkdtempSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -16,7 +24,9 @@ function makeProjectWithCli(
   content,
   { mode = 0o755, rootPackageType, writeOutPackageJson = true } = {}
 ) {
-  const projectDir = mkdtempSync(path.join(tmpdir(), 'orca-cli-bin-'))
+  // orca #48: the child reports real paths (cwd, __dirname, a launcher's own location); on macOS the temp folder is
+  // a symlink into /private, so the test makes its root under the real temp path and compares like with like.
+  const projectDir = mkdtempSync(path.join(realpathSync(tmpdir()), 'orca-cli-bin-'))
   roots.push(projectDir)
   const cliPath = path.join(projectDir, 'out', 'cli', 'index.js')
   const outPackageJsonPath = path.join(projectDir, 'out', 'package.json')
