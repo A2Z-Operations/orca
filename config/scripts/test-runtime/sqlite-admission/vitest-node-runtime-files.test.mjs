@@ -39,3 +39,17 @@ it('runs tests that import a module opening SQLite read-only on the Node runtime
   const onBun = files.filter((file) => !include.some((pattern) => posix.matchesGlob(file, pattern)))
   expect(onBun).toEqual([])
 })
+
+// orca #48 slice 8: Node-only build scripts whose tests hit Bun behavior (each proven by a probe outside Orca):
+// Bun's fs.rm on a read-only directory throws ENOTEMPTY where Node throws EACCES, so the reclaim script's
+// make-writable retry never ran; Bun's resolver keeps a directory's state after a first lookup and misses a
+// node_modules created later, falling back to its global install cache.
+it('runs the Node-only build script tests that Bun semantics break on the Node runtime', () => {
+  const files = [
+    'config/scripts/worktree-storage/reclaim-worktree-generated-files.test.mjs',
+    'config/scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.test.mjs'
+  ]
+  const include = getNodeRuntimeInclude({ filters: files })
+  const onBun = files.filter((file) => !include.some((pattern) => posix.matchesGlob(file, pattern)))
+  expect(onBun).toEqual([])
+})
