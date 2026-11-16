@@ -12,15 +12,15 @@ import { readLinuxStartTicks } from './pane-ownership-table'
  * this module: a reader answers only true / false / null (not read) per pid.
  *
  * Linux reads /proc/<pid>/environ (NUL-separated, exact) and, when the entry's start ticks are known, checks
- * /proc/<pid>/stat still shows them (#67). macOS reads each pid THREE times, each `lstart=,command=` under LANG=C,
+ * /proc/<pid>/stat still shows them (#67; unknown ticks = null, fail closed). macOS reads each pid THREE times, each `lstart=,command=` under LANG=C,
  * TZ=UTC: `ps -wwo` (the command line), `ps -wwE -o` (the command line, then the environment), `ps -wwo` again. Only
  * what follows the plain line is searched, so no ARGUMENT can match (Fable-3 S1). Every read's lstart must equal the
  * recorded start (#67 S1b: a reused pid is null) and the two plain reads must agree (#67 S1a: a command line that
  * changed across the -E read is null). No native code inside the terminal host (S3; this replaces the KERN_PROCARGS2
  * sysctl the design note first named). Never a pid LIST: macOS ps reads the whole process table for two or more -p
  * pids (0.8 s of CPU at ~1,900 processes, measured), but only the one process for a single pid (~0 s). At most
- * MAX_MARKER_READS_PER_CLOSE pids per close, and the WHOLE close within MARKER_CLOSE_BUDGET_MS (#67 S2: each read's
- * timeout is what is left of it). Both see the environment the process was started with, same uid only: another
+ * MAX_MARKER_READS_PER_CLOSE pids per close, and the WHOLE close within MARKER_CLOSE_BUDGET_MS, process-host's exit
+ * grace included (#67 S2: each read's timeout is what is left of it, minus MARKER_EXIT_GRACE_MS). Both see the environment the process was started with, same uid only: another
  * uid's process (or a root one) reads as null.
  *
  * Remaining limit (macOS): ps joins the environment entries with spaces, so a WORD inside an environment VALUE (e.g.
@@ -35,6 +35,11 @@ export const MARKER_HELPER_TIMEOUT_MS = 2_000
 export const MAX_MARKER_READS_PER_CLOSE = 32
 /** Total time one close may spend reading markers, every read included (#67); the pids left stay null (not read). */
 export const MARKER_CLOSE_BUDGET_MS = 5_000
+/**
+ * process-host's exit grace (run-process.ts PROCESS_EXIT_GRACE_MS): a timed-out helper gets SIGTERM, and only after
+ * this long SIGKILL and a forced settle. Reads stop early enough that this grace still ends inside the budget.
+ */
+export const MARKER_EXIT_GRACE_MS = 2_000
 
 export type KeepMarkers = Map<number, boolean | null>
 
@@ -147,9 +152,10 @@ class BudgetSpent extends Error {}
 
 /**
  * macOS: per pid, three single-pid reads (a pid LIST would make ps read the whole table), up to
- * MAX_MARKER_READS_PER_CLOSE pids. #67 S2: the WHOLE close is bounded by MARKER_CLOSE_BUDGET_MS: each read gets
- * min(MARKER_HELPER_TIMEOUT_MS, what is left), and a read cut short by the budget ends the reading with the pids left
- * null (what was read is kept). A read that fails with its full time throws (with no ps output in the error).
+ * MAX_MARKER_READS_PER_CLOSE pids. #67 S2: the WHOLE close is bounded by MARKER_CLOSE_BUDGET_MS, including
+ * process-host's exit grace: each read gets min(MARKER_HELPER_TIMEOUT_MS, what is left minus MARKER_EXIT_GRACE_MS),
+ * and a cut read that TIMES OUT ends the reading with the pids left null (what was read is kept). Any other failure,
+ * or a timeout with the full time, throws (with no ps output in the error) and counts as a failed read.
  */
 export async function readMacKeepMarkers(
   targets: readonly MarkerTarget[],
@@ -157,7 +163,8 @@ export async function readMacKeepMarkers(
   now: () => number = Date.now
 ): Promise<KeepMarkers> {
   const result: KeepMarkers = new Map()
-  const deadline = now() + MARKER_CLOSE_BUDGET_MS
+  // A read must END by the budget even when its ps ignores SIGTERM: its timeout plus the exit grace fits what is left.
+  const deadline = now() + MARKER_CLOSE_BUDGET_MS - MARKER_EXIT_GRACE_MS
   const read = async (args: string[]): Promise<string> => {
     const timeoutMs = Math.min(MARKER_HELPER_TIMEOUT_MS, deadline - now())
     if (timeoutMs <= 0) {
@@ -166,7 +173,9 @@ export async function readMacKeepMarkers(
     try {
       return await run(args, timeoutMs)
     } catch (error) {
-      throw timeoutMs < MARKER_HELPER_TIMEOUT_MS ? new BudgetSpent() : error
+      // Only a TIMEOUT of a cut read is the budget running out; any other failure is a failed read (counted).
+      const cutTimeout = timeoutMs < MARKER_HELPER_TIMEOUT_MS && String(error).endsWith(': timeout')
+      throw cutTimeout ? new BudgetSpent() : error
     }
   }
   let spent = false
@@ -193,8 +202,9 @@ export async function readMacKeepMarkers(
 }
 
 /**
- * Linux: /proc/<pid>/environ per pid; unreadable (gone, or another uid) is null. #67: when the entry's start ticks are
- * known, /proc/<pid>/stat is read after the environment and must still show them (a reused pid is null).
+ * Linux: /proc/<pid>/environ per pid; unreadable (gone, or another uid) is null. #67: /proc/<pid>/stat is read after
+ * the environment and must still show the entry's recorded start ticks (a reused pid is null). An entry whose ticks
+ * were never read is null too: no identity, no marker (fail closed).
  */
 export async function readLinuxKeepMarkers(
   targets: readonly MarkerTarget[],
@@ -207,7 +217,7 @@ export async function readLinuxKeepMarkers(
       continue
     }
     const environ = await read(`/proc/${pid}/environ`).catch(() => null)
-    const same = startTicks === null || (await readLinuxStartTicks(pid, read)) === startTicks
+    const same = startTicks !== null && (await readLinuxStartTicks(pid, read)) === startTicks
     result.set(pid, environ === null || !same ? null : markerInEnviron(environ))
   }
   return result

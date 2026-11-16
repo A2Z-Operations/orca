@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   KEEP_MARKER,
   MARKER_CLOSE_BUDGET_MS,
+  MARKER_EXIT_GRACE_MS,
   MAX_MARKER_READS_PER_CLOSE,
   markerInEnviron,
   markerInPsReads,
@@ -169,7 +170,7 @@ describe('keep marker readers', () => {
     expect(await readMacKeepMarkers([], async () => 'never')).toEqual(new Map())
   })
 
-  it('#67 S2: the WHOLE close is bounded by MARKER_CLOSE_BUDGET_MS: each read gets only what is left', async () => {
+  it('#67 S2: the WHOLE close is bounded, exit grace included: each read gets what is left minus the grace', async () => {
     let now = 0
     const timeouts: number[] = []
     const markers = await readMacKeepMarkers(
@@ -177,16 +178,18 @@ describe('keep marker readers', () => {
       async (args, timeoutMs) => {
         timeouts.push(timeoutMs)
         if (args.at(-1) === '1') {
-          now += 1_200 // pid 1: three slow reads use 3.6 s of the 5 s
+          now += 500 // pid 1: three reads, 1.5 s
           return args.includes('-wwE') ? `${OLD} x ORCA_PANE_KEEP=1` : `${OLD} x`
         }
-        now += timeoutMs // pid 2 hangs: its read runs into its (cut) timeout
+        // pid 2: a ps that ignores SIGTERM: its cut timeout, then process-host's SIGKILL after the exit grace
+        now += timeoutMs + MARKER_EXIT_GRACE_MS
         throw new Error('keep marker read failed: timeout')
       },
       () => now
     )
-    expect(now).toBeLessThanOrEqual(MARKER_CLOSE_BUDGET_MS) // before #67: 3.6 s + a full 2 s read = 5.6 s
-    expect(timeouts).toEqual([2_000, 2_000, 2_000, 1_400]) // pid 2's read gets only what is left
+    // Before Fable-3's S1 the cut read got 3.5 s and its grace ran past the budget: 1.5 + 3.5 + 2 = 7 s here.
+    expect(now).toBeLessThanOrEqual(MARKER_CLOSE_BUDGET_MS)
+    expect(timeouts).toEqual([2_000, 2_000, 2_000, 1_500])
     expect(markers).toEqual(
       new Map([
         [1, true],
@@ -204,6 +207,33 @@ describe('keep marker readers', () => {
     ).rejects.toThrow(/timeout/)
   })
 
+  it('N2: inside the cut window, a failure that is NOT a timeout is a failed read (counted), not the budget', async () => {
+    let now = 0
+    await expect(
+      readMacKeepMarkers(
+        [target(1), target(2)],
+        async (args, timeoutMs) => {
+          if (args.at(-1) === '1') {
+            now += 500
+            return `${OLD} x`
+          }
+          expect(timeoutMs).toBeLessThan(2_000) // this read is cut by the budget
+          throw new Error('keep marker read failed: exit')
+        },
+        () => now
+      )
+    ).rejects.toThrow(/exit/)
+  })
+
+  it('process-host still uses the exit grace this budget leaves room for (drift guard)', () => {
+    const runProcess = readFileSync(
+      join(__dirname, '../../../../packages/process-host/src/run-process.ts'),
+      'utf8'
+    )
+    expect(MARKER_EXIT_GRACE_MS).toBe(2_000)
+    expect(runProcess).toContain('const PROCESS_EXIT_GRACE_MS = 2_000')
+  })
+
   it('reads at most MAX_MARKER_READS_PER_CLOSE pids; the rest are null (not read)', async () => {
     const pids = Array.from({ length: MAX_MARKER_READS_PER_CLOSE + 2 }, (_, i) => 1000 + i)
     const asked = new Set<string>()
@@ -218,16 +248,19 @@ describe('keep marker readers', () => {
     expect(mac.get(pids.at(-1)!)).toBeNull()
     expect(mac.get(pids[0]!)).toBe(false)
     const linux = await readLinuxKeepMarkers(
-      pids.map((pid) => target(pid)),
-      async () => 'A=1\0'
+      pids.map((pid) => target(pid, { startTicks: '5' })),
+      async (path) => (path.endsWith('/stat') ? `9 (x) S ${'0 '.repeat(18)}5 0` : 'A=1\0')
     )
     expect([...linux.values()].filter((v) => v === null)).toHaveLength(2)
   })
 
   it('Linux: /proc/<pid>/environ per pid; an unreadable one (gone, or another uid) is null', async () => {
     const markers = await readLinuxKeepMarkers(
-      [target(201), target(202), target(203)],
+      [201, 202, 203].map((pid) => target(pid, { startTicks: '5' })),
       async (path) => {
+        if (path.endsWith('/stat')) {
+          return `9 (x) S ${'0 '.repeat(18)}5 0`
+        }
         if (path === '/proc/201/environ') {
           return 'A=1\0ORCA_PANE_KEEP=1\0'
         }
@@ -246,7 +279,7 @@ describe('keep marker readers', () => {
     )
   })
 
-  it('#67 Linux: with recorded start ticks, a pid whose /proc/<pid>/stat now shows other ticks is null', async () => {
+  it('#67 Linux: a pid whose /proc/<pid>/stat now shows other ticks is null; unknown ticks are null too (N1, fail closed)', async () => {
     const stat = (ticks: string) => `9 (node) S ${'0 '.repeat(18)}${ticks} 0`
     const read = async (path: string) =>
       path.endsWith('/environ')
@@ -260,7 +293,7 @@ describe('keep marker readers', () => {
       new Map([
         [301, true],
         [302, null],
-        [303, true]
+        [303, null]
       ])
     )
   })
