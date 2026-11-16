@@ -54,13 +54,19 @@ function parseArgs(argv) {
 
 /**
  * Fork (#48): the cross-version wire tests need upstream's release tags and the fork repo carries none, so the unit step
- * first fetches them into a clone that has none (a no-op otherwise); then the native runtime, as upstream does.
+ * first fetches them into a clone that has none (a no-op otherwise). The relay integration tests import the cloud/
+ * workspace, which only CI's relay job installs, so it is installed next when missing (#48 slice 12); then the native
+ * runtime, as upstream does.
  */
 export function unitTestPrelude(node) {
   return [
     {
       program: node,
       args: ['config/scripts/orca-fork/fetch-upstream-release-tags.mjs', '--if-missing']
+    },
+    {
+      program: node,
+      args: ['config/scripts/orca-fork/install-relay-test-dependencies.mjs', '--if-missing']
     },
     {
       program: node,
