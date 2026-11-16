@@ -8,6 +8,7 @@ import type { OwnedEntry, PaneOwnershipSets } from './pane-ownership-sets'
  * `carried: { from, generation }`. The claim may arrive before or after the hold. Nothing here can signal (S1): adopted
  * entries only appear, labelled, in the new pane's close lines.
  *
+ * A claim that never meets a hold within CARRY_HOLD_MS logs `pane-ownership-carry-claim-unmatched` (#70 S2).
  * Bounds: a set is held at most CARRY_HOLD_MS and is claimed at most once (first claim wins); at most CARRY_MAX_ENTRIES
  * entries are carried; an entry already carried CARRY_MAX_GENERATIONS times is dropped (a pane that rotates all day
  * cannot grow). Held sets are memory only and end with the daemon, like every set.
@@ -118,11 +119,17 @@ export class PaneCarry {
         })
       }
     }
-    for (const map of [this.early, this.claimedBy]) {
-      for (const [from, claim] of map) {
-        if (nowMs - claim.atMs > CARRY_HOLD_MS) {
-          map.delete(from)
-        }
+    for (const [from, claim] of this.early) {
+      if (nowMs - claim.atMs > CARRY_HOLD_MS) {
+        // #70 S2: a replacement that named a session no restart close ever held (its old pane was closed, not
+        // restarted, or the stop never reached the observer): one trace, instead of expiring silently.
+        this.early.delete(from)
+        this.log('pane-ownership-carry-claim-unmatched', { from, to: claim.to })
+      }
+    }
+    for (const [from, claim] of this.claimedBy) {
+      if (nowMs - claim.atMs > CARRY_HOLD_MS) {
+        this.claimedBy.delete(from)
       }
     }
   }

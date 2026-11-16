@@ -46,8 +46,8 @@ export async function buildPtyIpcSpawnOptions(ctx: PtyIpcSpawnState): Promise<vo
     sessionId: ctx.effectiveSessionId,
     // Window callers may declare restore intents only; other intents belong to the host.
     spawnIntent: isRestoreSpawnIntent(args.spawnIntent) ? args.spawnIntent : undefined,
-    // #44 (a): a renderer restart or resume names the PTY it replaces; the daemon observes the carry-over.
-    ...carryOverFor(args.replacesPtyId),
+    // #44 (a): a renderer restart or resume names the PTY it replaces, once proven (#70 S3); observe only.
+    ...carryOverFor(ctx.replacedPaneOwner),
     getSettings: ctx.deps.getSettings,
     store: ctx.deps.store,
     claudeAuth: ctx.claudeAuth

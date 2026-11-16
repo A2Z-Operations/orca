@@ -22,7 +22,8 @@ const tabId = 'restart-tab'
 const paneKey = makePaneKey(tabId, TEST_LEAF_1)
 const stopped: ReplacedPaneOwner = {
   ptyId: 'old',
-  pane: { worktreeId, tabId, leafId: TEST_LEAF_1, hostId: undefined }
+  pane: { worktreeId, tabId, leafId: TEST_LEAF_1, hostId: undefined },
+  proven: true // #70 S3: the runtime route always proves the PTY before it stops it
 }
 
 function storeBinding(ptyId: string): Store {

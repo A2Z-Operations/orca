@@ -198,6 +198,12 @@ describe('runtime replacement addendum', () => {
     }
   )
 
+  it('#70 S3: the runtime route proved the PTY, so the spawn names it (carriesFrom, observe only)', async () => {
+    await expect(spawn()).resolves.toMatchObject({ id: 'new' })
+    const ctx: RuntimePtySpawnState = physical.spawn.mock.calls[0][0]
+    expect(ctx.spawnOptions.carriesFrom).toBe('old')
+  })
+
   it('(k) launches on the chosen account and replaces the registry record after the swap', async () => {
     await expect(spawn()).resolves.toMatchObject({ id: 'new' })
     const ctx: RuntimePtySpawnState = physical.spawn.mock.calls[0][0]

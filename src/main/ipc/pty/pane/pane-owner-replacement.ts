@@ -4,6 +4,7 @@ import type { Store } from '../../../persistence/loading-store/store'
 import type { PersistPtyBindingArgs } from '../../../persistence/loading-store/pty-binding-persistence'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
 import type { ReplacedPaneOwner } from './replaced-pane-owner'
+import { ptyPaneKey } from './key-state'
 import { resolveStablePaneOwner } from './stable-owner'
 
 /** Caller holds the pane's spawn reservation, so no other spawn can claim the pane meanwhile. */
@@ -30,9 +31,14 @@ export async function stopReplacedPaneOwner(
   if (owner && owner.ptyId !== args.replacesPtyId) {
     throw new Error('terminal_pane_owner_changed')
   }
+  // #70 S3: proven = a bound owner with this id, or (unbound) the PTY's own pane-key record. Never a refusal here: an
+  // unproven restart still runs as before (the window route relies on that); it only carries nothing.
+  const proven =
+    owner !== null || (args.paneKey !== null && ptyPaneKey.get(args.replacesPtyId) === args.paneKey)
   await deps.stopReplacedPty(args.replacesPtyId)
   const pane = args.paneKey ? parsePaneKey(args.paneKey) : null
   return {
+    ...(proven ? { proven: true as const } : {}),
     ptyId: args.replacesPtyId,
     pane:
       pane && args.worktreeId

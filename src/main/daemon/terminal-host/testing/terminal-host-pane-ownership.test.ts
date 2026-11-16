@@ -194,6 +194,22 @@ describe('TerminalHost and pane ownership (#44 stage 2, observe only)', () => {
       await host.dispose()
     })
 
+    it('#70 S1: an ATTACH to an existing agent pane never carries, even naming carriesFrom', async () => {
+      const hooks = base()
+      const host = await create(hooks, { launchAgent: 'claude' })
+      await host.createOrAttach({
+        sessionId: 's2',
+        cols: 80,
+        rows: 24,
+        launchAgent: 'claude',
+        attachOnly: true,
+        carriesFrom: 's1',
+        streamClient: { onData: vi.fn(), onExit: vi.fn() }
+      })
+      expect(hooks.carries).toEqual([])
+      await host.dispose()
+    })
+
     it('no carry for a plain shell or without carriesFrom', async () => {
       const shell = base()
       const a = await create(shell, { carriesFrom: 's1' })
