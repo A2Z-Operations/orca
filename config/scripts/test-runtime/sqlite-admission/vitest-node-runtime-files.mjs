@@ -157,6 +157,8 @@ const NODE_RUNTIME_INCLUDE = [
   'src/shared/remote-runtime/requests/remote-runtime-request-websocket.test.ts',
   'src/shared/remote-runtime/requests/remote-runtime-subscription-connect-bound.test.ts',
   'src/main/codex/configuration/shared-server/codex-shared-server-probe.test.ts',
+  // Proves its pipe-close path by observing EPIPE: Bun's child stdin emits no error when the child closed it (orca #48).
+  'src/main/text-generation/source-control-wsl-prompt.test.ts',
   'src/main/opencode/opencode-launch-model-context-supervision.test.ts',
   'src/main/hermes/hermes-config-remote-adapter.test.ts',
   'src/main/ipc/profiles/orca-profiles-switch-persistence.test.ts',
