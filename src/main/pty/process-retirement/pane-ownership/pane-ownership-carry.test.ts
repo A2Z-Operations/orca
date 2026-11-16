@@ -21,18 +21,20 @@ function row(pid: number, ppid: number): OwnershipRow {
 /** Panes and the process table are mutable: the test moves them like a restart does. */
 function harness() {
   const logs: { event: string; details: Record<string, unknown> }[] = []
-  const state = {
-    now: T0,
-    roots: [{ sessionId: 's1', rootPid: 10 }] as { sessionId: string; rootPid: number }[],
-    rows: [] as OwnershipRow[]
-  }
+  const state: {
+    now: number
+    roots: { sessionId: string; rootPid: number }[]
+    rows: OwnershipRow[]
+    off: boolean
+  } = { now: T0, roots: [{ sessionId: 's1', rootPid: 10 }], rows: [], off: false }
   const deps: PaneOwnershipObserverDeps = {
     listAgentRoots: () => state.roots,
     readTable: async () => ({ rows: [row(HOST, 1), ...state.rows], capturedAtMs: state.now }),
     readFds: async () => new Map<number, FdInfo[]>(),
     readStartTicks: null,
     listDurableJobs: async () => [],
-    readMode: async () => ({ mode: 'observe', requested: null }),
+    readMode: async () =>
+      state.off ? { mode: 'off', requested: null } : { mode: 'observe', requested: null },
     log: (event, details) => logs.push({ event, details }),
     hostUid: UID,
     hostPid: HOST,
@@ -190,18 +192,14 @@ describe('restart carry-over (observe only)', () => {
 
   it('mode off drops what is held', async () => {
     const h = harness()
-    let off = false
-    const obs = h.obs as unknown as { deps: PaneOwnershipObserverDeps }
-    obs.deps.readMode = async () =>
-      off ? { mode: 'off', requested: null } : { mode: 'observe', requested: null }
     h.state.rows = [row(10, 5), row(20, 10)]
     await h.obs.tick()
     h.state.rows = [row(20, 1)]
     h.state.roots = []
     await h.obs.observeClose('s1', 'restart')
-    off = true
+    h.state.off = true
     await h.obs.tick()
-    off = false
+    h.state.off = false
     h.obs.noteCarry('s2', 's1')
     h.state.roots = [{ sessionId: 's2', rootPid: 30 }]
     h.state.rows = [row(20, 1), row(30, 5)]

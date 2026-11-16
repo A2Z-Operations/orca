@@ -46,6 +46,10 @@ vi.mock('../../../launch/daemon-bundle-staleness', async (importOriginal) => {
   }
 })
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 // #44 (a), observe only: a replacement spawn names the PTY it replaces (carriesFrom), main -> daemon -> host.
 describe('DaemonPtyAdapter: carriesFrom (#44 restart carry-over)', () => {
   let dir: string
@@ -61,26 +65,21 @@ describe('DaemonPtyAdapter: carriesFrom (#44 restart carry-over)', () => {
     adapter = harness.adapter
     payloads = []
     hostOptions = []
-    const client = (
-      adapter as unknown as {
-        client: { request: (type: string, payload?: unknown) => Promise<unknown> }
+    // Spy on the wire (the adapter's private RPC client) and on the daemon's private host: what is sent, what arrives.
+    const client = Reflect.get(adapter, 'client')
+    const request: (...args: unknown[]) => Promise<unknown> = client.request.bind(client)
+    vi.spyOn(client, 'request').mockImplementation(async (...args: unknown[]) => {
+      if (args[0] === 'createOrAttach' && isRecord(args[1])) {
+        payloads.push(args[1])
       }
-    ).client
-    const request = client.request.bind(client)
-    vi.spyOn(client, 'request').mockImplementation(
-      async (type: string, payload?: unknown, ...rest: unknown[]) => {
-        if (type === 'createOrAttach') {
-          payloads.push(payload as Record<string, unknown>)
-        }
-        return (request as (...a: unknown[]) => Promise<unknown>)(type, payload, ...rest)
-      }
-    )
-    const host = (
-      server as unknown as { host: { createOrAttach: (o: unknown) => Promise<unknown> } }
-    ).host
-    const create = host.createOrAttach.bind(host)
+      return request(...args)
+    })
+    const host = Reflect.get(server, 'host')
+    const create: (opts: unknown) => Promise<unknown> = host.createOrAttach.bind(host)
     vi.spyOn(host, 'createOrAttach').mockImplementation(async (opts: unknown) => {
-      hostOptions.push(opts as Record<string, unknown>)
+      if (isRecord(opts)) {
+        hostOptions.push(opts)
+      }
       return create(opts)
     })
     getMacDaemonSystemResolverHealthMock.mockResolvedValue('unknown')
