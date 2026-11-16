@@ -176,13 +176,14 @@ Do not require pgid. `setsid` changes the process group, so the pgid match in `m
 
 - The marker is read ONCE, at close, for the recorded processes still present, by `pane-ownership-marker.ts`. A verdict is needed only then. A read of every new process each tick cost about 3x the sampler's CPU under churn (20 panes, measured), and the start environment does not change.
   - **Linux:** `/proc/<pid>/environ`.
-  - **macOS:** `ps -wwE -o pid=,command= -p <pid>`, once PER PID (at most 64 per close), with the same 2 s timeout as the `lsof` helper. It replaces `KERN_PROCARGS2`, so no native code runs in the terminal host (S3).
+  - **macOS:** per pid, two reads: `ps -wwo command= -p <pid>` (the command line), then `ps -wwE -o command= -p <pid>` (the command line followed by the environment). Only what follows the plain line is searched, so no argument can match; a command line that changed between the two reads is null. At most 32 pids and 5 s in total per close, 2 s per read. It replaces `KERN_PROCARGS2`, so no native code runs in the terminal host (S3).
   - Never a pid list: macOS `ps` reads the whole process table for two or more `-p` pids (0.8 s of CPU at ~1,900 processes, measured on the MacBook), and only the one process for a single pid.
 - Both see the start environment, same uid only. Another uid (or root) reads as null.
 - A failed or timed-out read leaves `marker: null` ("not read"), never "no marker", and is counted in `markerFailures`.
 - Only the answer is kept. No environment text reaches the log (a test pins it).
 - The entry line carries `marker`, the verdict is `kept: marker` (children included, through the kept walk), and the daily line lists `topMarked`.
-- **Known limit, macOS:** `ps` prints the arguments and the environment on one line, so an ARGUMENT exactly equal to `ORCA_PANE_KEEP=1` reads as the marker. In observe that changes only a label.
+- **Remaining limit, macOS:** `ps` joins the environment entries with spaces, so a WORD inside an environment VALUE (for example `FOO='x ORCA_PANE_KEEP=1'`) still reads as the marker. Arguments cannot match. In observe that changes only a label.
+- **Secrets:** no reader error carries `ps` output or file text, and the observer counts a failed read without logging its message. Tests pin the success path, a `ps` exit 2 with the token in stdout and stderr, and a read that throws the token.
 
 **Per OS (M5, M6).**
 

@@ -10,19 +10,27 @@ import type { OwnedEntry } from './pane-ownership-sets'
  * start environment does not change, and a child normally inherits the variable. Nothing here can signal (S1), and no environment text leaves
  * this module: a reader answers only true / false / null (not read) per pid.
  *
- * Linux reads /proc/<pid>/environ. macOS runs `ps -wwE -p <pid>` once PER PID (no native code inside
- * the terminal host, S3; it replaces the KERN_PROCARGS2 sysctl the design note first named). Never a pid LIST: macOS
- * ps reads the whole process table for two or more -p pids (0.8 s of CPU at ~1,900 processes, measured), but only
- * the one process for a single pid (~0 s). At most MAX_MARKER_READS_PER_CLOSE pids are read. Both see the environment
- * the process was started with, same uid only: another uid's process (or a root one) reads as null.
+ * Linux reads /proc/<pid>/environ (NUL-separated, exact). macOS reads each pid TWICE: `ps -wwo command= -p <pid>`
+ * (the command line) and `ps -wwE -o command= -p <pid>` (the command line, then the environment). Only what follows
+ * the plain line is searched, so no ARGUMENT can match (Fable-3 S1); a command line that changed between the two reads
+ * is null. No native code inside the terminal host (S3; this replaces the KERN_PROCARGS2 sysctl the design note first
+ * named). Never a pid LIST: macOS ps reads the whole process table for two or more -p pids (0.8 s of CPU at ~1,900
+ * processes, measured), but only the one process for a single pid (~0 s). At most MAX_MARKER_READS_PER_CLOSE pids
+ * and MARKER_CLOSE_BUDGET_MS in total per close. Both see the environment the process was started with, same uid
+ * only: another uid's process (or a root one) reads as null.
  *
- * Known limit (macOS): ps prints the command's arguments and its environment on one line, separated by spaces, so an
- * ARGUMENT that is exactly `ORCA_PANE_KEEP=1` reads as the marker. In observe that changes only a label.
+ * Remaining limit (macOS): ps joins the environment entries with spaces, so a WORD inside an environment VALUE (e.g.
+ * FOO='x ORCA_PANE_KEEP=1') still reads as the marker. In observe that changes only a label.
+ *
+ * Secrets: no reader error carries ps output or a file's text (psEnvOutput names only the failure kind), and the
+ * observer counts a failed read without logging its message.
  */
 export const KEEP_MARKER = 'ORCA_PANE_KEEP=1'
 export const MARKER_HELPER_TIMEOUT_MS = 2_000
-/** Present processes read per close; the rest stay null (not read). */
-export const MAX_MARKER_READS_PER_CLOSE = 64
+/** Present processes read per close (two ps reads each on macOS); the rest stay null (not read). */
+export const MAX_MARKER_READS_PER_CLOSE = 32
+/** Total time one close may spend reading markers; the pids left stay null (not read). */
+export const MARKER_CLOSE_BUDGET_MS = 5_000
 
 export type KeepMarkers = Map<number, boolean | null>
 
@@ -57,23 +65,24 @@ export function markerInEnviron(environ: string): boolean {
   return environ.split('\0').includes(KEEP_MARKER)
 }
 
-/** macOS: `ps -wwE -o pid=,command=` lines → pid → whether the exact token appears after the pid. */
-export function parsePsEnvMarkers(output: string): Map<number, boolean> {
-  const result = new Map<number, boolean>()
-  for (const line of output.split('\n')) {
-    const tokens = line.trim().split(/\s+/)
-    const pid = Number(tokens[0])
-    if (tokens[0] && Number.isInteger(pid) && pid > 0) {
-      result.set(pid, tokens.slice(1).includes(KEEP_MARKER))
-    }
+/**
+ * macOS: the environment part of `ps -wwE -o command=` is what follows the plain `ps -wwo command=` line. null when
+ * either answer is empty (the process is gone) or the -E line does not start with the plain one (it changed).
+ */
+export function markerInPsLines(commandLine: string, withEnvironment: string): boolean | null {
+  const plain = commandLine.replace(/\n+$/, '')
+  const full = withEnvironment.replace(/\n+$/, '')
+  if (!plain.trim() || !full.trim() || !full.startsWith(plain)) {
+    return null
   }
-  return result
+  return full.slice(plain.length).trim().split(/\s+/).includes(KEEP_MARKER)
 }
 
 /** The ps helper's outcome as text; exit 1 with nothing printed = every pid asked about is gone. */
 export function psEnvOutput(result: {
   code: number | null
   stdout: string
+  stderr?: string
   timedOut: boolean
   outputTruncated?: boolean
 }): string {
@@ -100,21 +109,25 @@ async function runPsEnv(args: string[]): Promise<string> {
 }
 
 /**
- * macOS: one ps per pid (a pid list makes ps read the whole table), up to MAX_MARKER_READS_PER_CLOSE; a pid that is
- * gone, or beyond the cap, is null. A failed helper throws.
+ * macOS: per pid, the plain command line then the one with the environment (a pid LIST would make ps read the whole
+ * table), up to MAX_MARKER_READS_PER_CLOSE pids and MARKER_CLOSE_BUDGET_MS in total; a gone pid, or one beyond either
+ * bound, is null. A failed helper throws (with no ps output in the error).
  */
 export async function readMacKeepMarkers(
   pids: readonly number[],
-  run: (args: string[]) => Promise<string> = runPsEnv
+  run: (args: string[]) => Promise<string> = runPsEnv,
+  now: () => number = Date.now
 ): Promise<KeepMarkers> {
   const result: KeepMarkers = new Map()
+  const startedAt = now()
   for (const [index, pid] of pids.entries()) {
-    if (index >= MAX_MARKER_READS_PER_CLOSE) {
+    if (index >= MAX_MARKER_READS_PER_CLOSE || now() - startedAt >= MARKER_CLOSE_BUDGET_MS) {
       result.set(pid, null)
       continue
     }
-    const found = parsePsEnvMarkers(await run(['-wwE', '-o', 'pid=,command=', '-p', String(pid)]))
-    result.set(pid, found.get(pid) ?? null)
+    const commandLine = await run(['-wwo', 'command=', '-p', String(pid)])
+    const withEnvironment = await run(['-wwE', '-o', 'command=', '-p', String(pid)])
+    result.set(pid, markerInPsLines(commandLine, withEnvironment))
   }
   return result
 }

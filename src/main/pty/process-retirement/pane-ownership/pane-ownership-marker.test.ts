@@ -3,9 +3,10 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   KEEP_MARKER,
+  MARKER_CLOSE_BUDGET_MS,
   MAX_MARKER_READS_PER_CLOSE,
   markerInEnviron,
-  parsePsEnvMarkers,
+  markerInPsLines,
   psEnvOutput,
   readLinuxKeepMarkers,
   readMacKeepMarkers
@@ -58,23 +59,27 @@ describe('keep marker parsing', () => {
     expect(markerInEnviron('')).toBe(false)
   })
 
-  it('macOS ps -wwE: an exact whitespace token after the pid, per pid', () => {
-    const out = [
-      `  101 /bin/sleep 30 TERM=xterm ORCA_PANE_KEEP=1 HOME=/h`,
-      `  102 node server.js ORCA_PANE_KEEP=10 X_ORCA_PANE_KEEP=1`,
-      `  103 node server.js`
-    ].join('\n')
-    expect(parsePsEnvMarkers(out)).toEqual(
-      new Map([
-        [101, true],
-        [102, false],
-        [103, false]
-      ])
-    )
+  it('macOS: matched only in the ENVIRONMENT part (what follows the plain ps command line)', () => {
+    const args = '/bin/sleep 30'
+    expect(markerInPsLines(args, `${args} TERM=xterm ORCA_PANE_KEEP=1 HOME=/h`)).toBe(true)
+    expect(markerInPsLines(args, `${args} ORCA_PANE_KEEP=10 X_ORCA_PANE_KEEP=1`)).toBe(false)
+    expect(markerInPsLines(args, `${args} HOME=/h`)).toBe(false)
   })
 
-  it('macOS: an ARGUMENT equal to the token is a false positive (named limit; only a label in observe)', () => {
-    expect(parsePsEnvMarkers('  104 echo ORCA_PANE_KEEP=1')).toEqual(new Map([[104, true]]))
+  it('macOS: an ARGUMENT never matches, exact or inside sh -c (Fable-3 S1)', () => {
+    expect(markerInPsLines('echo ORCA_PANE_KEEP=1', 'echo ORCA_PANE_KEEP=1 HOME=/h')).toBe(false)
+    const shc = 'sh -c ORCA_PANE_KEEP=1 npm run dev'
+    expect(markerInPsLines(shc, `${shc} HOME=/h`)).toBe(false)
+  })
+
+  it('macOS residual limit (named): a WORD inside an environment value matches, ps joins entries with spaces', () => {
+    expect(markerInPsLines('node s.js', 'node s.js FOO=x ORCA_PANE_KEEP=1')).toBe(true)
+  })
+
+  it('macOS: no answer, or a command line that changed between the two reads, is null (not read)', () => {
+    expect(markerInPsLines('', '')).toBeNull()
+    expect(markerInPsLines('node a.js', '')).toBeNull()
+    expect(markerInPsLines('node a.js', 'node b.js ORCA_PANE_KEEP=1')).toBeNull()
   })
 
   it('macOS ps outcome: exit 1 with nothing = every pid gone; a timeout, other exit or cut answer fails', () => {
@@ -89,19 +94,23 @@ describe('keep marker parsing', () => {
 })
 
 describe('keep marker readers', () => {
-  it('macOS: one ps PER PID (a pid list makes ps read the whole table); a gone pid is null, not "no marker"', async () => {
+  it('macOS: per pid, one plain ps then one ps -E (a pid LIST would read the whole table); a gone pid is null', async () => {
     const calls: string[][] = []
-    const answers: Record<string, string> = {
-      '101': '  101 a ORCA_PANE_KEEP=1',
-      '102': '  102 b',
-      '105': ''
+    const lines: Record<string, [string, string]> = {
+      '101': ['a', 'a ORCA_PANE_KEEP=1'],
+      '102': ['b', 'b HOME=/h'],
+      '105': ['', '']
     }
     const markers = await readMacKeepMarkers([101, 102, 105], async (args) => {
       calls.push(args)
-      return answers[args[4]!]!
+      const [plain, withEnv] = lines[args.at(-1)!]!
+      return args.includes('-wwE') ? withEnv : plain
     })
     expect(calls).toEqual(
-      ['101', '102', '105'].map((pid) => ['-wwE', '-o', 'pid=,command=', '-p', pid])
+      ['101', '102', '105'].flatMap((pid) => [
+        ['-wwo', 'command=', '-p', pid],
+        ['-wwE', '-o', 'command=', '-p', pid]
+      ])
     )
     expect(markers).toEqual(
       new Map([
@@ -113,14 +122,33 @@ describe('keep marker readers', () => {
     expect(await readMacKeepMarkers([], async () => 'never')).toEqual(new Map())
   })
 
+  it('macOS: a close stops reading after MARKER_CLOSE_BUDGET_MS in total; the rest are null', async () => {
+    let now = 0
+    const markers = await readMacKeepMarkers(
+      [1, 2, 3],
+      async (args) => {
+        now += MARKER_CLOSE_BUDGET_MS / 2 // each pid's two reads take the whole budget
+        return args.includes('-wwE') ? 'x ORCA_PANE_KEEP=1' : 'x'
+      },
+      () => now
+    )
+    expect(markers).toEqual(
+      new Map([
+        [1, true],
+        [2, null],
+        [3, null]
+      ])
+    )
+  })
+
   it('reads at most MAX_MARKER_READS_PER_CLOSE pids; the rest are null (not read)', async () => {
     const pids = Array.from({ length: MAX_MARKER_READS_PER_CLOSE + 2 }, (_, i) => 1000 + i)
-    let calls = 0
+    const asked = new Set<string>()
     const mac = await readMacKeepMarkers(pids, async (args) => {
-      calls += 1
-      return `  ${args[4]} x`
+      asked.add(args.at(-1)!)
+      return 'x'
     })
-    expect(calls).toBe(MAX_MARKER_READS_PER_CLOSE)
+    expect(asked.size).toBe(MAX_MARKER_READS_PER_CLOSE)
     expect(mac.get(pids.at(-1)!)).toBeNull()
     expect(mac.get(pids[0]!)).toBe(false)
     const linux = await readLinuxKeepMarkers(pids, async () => 'A=1\0')
@@ -194,7 +222,9 @@ describe('observer with the keep marker (observe only)', () => {
     const { obs, logs } = observer({
       tables: [[row(10, 5), row(20, 10)], [row(20, 1)]],
       readKeepMarkers: (pids) =>
-        readMacKeepMarkers(pids, async () => `  20 /bin/sh TERM=x ${SECRET} ORCA_PANE_KEEP=1`)
+        readMacKeepMarkers(pids, async (args) =>
+          args.includes('-wwE') ? `/bin/sh TERM=x ${SECRET} ORCA_PANE_KEEP=1` : '/bin/sh'
+        )
     })
     await obs.tick()
     await obs.observeClose('s1', 'close')
@@ -205,6 +235,38 @@ describe('observer with the keep marker (observe only)', () => {
     expect(logs.find((l) => l.event === 'pane-ownership-entry')!.details.verdict).toBe(
       'kept: marker'
     )
+  })
+
+  it('MUST (error path, Fable-3 M1): ps exits 2 with the token in stdout AND stderr: no token in logs or status', async () => {
+    const { obs, logs } = observer({
+      tables: [[row(10, 5), row(20, 10)], [row(20, 1)]],
+      readKeepMarkers: (pids) =>
+        readMacKeepMarkers(pids, async () =>
+          psEnvOutput({ code: 2, stdout: `x ${SECRET}`, stderr: `ps: ${SECRET}`, timedOut: false })
+        )
+    })
+    await obs.tick()
+    await obs.observeClose('s1', 'close')
+    const text = JSON.stringify([logs, obs.status()])
+    expect(text).not.toContain('ghp_do_not_log_me')
+    expect(text).not.toContain('GITHUB_TOKEN')
+    expect(logs.find((l) => l.event === 'pane-ownership-entry')!.details.marker).toBeNull()
+    expect(obs.status().markerFailures).toBe(1)
+  })
+
+  it('MUST (error path, Fable-3 M1): a read that throws Error(<token>): no token in logs or status', async () => {
+    const { obs, logs } = observer({
+      tables: [[row(10, 5), row(20, 10)], [row(20, 1)]],
+      readKeepMarkers: async () => {
+        throw new Error(SECRET)
+      }
+    })
+    await obs.tick()
+    await obs.observeClose('s1', 'close')
+    const text = JSON.stringify([logs, obs.status()])
+    expect(text).not.toContain('ghp_do_not_log_me')
+    expect(text).not.toContain('GITHUB_TOKEN')
+    expect(logs.some((l) => l.event === 'pane-ownership-close')).toBe(true)
   })
 
   it('the daily summary counts kept: marker per comm', async () => {
