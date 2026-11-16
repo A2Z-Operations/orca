@@ -104,6 +104,8 @@ export type PtySpawnLaunchOptionsInput = {
   sessionId: string | undefined
   /** Each lane's own admission rule for which caller intents reach the provider. */
   spawnIntent: PtySpawnOptions['spawnIntent']
+  /** #44 (a): the PTY a replacement spawn replaces (its replacesPtyId); observe only. */
+  carriesFrom?: string
   /** Host history is sampled before preparation; otherwise read it after OpenCode preparation. */
   historyIsolationEnabled?: boolean
   getSettings?: () => GlobalSettings | undefined
@@ -195,6 +197,9 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
   }
   if (input.spawnIntent) {
     spawnOptions.spawnIntent = input.spawnIntent
+  }
+  if (input.carriesFrom) {
+    spawnOptions.carriesFrom = input.carriesFrom
   }
   const startupIngress = getStartupTerminalIngressIntent(args)
   if (startupIngress) {

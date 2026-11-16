@@ -94,6 +94,7 @@ export function entryLine(
     ageMs: Math.max(0, details.nowMs - entry.firstSeenMs),
     how: entry.how,
     startTicks: entry.startTicks,
+    carried: entry.carried,
     // #44 (b): only the answer (true / false / null = not read), never any environment text.
     marker: entry.marker,
     ppid: row.ppid,

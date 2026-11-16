@@ -44,6 +44,18 @@ export function observedKill(
   return killed
 }
 
+/** #44 (a): a created agent pane that replaces another one tells the observer which (it carries the old set). */
+export function reportCarry(
+  hooks: PaneOwnershipHooks | undefined,
+  opts: { sessionId: string; carriesFrom?: string; launchAgent?: unknown; attachOnly?: boolean }
+): void {
+  if (hooks?.noteCarry && opts.carriesFrom && opts.launchAgent && !opts.attachOnly) {
+    const { noteCarry } = hooks
+    const from = opts.carriesFrom
+    guarded(() => noteCarry.call(hooks, opts.sessionId, from))
+  }
+}
+
 export function reportAgentRootExit(
   hooks: PaneOwnershipHooks | undefined,
   session: Session | undefined,

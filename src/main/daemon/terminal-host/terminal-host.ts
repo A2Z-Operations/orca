@@ -117,6 +117,7 @@ export class TerminalHost {
               onDeadSessionRemoved: (sessionId) => this.agentSessionGenerations.forget(sessionId),
               onSessionCreated: (sessionId, generation, isAlive) =>
                 this.agentSessionGenerations.remember(sessionId, generation, isAlive),
+              onCreated: () => ownership.reportCarry(this.paneOwnership, options), // #44 (a)
               ...(this.reportReadinessEvent
                 ? { reportReadinessEvent: this.reportReadinessEvent }
                 : {}),
