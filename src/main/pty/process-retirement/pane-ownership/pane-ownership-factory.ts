@@ -1,5 +1,6 @@
 import { DurableJobIndex, durableJobRoot } from './pane-ownership-durable'
 import { readLinuxFds, readMacFds } from './pane-ownership-fds'
+import { readLinuxKeepMarkers, readMacKeepMarkers } from './pane-ownership-marker'
 import { readPaneOwnershipMode } from './pane-ownership-mode'
 import { PaneOwnershipObserver } from './pane-ownership-observer'
 import type { LiveAgentRoot } from './pane-ownership-sets'
@@ -42,6 +43,10 @@ export function paneOwnershipFor(
         ? (pids, fds) => readMacFds(pids, fds)
         : (pids, fds) => readLinuxFds(pids, fds),
     readStartTicks: platform === 'linux' ? (pid) => readLinuxStartTicks(pid) : null,
+    readKeepMarkers:
+      platform === 'darwin'
+        ? (pids) => readMacKeepMarkers(pids)
+        : (pids) => readLinuxKeepMarkers(pids),
     listDurableJobs: () => durableJobs.refresh(),
     readMode: () => readPaneOwnershipMode(env, options.modeFilePath),
     log: options.log,

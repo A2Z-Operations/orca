@@ -18,6 +18,10 @@ import {
   readLinuxFds,
   readMacFds
 } from '../../../src/main/pty/process-retirement/pane-ownership/pane-ownership-fds'
+import {
+  readLinuxKeepMarkers,
+  readMacKeepMarkers
+} from '../../../src/main/pty/process-retirement/pane-ownership/pane-ownership-marker'
 import { PaneOwnershipObserver } from '../../../src/main/pty/process-retirement/pane-ownership/pane-ownership-observer'
 import {
   readLinuxStartTicks,
@@ -34,6 +38,8 @@ const seconds = Number(args[args.indexOf('--seconds') + 1] || 60)
 const churn = args.includes('--churn')
 // --no-fds: skip every fd read, to separate the table read's cost from the fd reads'
 const noFds = args.includes('--no-fds')
+// #44 (b): the keep-marker read (one ps -wwE per present pid at close on macOS, /proc environ on Linux) is on unless --no-markers.
+const noMarkers = args.includes('--no-markers')
 // --in-process: read the table through the libproc addon, as the app does on macOS (run with tsx from the repo root,
 // after ensure-native-runtime --runtime=node); without it the table is read with ps, the pessimistic case
 const inProcess = args.includes('--in-process')
@@ -63,6 +69,7 @@ async function main(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 1_500))
   let lines = 0
   let newEntries = 0
+  let markerPids = 0
   const observer = new PaneOwnershipObserver({
     listAgentRoots: () => roots,
     readTable: () =>
@@ -77,6 +84,14 @@ async function main(): Promise<void> {
       return process.platform === 'darwin' ? readMacFds(pids, fds) : readLinuxFds(pids, fds)
     },
     readStartTicks: process.platform === 'linux' ? (pid) => readLinuxStartTicks(pid) : null,
+    readKeepMarkers: noMarkers
+      ? null
+      : (pids) => {
+          markerPids += pids.length
+          return process.platform === 'darwin'
+            ? readMacKeepMarkers(pids)
+            : readLinuxKeepMarkers(pids)
+        },
     listDurableJobs: () => durableJobs.refresh(),
     readMode: async () => ({ mode: 'observe', requested: null }),
     log: () => {
@@ -116,6 +131,8 @@ async function main(): Promise<void> {
       panes,
       churn,
       noFds,
+      noMarkers,
+      markerPids,
       inProcess,
       seconds,
       ticks,

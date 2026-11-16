@@ -1,5 +1,6 @@
 import { markYoungDurable, matchDurableJob, type DurableJobRecord } from './pane-ownership-durable'
 import type { FdInfo } from './pane-ownership-fds'
+import { applyKeepMarkers, type KeepMarkers } from './pane-ownership-marker'
 import { PaneClosing } from './pane-ownership-closing'
 import { PaneWiring } from './pane-ownership-wiring'
 import type { PaneOwnershipModeRead } from './pane-ownership-mode'
@@ -28,6 +29,11 @@ export type PaneOwnershipObserverDeps = {
   readFds: (pids: number[], fds: number[] | 'all') => Promise<Map<number, FdInfo[]>>
   /** Linux only: start ticks of a newly recorded process (S2: never for the whole table). */
   readStartTicks: ((pid: number) => Promise<string | null>) | null
+  /**
+   * #44 (b): ORCA_PANE_KEEP=1 per pid, ONE batched read at close for the processes still present (a verdict is only
+   * needed then; short-lived churn is never read: S2). null/absent = not read.
+   */
+  readKeepMarkers?: ((pids: number[]) => Promise<KeepMarkers>) | null
   /** Async and cached (DurableJobIndex): asked only for young unmarked entries and at close (S2). */
   listDurableJobs: () => Promise<DurableJobRecord[]>
   readMode: () => Promise<PaneOwnershipModeRead>
@@ -58,6 +64,7 @@ export class PaneOwnershipObserver {
   private started = false
   private lastHadRoots = false
   private failures = 0
+  private markerFailures = 0
   private failingLogged = false
   private killNoted = false
   private startLogged = false
@@ -119,6 +126,7 @@ export class PaneOwnershipObserver {
     failures: number
     fdFailures: number
     closesUnfinished: number
+    markerFailures: number
     panes: number
     entries: number
     dropped: number
@@ -128,6 +136,7 @@ export class PaneOwnershipObserver {
       failures: this.failures,
       fdFailures: this.wiring.fdStatus().fdFailures,
       closesUnfinished: this.closing.unfinishedCount(),
+      markerFailures: this.markerFailures,
       panes: all.length,
       entries: all.reduce((n, set) => n + set.entries.size, 0),
       dropped: all.reduce((n, set) => n + set.dropped, 0)
@@ -248,6 +257,14 @@ export class PaneOwnershipObserver {
           entry.kept = 'durable-job'
         }
         present.push({ entry, row })
+      }
+      if (
+        !(await applyKeepMarkers(
+          present.map((p) => p.entry),
+          this.deps.readKeepMarkers
+        ))
+      ) {
+        this.markerFailures += 1
       }
       // A kept mark covers the children of a kept entry, also those recorded before the parent was marked.
       inheritKept(present)
