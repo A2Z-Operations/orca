@@ -3,7 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { fetchUpstreamReleaseTags, pinnedReleaseRefs } from './fetch-upstream-release-tags.mjs'
+import {
+  fetchUpstreamReleaseTags,
+  pinnedReleaseRefs,
+  pruneNewerReleaseTags
+} from './fetch-upstream-release-tags.mjs'
 
 // A local repository stands in for upstream: the test never reaches the network.
 const roots = []
@@ -176,4 +180,54 @@ it('reports a pinned ref that is still missing after the fetch', () => {
     fetched: true,
     stillMissing: ['v1.0.9']
   })
+})
+
+// #48 slice 14: a release newer than the checkout is never a baseline (slice 2), and its tag must not be fetched
+// either: the skill-bundle ledger reads SKILL.md from every v* tag, so upstream v1.4.256's skill text made the fork's
+// (1.4.255) "skill bundle manifest" check stale.
+function atVersion(fork, version) {
+  writeFileSync(join(fork, 'package.json'), JSON.stringify({ name: 'orca', version }))
+}
+
+it('fetches only the release tags not newer than the checkout version', () => {
+  const { upstream, fork } = repos()
+  atVersion(fork, '1.0.0')
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream })).toMatchObject({
+    before: 0,
+    after: 1,
+    fetched: true
+  })
+  expect(git(fork, 'tag', '--list')).toBe('v1.0.0')
+})
+
+it('fetches a release tag equal to the checkout version, annotated ones included', () => {
+  const { upstream, fork } = repos()
+  atVersion(fork, '1.0.1')
+  fetchUpstreamReleaseTags({ repo: fork, upstream })
+  expect(git(fork, 'tag', '--list').split('\n')).toEqual(['v1.0.0', 'v1.0.1'])
+  expect(git(fork, 'cat-file', '-t', 'v1.0.1')).toBe('tag')
+})
+
+it('fetches nothing when every upstream release is newer than the checkout', () => {
+  const { upstream, fork } = repos()
+  atVersion(fork, '0.9.0')
+  expect(fetchUpstreamReleaseTags({ repo: fork, upstream })).toMatchObject({ before: 0, after: 0 })
+  expect(git(fork, 'tag', '--list')).toBe('')
+})
+
+it('--prune-newer deletes only the local release tags newer than the checkout', () => {
+  const { upstream, fork } = repos()
+  fetchUpstreamReleaseTags({ repo: fork, upstream }) // no version yet: every v* tag
+  git(fork, 'tag', 'keep-me')
+  atVersion(fork, '1.0.0')
+  expect(pruneNewerReleaseTags({ repo: fork })).toEqual(['v1.0.1'])
+  expect(git(fork, 'tag', '--list').split('\n')).toEqual(['keep-me', 'v1.0.0'])
+  expect(pruneNewerReleaseTags({ repo: fork })).toEqual([]) // idempotent
+})
+
+it('--prune-newer refuses a checkout whose version it cannot read', () => {
+  const { upstream, fork } = repos()
+  fetchUpstreamReleaseTags({ repo: fork, upstream })
+  expect(() => pruneNewerReleaseTags({ repo: fork })).toThrow(/version/)
+  expect(git(fork, 'tag', '--list').split('\n')).toEqual(['v1.0.0', 'v1.0.1'])
 })
