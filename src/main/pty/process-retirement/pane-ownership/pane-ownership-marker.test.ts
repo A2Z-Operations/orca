@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest'
 import {
   KEEP_MARKER,
   MARKER_CLOSE_BUDGET_MS,
+  MARKER_EXIT_GRACE_MS,
   MAX_MARKER_READS_PER_CLOSE,
   markerInEnviron,
-  markerInPsLines,
+  markerInPsReads,
   psEnvOutput,
   readLinuxKeepMarkers,
   readMacKeepMarkers
@@ -59,27 +60,60 @@ describe('keep marker parsing', () => {
     expect(markerInEnviron('')).toBe(false)
   })
 
+  // #67: every macOS read carries lstart (UTC, LANG=C), compared with the recorded start: a reused pid is never read.
+  const T = { pid: 7, startedAt: OLD, startTicks: null }
+  const at = (command: string, start = OLD) => `${start} ${command}`
+
   it('macOS: matched only in the ENVIRONMENT part (what follows the plain ps command line)', () => {
     const args = '/bin/sleep 30'
-    expect(markerInPsLines(args, `${args} TERM=xterm ORCA_PANE_KEEP=1 HOME=/h`)).toBe(true)
-    expect(markerInPsLines(args, `${args} ORCA_PANE_KEEP=10 X_ORCA_PANE_KEEP=1`)).toBe(false)
-    expect(markerInPsLines(args, `${args} HOME=/h`)).toBe(false)
+    const read = (env: string) => markerInPsReads(T, at(args), at(`${args} ${env}`), at(args))
+    expect(read('TERM=xterm ORCA_PANE_KEEP=1 HOME=/h')).toBe(true)
+    expect(read('ORCA_PANE_KEEP=10 X_ORCA_PANE_KEEP=1')).toBe(false)
+    expect(read('HOME=/h')).toBe(false)
   })
 
   it('macOS: an ARGUMENT never matches, exact or inside sh -c (Fable-3 S1)', () => {
-    expect(markerInPsLines('echo ORCA_PANE_KEEP=1', 'echo ORCA_PANE_KEEP=1 HOME=/h')).toBe(false)
+    const exact = 'echo ORCA_PANE_KEEP=1'
+    expect(markerInPsReads(T, at(exact), at(`${exact} HOME=/h`), at(exact))).toBe(false)
     const shc = 'sh -c ORCA_PANE_KEEP=1 npm run dev'
-    expect(markerInPsLines(shc, `${shc} HOME=/h`)).toBe(false)
+    expect(markerInPsReads(T, at(shc), at(`${shc} HOME=/h`), at(shc))).toBe(false)
   })
 
   it('macOS residual limit (named): a WORD inside an environment value matches, ps joins entries with spaces', () => {
-    expect(markerInPsLines('node s.js', 'node s.js FOO=x ORCA_PANE_KEEP=1')).toBe(true)
+    expect(
+      markerInPsReads(T, at('node s.js'), at('node s.js FOO=x ORCA_PANE_KEEP=1'), at('node s.js'))
+    ).toBe(true)
   })
 
-  it('macOS: no answer, or a command line that changed between the two reads, is null (not read)', () => {
-    expect(markerInPsLines('', '')).toBeNull()
-    expect(markerInPsLines('node a.js', '')).toBeNull()
-    expect(markerInPsLines('node a.js', 'node b.js ORCA_PANE_KEEP=1')).toBeNull()
+  it('macOS: no answer, or a command line that changed, is null (not read)', () => {
+    expect(markerInPsReads(T, '', '', '')).toBeNull()
+    expect(markerInPsReads(T, at('node a.js'), '', at('node a.js'))).toBeNull()
+    expect(
+      markerInPsReads(T, at('node a.js'), at('node b.js ORCA_PANE_KEEP=1'), at('node a.js'))
+    ).toBeNull()
+  })
+
+  it('#67 S1a: a command line that GREW into the -E read (setproctitle) is null: the two plain reads must agree', () => {
+    const grown = 'node a.js ORCA_PANE_KEEP=1'
+    expect(markerInPsReads(T, at('node a.js'), at(`${grown} HOME=/h`), at(grown))).toBeNull()
+  })
+
+  it('#67 S1b: a REUSED pid (another start time, same command line) is null, on any of the three reads', () => {
+    const other = 'Sat Nov 15 07:30:00 2026'
+    const cmd = 'node a.js'
+    const env = `${cmd} ORCA_PANE_KEEP=1`
+    expect(markerInPsReads(T, at(cmd, other), at(env, other), at(cmd, other))).toBeNull()
+    expect(markerInPsReads(T, at(cmd), at(env, other), at(cmd))).toBeNull()
+    expect(markerInPsReads(T, at(cmd), at(env), at(cmd, other))).toBeNull()
+    expect(markerInPsReads(T, at(cmd), at(env), at(cmd))).toBe(true)
+  })
+
+  it('#67: lstart is compared space-normalised (a one-digit day is padded by ps)', () => {
+    const t = { pid: 7, startedAt: 'Sat Nov 1 07:00:00 2026', startTicks: null }
+    const padded = 'Sat Nov  1 07:00:00 2026'
+    expect(
+      markerInPsReads(t, at('x', padded), at('x ORCA_PANE_KEEP=1', padded), at('x', padded))
+    ).toBe(true)
   })
 
   it('macOS ps outcome: exit 1 with nothing = every pid gone; a timeout, other exit or cut answer fails', () => {
@@ -94,22 +128,36 @@ describe('keep marker parsing', () => {
 })
 
 describe('keep marker readers', () => {
-  it('macOS: per pid, one plain ps then one ps -E (a pid LIST would read the whole table); a gone pid is null', async () => {
+  const target = (
+    pid: number,
+    extra: Partial<{ startedAt: string; startTicks: string | null }> = {}
+  ) => ({
+    pid,
+    startedAt: OLD,
+    startTicks: null,
+    ...extra
+  })
+
+  it('macOS: per pid, plain, then -E, then plain again, each with lstart (a pid LIST would read the whole table)', async () => {
     const calls: string[][] = []
     const lines: Record<string, [string, string]> = {
-      '101': ['a', 'a ORCA_PANE_KEEP=1'],
-      '102': ['b', 'b HOME=/h'],
+      '101': [`${OLD} a`, `${OLD} a ORCA_PANE_KEEP=1`],
+      '102': [`${OLD} b`, `${OLD} b HOME=/h`],
       '105': ['', '']
     }
-    const markers = await readMacKeepMarkers([101, 102, 105], async (args) => {
-      calls.push(args)
-      const [plain, withEnv] = lines[args.at(-1)!]!
-      return args.includes('-wwE') ? withEnv : plain
-    })
+    const markers = await readMacKeepMarkers(
+      [target(101), target(102), target(105)],
+      async (args) => {
+        calls.push(args)
+        const [plain, withEnv] = lines[args.at(-1)!]!
+        return args.includes('-wwE') ? withEnv : plain
+      }
+    )
     expect(calls).toEqual(
       ['101', '102', '105'].flatMap((pid) => [
-        ['-wwo', 'command=', '-p', pid],
-        ['-wwE', '-o', 'command=', '-p', pid]
+        ['-wwo', 'lstart=,command=', '-p', pid],
+        ['-wwE', '-o', 'lstart=,command=', '-p', pid],
+        ['-wwo', 'lstart=,command=', '-p', pid]
       ])
     )
     expect(markers).toEqual(
@@ -122,16 +170,26 @@ describe('keep marker readers', () => {
     expect(await readMacKeepMarkers([], async () => 'never')).toEqual(new Map())
   })
 
-  it('macOS: a close stops reading after MARKER_CLOSE_BUDGET_MS in total; the rest are null', async () => {
+  it('#67 S2: the WHOLE close is bounded, exit grace included: each read gets what is left minus the grace', async () => {
     let now = 0
+    const timeouts: number[] = []
     const markers = await readMacKeepMarkers(
-      [1, 2, 3],
-      async (args) => {
-        now += MARKER_CLOSE_BUDGET_MS / 2 // each pid's two reads take the whole budget
-        return args.includes('-wwE') ? 'x ORCA_PANE_KEEP=1' : 'x'
+      [target(1), target(2), target(3)],
+      async (args, timeoutMs) => {
+        timeouts.push(timeoutMs)
+        if (args.at(-1) === '1') {
+          now += 500 // pid 1: three reads, 1.5 s
+          return args.includes('-wwE') ? `${OLD} x ORCA_PANE_KEEP=1` : `${OLD} x`
+        }
+        // pid 2: a ps that ignores SIGTERM: its cut timeout, then process-host's SIGKILL after the exit grace
+        now += timeoutMs + MARKER_EXIT_GRACE_MS
+        throw new Error('keep marker read failed: timeout')
       },
       () => now
     )
+    // Before Fable-3's S1 the cut read got 3.5 s and its grace ran past the budget: 1.5 + 3.5 + 2 = 7 s here.
+    expect(now).toBeLessThanOrEqual(MARKER_CLOSE_BUDGET_MS)
+    expect(timeouts).toEqual([2_000, 2_000, 2_000, 1_500])
     expect(markers).toEqual(
       new Map([
         [1, true],
@@ -141,35 +199,101 @@ describe('keep marker readers', () => {
     )
   })
 
+  it('a read that times out with its FULL time (not cut by the budget) still fails the read, as before', async () => {
+    await expect(
+      readMacKeepMarkers([target(1)], async () => {
+        throw new Error('keep marker read failed: timeout')
+      })
+    ).rejects.toThrow(/timeout/)
+  })
+
+  it('N2: inside the cut window, a failure that is NOT a timeout is a failed read (counted), not the budget', async () => {
+    let now = 0
+    await expect(
+      readMacKeepMarkers(
+        [target(1), target(2)],
+        async (args, timeoutMs) => {
+          if (args.at(-1) === '1') {
+            now += 500
+            return `${OLD} x`
+          }
+          expect(timeoutMs).toBeLessThan(2_000) // this read is cut by the budget
+          throw new Error('keep marker read failed: exit')
+        },
+        () => now
+      )
+    ).rejects.toThrow(/exit/)
+  })
+
+  it('process-host still uses the exit grace this budget leaves room for (drift guard)', () => {
+    const runProcess = readFileSync(
+      join(__dirname, '../../../../packages/process-host/src/run-process.ts'),
+      'utf8'
+    )
+    expect(MARKER_EXIT_GRACE_MS).toBe(2_000)
+    expect(runProcess).toContain('const PROCESS_EXIT_GRACE_MS = 2_000')
+  })
+
   it('reads at most MAX_MARKER_READS_PER_CLOSE pids; the rest are null (not read)', async () => {
     const pids = Array.from({ length: MAX_MARKER_READS_PER_CLOSE + 2 }, (_, i) => 1000 + i)
     const asked = new Set<string>()
-    const mac = await readMacKeepMarkers(pids, async (args) => {
-      asked.add(args.at(-1)!)
-      return 'x'
-    })
+    const mac = await readMacKeepMarkers(
+      pids.map((pid) => target(pid)),
+      async (args) => {
+        asked.add(args.at(-1)!)
+        return `${OLD} x`
+      }
+    )
     expect(asked.size).toBe(MAX_MARKER_READS_PER_CLOSE)
     expect(mac.get(pids.at(-1)!)).toBeNull()
     expect(mac.get(pids[0]!)).toBe(false)
-    const linux = await readLinuxKeepMarkers(pids, async () => 'A=1\0')
+    const linux = await readLinuxKeepMarkers(
+      pids.map((pid) => target(pid, { startTicks: '5' })),
+      async (path) => (path.endsWith('/stat') ? `9 (x) S ${'0 '.repeat(18)}5 0` : 'A=1\0')
+    )
     expect([...linux.values()].filter((v) => v === null)).toHaveLength(2)
   })
 
   it('Linux: /proc/<pid>/environ per pid; an unreadable one (gone, or another uid) is null', async () => {
-    const markers = await readLinuxKeepMarkers([201, 202, 203], async (path) => {
-      if (path === '/proc/201/environ') {
-        return 'A=1\0ORCA_PANE_KEEP=1\0'
+    const markers = await readLinuxKeepMarkers(
+      [201, 202, 203].map((pid) => target(pid, { startTicks: '5' })),
+      async (path) => {
+        if (path.endsWith('/stat')) {
+          return `9 (x) S ${'0 '.repeat(18)}5 0`
+        }
+        if (path === '/proc/201/environ') {
+          return 'A=1\0ORCA_PANE_KEEP=1\0'
+        }
+        if (path === '/proc/202/environ') {
+          return 'A=1\0'
+        }
+        throw new Error('EACCES')
       }
-      if (path === '/proc/202/environ') {
-        return 'A=1\0'
-      }
-      throw new Error('EACCES')
-    })
+    )
     expect(markers).toEqual(
       new Map([
         [201, true],
         [202, false],
         [203, null]
+      ])
+    )
+  })
+
+  it('#67 Linux: a pid whose /proc/<pid>/stat now shows other ticks is null; unknown ticks are null too (N1, fail closed)', async () => {
+    const stat = (ticks: string) => `9 (node) S ${'0 '.repeat(18)}${ticks} 0`
+    const read = async (path: string) =>
+      path.endsWith('/environ')
+        ? 'ORCA_PANE_KEEP=1\0'
+        : stat(path.startsWith('/proc/301/') ? '500' : '999')
+    const markers = await readLinuxKeepMarkers(
+      [target(301, { startTicks: '500' }), target(302, { startTicks: '500' }), target(303)],
+      read
+    )
+    expect(markers).toEqual(
+      new Map([
+        [301, true],
+        [302, null],
+        [303, null]
       ])
     )
   })
@@ -184,9 +308,9 @@ describe('observer with the keep marker (observe only)', () => {
         [row(10, 5), row(20, 10), row(21, 20), row(22, 10)],
         [row(20, 1), row(21, 20)]
       ],
-      readKeepMarkers: async (pids) => {
-        asked.push([...pids])
-        return new Map(pids.map((pid) => [pid, pid === 20]))
+      readKeepMarkers: async (targets) => {
+        asked.push(targets.map((t) => t.pid))
+        return new Map(targets.map((t) => [t.pid, t.pid === 20]))
       }
     })
     await obs.tick()
@@ -221,9 +345,11 @@ describe('observer with the keep marker (observe only)', () => {
   it('MUST: no environment text reaches the log, only the marker answer', async () => {
     const { obs, logs } = observer({
       tables: [[row(10, 5), row(20, 10)], [row(20, 1)]],
-      readKeepMarkers: (pids) =>
-        readMacKeepMarkers(pids, async (args) =>
-          args.includes('-wwE') ? `/bin/sh TERM=x ${SECRET} ORCA_PANE_KEEP=1` : '/bin/sh'
+      readKeepMarkers: (targets) =>
+        readMacKeepMarkers(targets, async (args) =>
+          args.includes('-wwE')
+            ? `${OLD} /bin/sh TERM=x ${SECRET} ORCA_PANE_KEEP=1`
+            : `${OLD} /bin/sh`
         )
     })
     await obs.tick()
@@ -240,8 +366,8 @@ describe('observer with the keep marker (observe only)', () => {
   it('MUST (error path, Fable-3 M1): ps exits 2 with the token in stdout AND stderr: no token in logs or status', async () => {
     const { obs, logs } = observer({
       tables: [[row(10, 5), row(20, 10)], [row(20, 1)]],
-      readKeepMarkers: (pids) =>
-        readMacKeepMarkers(pids, async () =>
+      readKeepMarkers: (targets) =>
+        readMacKeepMarkers(targets, async () =>
           psEnvOutput({ code: 2, stdout: `x ${SECRET}`, stderr: `ps: ${SECRET}`, timedOut: false })
         )
     })
@@ -273,7 +399,7 @@ describe('observer with the keep marker (observe only)', () => {
     let now = NOW_MS
     const { obs, logs } = observer({
       tables: [[row(10, 5), row(20, 10)], [row(20, 1)]],
-      readKeepMarkers: async (pids) => new Map(pids.map((pid) => [pid, true])),
+      readKeepMarkers: async (targets) => new Map(targets.map((t) => [t.pid, true])),
       now: () => now
     })
     await obs.tick()

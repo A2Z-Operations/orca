@@ -86,11 +86,11 @@ async function main(): Promise<void> {
     readStartTicks: process.platform === 'linux' ? (pid) => readLinuxStartTicks(pid) : null,
     readKeepMarkers: noMarkers
       ? null
-      : (pids) => {
-          markerPids += pids.length
+      : (targets) => {
+          markerPids += targets.length
           return process.platform === 'darwin'
-            ? readMacKeepMarkers(pids)
-            : readLinuxKeepMarkers(pids)
+            ? readMacKeepMarkers(targets)
+            : readLinuxKeepMarkers(targets)
         },
     listDurableJobs: () => durableJobs.refresh(),
     readMode: async () => ({ mode: 'observe', requested: null }),
