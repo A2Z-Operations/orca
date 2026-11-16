@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import { resolve } from 'node:path'
 import { runProcess, runProcessSync, spawnProcess } from '@orca/process-host'
@@ -6,6 +7,7 @@ import { RUN_ARGS_ENV } from './vitest-run-filters.mjs'
 import { localModuleCacheEnv } from '../module-cache/vitest-local-module-cache.mjs'
 import { createRunTempDirectory } from './vitest-run-temp-directory.mjs'
 import { createVitestZodBundle } from '../module-cache/vitest-zod-bundle.mjs'
+import { checkNodeMajor } from './node-major-guard.mjs'
 import {
   checkBunVersion,
   probeBunVersion,
@@ -54,6 +56,19 @@ function waitForVitest(spec) {
 }
 
 async function runVitest() {
+  // Fork (#48 slice 13): the Node lane runs on this process's node; refuse a major other than the pin, locally.
+  const nodeCheck = checkNodeMajor({
+    version: process.versions.node,
+    execPath: process.execPath,
+    enginesNode: JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).engines?.node,
+    env: process.env
+  })
+  if (nodeCheck.message) {
+    console.error(nodeCheck.message)
+  }
+  if (!nodeCheck.ok) {
+    return 1
+  }
   const pinnedBun = resolvePinnedBunExecutable(root, runProcessSync)
   const bunCheck = pinnedBun
     ? { ok: true }
