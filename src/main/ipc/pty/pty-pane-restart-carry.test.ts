@@ -68,8 +68,11 @@ describe('pty:spawn replacing a pane owner: carriesFrom only for a proven PTY', 
     providerSpawn: ReturnType<typeof installRestartHarness>['providerSpawn']
   ) {
     const fresh = providerSpawn.mock.calls
-      .map(([options]) => options as { attachOnly?: boolean; carriesFrom?: string })
+      .map(([options]) => options)
       .filter((options) => !options.attachOnly)
+      .map((options) => ({
+        carriesFrom: 'carriesFrom' in options ? options.carriesFrom : undefined
+      }))
     expect(fresh).toHaveLength(1)
     return fresh[0]!
   }
@@ -87,7 +90,7 @@ describe('pty:spawn replacing a pane owner: carriesFrom only for a proven PTY', 
     registerWithFakes(mainWindow, runtime, store)
     await handlers.get('pty:spawn')!(null, restartSpawnArgs({ replacesPtyId: 'pty-old' }))
     expect(shutdown).toHaveBeenCalled() // not refused: the window route behaves as before
-    expect(freshSpawnOptions(providerSpawn)).not.toHaveProperty('carriesFrom')
+    expect(freshSpawnOptions(providerSpawn).carriesFrom).toBeUndefined()
   })
 
   it("an unbound pane whose replaced PTY's own pane-key record names it: carriesFrom is sent", async () => {
