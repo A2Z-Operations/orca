@@ -1,5 +1,6 @@
 import { markYoungDurable, matchDurableJob, type DurableJobRecord } from './pane-ownership-durable'
 import type { FdInfo } from './pane-ownership-fds'
+import { PaneCarry } from './pane-ownership-carry'
 import { PaneClosing } from './pane-ownership-closing'
 import { PaneWiring } from './pane-ownership-wiring'
 import type { PaneOwnershipModeRead } from './pane-ownership-mode'
@@ -51,6 +52,7 @@ export class PaneOwnershipObserver {
   private readonly sets: PaneOwnershipSets
   private readonly wiring: PaneWiring
   private readonly closing: PaneClosing
+  private readonly carry: PaneCarry
   private lastVia: 'in-process' | 'ps' | 'unknown' = 'unknown'
   private readonly summary = new DailySummary()
   private inFlight: Promise<void> | null = null
@@ -66,6 +68,7 @@ export class PaneOwnershipObserver {
     this.sets = new PaneOwnershipSets({ hostUid: deps.hostUid, hostPid: deps.hostPid })
     this.wiring = new PaneWiring(deps.log)
     this.closing = new PaneClosing(deps.log)
+    this.carry = new PaneCarry(deps.log)
   }
 
   private now(): number {
@@ -155,6 +158,7 @@ export class PaneOwnershipObserver {
       })
     }
     if (mode.mode === 'off') {
+      this.carry.clear()
       if (this.sets.all().length > 0) {
         this.sets.clear()
         this.wiring.clear()
@@ -171,6 +175,7 @@ export class PaneOwnershipObserver {
     // logged once, not again as an exit; ids whose session is gone are dropped.
     const aliveIds = new Set(alive.map((root) => root.sessionId))
     this.closing.settle(aliveIds, this.now())
+    this.carry.expire(this.now())
     const roots = alive.filter((root) => !this.closing.has(root.sessionId))
     this.lastHadRoots = roots.length > 0
     if (roots.length === 0) {
@@ -193,6 +198,7 @@ export class PaneOwnershipObserver {
       })
     }
     const { newlyRecorded } = this.sets.sample(capture, roots)
+    this.carry.adopt(this.sets)
     await markYoungDurable(this.sets.all(), this.now(), this.deps.listDurableJobs)
     this.wiring.noteRecorded(newlyRecorded)
     for (const { sessionId, pid } of newlyRecorded) {
@@ -207,6 +213,11 @@ export class PaneOwnershipObserver {
   /** Called synchronously before the host starts a kill, so the next tick no longer samples that session. */
   noteClose(sessionId: string, reason: CloseReason): void {
     this.closing.note(sessionId, reason, this.now())
+  }
+
+  /** #44 (a): the replacement `sessionId` names the session it replaces (main's replacesPtyId). Observe only. */
+  noteCarry(sessionId: string, fromSessionId: string): void {
+    this.carry.claim(sessionId, fromSessionId, this.now())
   }
 
   /** The agent root exited by itself while its pane stayed open: log the set now (the session is reaped). */
@@ -281,6 +292,13 @@ export class PaneOwnershipObserver {
             agentIdsDropped: wiring.agentIdsDropped,
             rootReadAgeMs: wiring.rootReadAtMs === null ? null : nowMs - wiring.rootReadAtMs
           })
+        )
+      }
+      if (reason === 'restart') {
+        this.carry.hold(
+          sessionId,
+          present.map((p) => p.entry),
+          nowMs
         )
       }
       this.deps.log('pane-ownership-close', {

@@ -90,6 +90,7 @@ export function entryLine(
     ageMs: Math.max(0, details.nowMs - entry.firstSeenMs),
     how: entry.how,
     startTicks: entry.startTicks,
+    carried: entry.carried,
     ppid: row.ppid,
     leftTree:
       row.ppid === 1

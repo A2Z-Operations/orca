@@ -26,6 +26,8 @@ export type TerminalHostSessionCreateDependencies = {
   spawnGate: TerminalSpawnGate | undefined
   onDeadSessionRemoved: (sessionId: string) => void
   onSessionCreated: (sessionId: string, generation: string | undefined, isAlive: boolean) => void
+  /** #44 (a), observe only: a session was really created (never an attach); the host reports a carry-over. */
+  onCreated?: () => void
   onSessionExit: (sessionId: string, generation: string | undefined) => void
   reportReadinessEvent?: (event: string, details: Record<string, unknown>) => void
 }

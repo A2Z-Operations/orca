@@ -1,4 +1,5 @@
 import { isRestoreSpawnIntent } from '../../../../shared/terminal/pty/admission/spawn-admission-contract'
+import { carryOverFor } from '../spawn-carry-over'
 import { beginPtySpawnForWorktree } from '../host-env/fresh-spawn-routing'
 import { makePaneSpawnReservationKey } from '../pane/spawn-reservation'
 import {
@@ -45,6 +46,8 @@ export async function buildPtyIpcSpawnOptions(ctx: PtyIpcSpawnState): Promise<vo
     sessionId: ctx.effectiveSessionId,
     // Window callers may declare restore intents only; other intents belong to the host.
     spawnIntent: isRestoreSpawnIntent(args.spawnIntent) ? args.spawnIntent : undefined,
+    // #44 (a): a renderer restart or resume names the PTY it replaces; the daemon observes the carry-over.
+    ...carryOverFor(args.replacesPtyId),
     getSettings: ctx.deps.getSettings,
     store: ctx.deps.store,
     claudeAuth: ctx.claudeAuth

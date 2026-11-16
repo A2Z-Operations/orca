@@ -1,3 +1,4 @@
+import type { Carried } from './pane-ownership-carry'
 import type { OwnershipCapture, OwnershipRow } from './pane-ownership-table'
 
 /**
@@ -19,6 +20,8 @@ export type OwnedEntry = {
   /** Consecutive COMPLETE reads that did not contain this pid (M4). */
   missingCompleteReads: number
   kept: KeptReason | null
+  /** #44 (a): adopted from the pane this one replaced at a restart; null = recorded under this pane. */
+  carried: Carried | null
 }
 
 export type PaneSet = {
@@ -232,7 +235,8 @@ export class PaneOwnershipSets {
       firstSeenMs: nowMs,
       lastSeenMs: nowMs,
       missingCompleteReads: 0,
-      kept
+      kept,
+      carried: null
     })
     return true
   }

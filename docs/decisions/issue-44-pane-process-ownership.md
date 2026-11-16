@@ -145,6 +145,23 @@ A daily summary line counts entries per verdict and lists the ten most common `c
   Main's replacement stop (`stopReplacedPanePty`, labelled `replaced`) passes `reason: 'restart'` down to the daemon's `kill` request; every other stop passes nothing, which is a close. The field is optional both ways: an older daemon ignores it, an older app omits it, and the daemon passes a reason on to the host only for a restart.
 
 - **DEFERRED to stage 3: carrying the set into the replacement session.** The daemon gets no link from the old session to its replacement; only the renderer knows both. In stage 2 a restart logs the old session's set, with the verdicts a close would reach and `reason=restart`, and then drops it. Carrying it needs the renderer to send the old→new pair. In stage 2 it would only change which close logs those entries.
+- **As built, observe-only (stage 3 piece a, 2026-11-16): restart carry-over.**
+  - **Order.** Main stops the old PTY first, then spawns the replacement (`beginRuntimePaneReplacement`). So at the restart's close the daemon holds the old pane's still-present entries for `CARRY_HOLD_MS` (60 s).
+  - **The link (one optional protocol field).** The replacement spawn carries `carriesFrom` = main's own `replacesPtyId`, through `PtySpawnOptions` → the daemon adapter's `createOrAttach` payload → admission → the host. The host calls the observer's optional `noteCarry` once the agent pane is created.
+    - Both routes (runtime, window) map it through `carryOverFor`.
+    - It is optional both ways. An older daemon ignores the field, and the held set then expires as before. An older app never sends it.
+    - It is sent only on a non-attach create.
+  - **Adoption.** The claim may come before or after the hold. On the new pane's next sample, its set adopts the held entries, marked `carried: { from, generation }`, and one `pane-ownership-carry` line is logged. The entries then appear, labelled, in that pane's close lines.
+  - **Bounds:**
+    - a held set is claimed at most once: a second claim logs `pane-ownership-carry-already-claimed` and gets nothing;
+    - a claim that names a close (not a restart) carries nothing;
+    - unclaimed after 60 s: `pane-ownership-carry-unclaimed` and dropped (the old behaviour, now visible);
+    - claimed but never sampled: `pane-ownership-carry-unadopted`;
+    - at most `CARRY_MAX_ENTRIES` (256) per carry, the rest counted;
+    - an entry carried `CARRY_MAX_GENERATIONS` (8) times is dropped and counted;
+    - mode `off` drops everything held;
+    - memory only, like every set.
+  - **No signal path:** the carry module only moves entries between sets and logs.
 - **Open:** whether a move goes through `killSession` at all. The stage 2 PR answers it from the code before the reason is wired.
 
 ## 5. Identity at kill (stage 4 only)
