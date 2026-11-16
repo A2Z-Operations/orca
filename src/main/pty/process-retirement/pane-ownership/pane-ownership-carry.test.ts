@@ -123,6 +123,34 @@ describe('restart carry-over (observe only)', () => {
     await h.obs.tick()
     expect(h.events('pane-ownership-carry')).toEqual([])
     expect(h.events('pane-ownership-carry-unclaimed')).toEqual([])
+    // #70 S2: the claim that never met a hold leaves one trace when it expires
+    expect(h.events('pane-ownership-carry-claim-unmatched')).toEqual([
+      expect.objectContaining({ from: 's1', to: 's2' })
+    ])
+  })
+
+  it('#70 S2: a claim with no restart behind it (a route not stopped as a restart) logs claim-unmatched, once', async () => {
+    const h = harness()
+    h.state.rows = [row(10, 5), row(20, 10)]
+    await h.obs.tick()
+    h.obs.noteCarry('s2', 's9') // s9 was never closed as a restart
+    h.state.now += CARRY_HOLD_MS / 2
+    await h.obs.tick()
+    expect(h.events('pane-ownership-carry-claim-unmatched')).toEqual([])
+    h.state.now += CARRY_HOLD_MS
+    await h.obs.tick()
+    await h.obs.tick()
+    expect(h.events('pane-ownership-carry-claim-unmatched')).toEqual([
+      expect.objectContaining({ from: 's9', to: 's2' })
+    ])
+  })
+
+  it('#70 S2: a claim that DID meet its hold is not reported as unmatched', async () => {
+    const h = harness()
+    await restartWith20(h, true)
+    h.state.now += CARRY_HOLD_MS * 2
+    await h.obs.tick()
+    expect(h.events('pane-ownership-carry-claim-unmatched')).toEqual([])
   })
 
   it('the first claim wins; a second one is logged and gets nothing', async () => {

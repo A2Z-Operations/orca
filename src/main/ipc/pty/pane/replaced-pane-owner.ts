@@ -4,6 +4,11 @@ export type ReplacedPaneOwner = {
   pane: { worktreeId: string; tabId: string; leafId: string; hostId: string | undefined } | null
   /** A gone process's: its swap clears the incarnation as the retire it stands in for would. */
   dropsIncarnation?: true
+  /**
+   * #70 S3: main proved this PTY was the pane's (a bound owner with that ptyId, or the PTY's own pane-key record).
+   * Only then does the replacement name it to the daemon (carriesFrom, #44 observe-only carry-over).
+   */
+  proven?: true
 }
 
 /** The stopped id is dead whatever its incarnation, so a binding naming it must not be reattached. */

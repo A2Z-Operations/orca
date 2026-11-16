@@ -84,7 +84,7 @@ export async function buildRuntimePtySpawnOptions(
     paneKey: ctx.spawnIdentityPaneKey,
     sessionId: ctx.sessionId,
     spawnIntent: ctx.preAdoptedStablePane ? undefined : args.spawnIntent,
-    ...carryOverFor(args.replacesPtyId),
+    ...carryOverFor(ctx.replacedPaneOwner),
     historyIsolationEnabled,
     getSettings: ctx.deps.getSettings,
     store: ctx.deps.store,
