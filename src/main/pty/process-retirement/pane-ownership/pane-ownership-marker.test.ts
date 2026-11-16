@@ -230,8 +230,10 @@ describe('keep marker readers', () => {
       join(__dirname, '../../../../packages/process-host/src/run-process.ts'),
       'utf8'
     )
-    expect(MARKER_EXIT_GRACE_MS).toBe(2_000)
-    expect(runProcess).toContain('const PROCESS_EXIT_GRACE_MS = 2_000')
+    const declared = runProcess.match(/const PROCESS_EXIT_GRACE_MS = ([0-9_]+)/)
+    const processExitGraceMs = Number(declared?.[1]?.replaceAll('_', ''))
+    expect(Number.isInteger(processExitGraceMs)).toBe(true)
+    expect(MARKER_EXIT_GRACE_MS).toBe(processExitGraceMs)
   })
 
   it('reads at most MAX_MARKER_READS_PER_CLOSE pids; the rest are null (not read)', async () => {
@@ -277,6 +279,19 @@ describe('keep marker readers', () => {
         [203, null]
       ])
     )
+  })
+
+  it('Linux: a gone pid (environ unreadable) is null and does not read /proc/<pid>/stat', async () => {
+    const statReads: string[] = []
+    const markers = await readLinuxKeepMarkers([target(401, { startTicks: '5' })], async (path) => {
+      if (path.endsWith('/stat')) {
+        statReads.push(path)
+        return `9 (x) S ${'0 '.repeat(18)}5 0`
+      }
+      throw new Error('ENOENT')
+    })
+    expect(markers.get(401)).toBeNull()
+    expect(statReads).toEqual([])
   })
 
   it('#67 Linux: a pid whose /proc/<pid>/stat now shows other ticks is null; unknown ticks are null too (N1, fail closed)', async () => {
