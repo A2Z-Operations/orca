@@ -10,6 +10,7 @@ import type { OwnedEntry, PaneSet } from './pane-ownership-sets'
 export type Verdict =
   | 'would-signal'
   | 'kept: durable-job'
+  | 'kept: marker'
   | 'kept: protected-pid'
   | 'kept: two-panes'
   | 'kept: same-second'
@@ -27,6 +28,9 @@ export function verdictFor(
 ): Verdict {
   if (entry.kept === 'durable-job') {
     return 'kept: durable-job'
+  }
+  if (entry.kept === 'marker') {
+    return 'kept: marker'
   }
   if (entry.pid <= 1 || entry.pid === context.hostPid || context.liveRoots.has(entry.pid)) {
     return 'kept: protected-pid'
@@ -91,6 +95,8 @@ export function entryLine(
     how: entry.how,
     startTicks: entry.startTicks,
     carried: entry.carried,
+    // #44 (b): only the answer (true / false / null = not read), never any environment text.
+    marker: entry.marker,
     ppid: row.ppid,
     leftTree:
       row.ppid === 1
@@ -141,11 +147,15 @@ export class DailySummary {
   private day: string | null = null
   private verdicts = new Map<string, number>()
   private wouldSignalComms = new Map<string, number>()
+  private markedComms = new Map<string, number>()
 
   add(verdict: Verdict, comm: string): void {
     this.verdicts.set(verdict, (this.verdicts.get(verdict) ?? 0) + 1)
     if (verdict === 'would-signal') {
       this.wouldSignalComms.set(comm, (this.wouldSignalComms.get(comm) ?? 0) + 1)
+    }
+    if (verdict === 'kept: marker') {
+      this.markedComms.set(comm, (this.markedComms.get(comm) ?? 0) + 1)
     }
   }
 
@@ -162,11 +172,14 @@ export class DailySummary {
     const line = {
       day: this.day,
       verdicts: Object.fromEntries(this.verdicts),
-      topWouldSignal: [...this.wouldSignalComms.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)
+      topWouldSignal: [...this.wouldSignalComms.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10),
+      // #44 (b): what users and tools keep with ORCA_PANE_KEEP=1.
+      topMarked: [...this.markedComms.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)
     }
     this.day = today
     this.verdicts = new Map()
     this.wouldSignalComms = new Map()
+    this.markedComms = new Map()
     return line
   }
 }

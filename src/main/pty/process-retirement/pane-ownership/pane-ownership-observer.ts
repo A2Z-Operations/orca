@@ -1,7 +1,9 @@
 import { markYoungDurable, matchDurableJob, type DurableJobRecord } from './pane-ownership-durable'
 import type { FdInfo } from './pane-ownership-fds'
 import { PaneCarry } from './pane-ownership-carry'
+import { applyKeepMarkers, type KeepMarkers } from './pane-ownership-marker'
 import { PaneClosing } from './pane-ownership-closing'
+import { SamplerHealth } from './pane-ownership-health'
 import { PaneWiring } from './pane-ownership-wiring'
 import type { PaneOwnershipModeRead } from './pane-ownership-mode'
 import {
@@ -29,6 +31,11 @@ export type PaneOwnershipObserverDeps = {
   readFds: (pids: number[], fds: number[] | 'all') => Promise<Map<number, FdInfo[]>>
   /** Linux only: start ticks of a newly recorded process (S2: never for the whole table). */
   readStartTicks: ((pid: number) => Promise<string | null>) | null
+  /**
+   * #44 (b): ORCA_PANE_KEEP=1 per pid, ONE batched read at close for the processes still present (a verdict is only
+   * needed then; short-lived churn is never read: S2). null/absent = not read.
+   */
+  readKeepMarkers?: ((pids: number[]) => Promise<KeepMarkers>) | null
   /** Async and cached (DurableJobIndex): asked only for young unmarked entries and at close (S2). */
   listDurableJobs: () => Promise<DurableJobRecord[]>
   readMode: () => Promise<PaneOwnershipModeRead>
@@ -46,7 +53,7 @@ export const SAMPLER_PS_INTERVAL_MS = 5_000
 export const SAMPLER_IDLE_INTERVAL_MS = 10_000
 /** A read that keeps failing backs off, doubling up to this. */
 export const SAMPLER_MAX_BACKOFF_MS = 60_000
-export const SAMPLER_FAILURES_BEFORE_LOG = 10
+export { SAMPLER_FAILURES_BEFORE_LOG } from './pane-ownership-health'
 
 export class PaneOwnershipObserver {
   private readonly sets: PaneOwnershipSets
@@ -59,8 +66,8 @@ export class PaneOwnershipObserver {
   private timer: ReturnType<typeof setTimeout> | null = null
   private started = false
   private lastHadRoots = false
-  private failures = 0
-  private failingLogged = false
+  private markerFailures = 0
+  private readonly health: SamplerHealth
   private killNoted = false
   private startLogged = false
 
@@ -68,6 +75,7 @@ export class PaneOwnershipObserver {
     this.sets = new PaneOwnershipSets({ hostUid: deps.hostUid, hostPid: deps.hostPid })
     this.wiring = new PaneWiring(deps.log)
     this.closing = new PaneClosing(deps.log)
+    this.health = new SamplerHealth(deps.log)
     this.carry = new PaneCarry(deps.log)
   }
 
@@ -101,8 +109,8 @@ export class PaneOwnershipObserver {
   /** The wait before the next tick, from what the last one saw. */
   nextDelayMs(): number {
     const base = this.activeIntervalMs()
-    if (this.failures > 0) {
-      return Math.min(SAMPLER_MAX_BACKOFF_MS, base * 2 ** Math.min(this.failures, 6))
+    if (this.health.failures > 0) {
+      return Math.min(SAMPLER_MAX_BACKOFF_MS, base * 2 ** Math.min(this.health.failures, 6))
     }
     return this.lastHadRoots ? base : SAMPLER_IDLE_INTERVAL_MS
   }
@@ -122,15 +130,17 @@ export class PaneOwnershipObserver {
     failures: number
     fdFailures: number
     closesUnfinished: number
+    markerFailures: number
     panes: number
     entries: number
     dropped: number
   } {
     const all = this.sets.all()
     return {
-      failures: this.failures,
+      failures: this.health.failures,
       fdFailures: this.wiring.fdStatus().fdFailures,
       closesUnfinished: this.closing.unfinishedCount(),
+      markerFailures: this.markerFailures,
       panes: all.length,
       entries: all.reduce((n, set) => n + set.entries.size, 0),
       dropped: all.reduce((n, set) => n + set.dropped, 0)
@@ -142,7 +152,7 @@ export class PaneOwnershipObserver {
       return this.inFlight
     }
     this.inFlight = this.runTick()
-      .catch((error: unknown) => this.noteFailure(error))
+      .catch((error: unknown) => this.health.failure(error))
       .finally(() => {
         this.inFlight = null
       })
@@ -183,10 +193,10 @@ export class PaneOwnershipObserver {
     }
     const capture = await this.deps.readTable()
     if (capture.rows.length === 0) {
-      this.noteFailure(new Error('empty process table'))
+      this.health.failure(new Error('empty process table'))
       return
     }
-    this.noteSuccess()
+    this.health.success()
     this.lastVia = capture.via ?? 'unknown'
     if (!this.startLogged) {
       this.startLogged = true
@@ -260,6 +270,14 @@ export class PaneOwnershipObserver {
         }
         present.push({ entry, row })
       }
+      if (
+        !(await applyKeepMarkers(
+          present.map((p) => p.entry),
+          this.deps.readKeepMarkers
+        ))
+      ) {
+        this.markerFailures += 1
+      }
       // A kept mark covers the children of a kept entry, also those recorded before the parent was marked.
       inheritKept(present)
       const { fds: closeFds, read: closeCall } = await this.wiring.readClose(
@@ -320,24 +338,5 @@ export class PaneOwnershipObserver {
     } finally {
       this.closing.observed(sessionId, this.now())
     }
-  }
-
-  private noteFailure(error: unknown): void {
-    this.failures += 1
-    if (this.failures >= SAMPLER_FAILURES_BEFORE_LOG && !this.failingLogged) {
-      this.failingLogged = true
-      this.deps.log('pane-ownership-sampler-failing', {
-        failures: this.failures,
-        error: String(error)
-      })
-    }
-  }
-
-  private noteSuccess(): void {
-    if (this.failingLogged) {
-      this.deps.log('pane-ownership-sampler-recovered', { afterFailures: this.failures })
-    }
-    this.failures = 0
-    this.failingLogged = false
   }
 }
