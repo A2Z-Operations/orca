@@ -95,6 +95,8 @@ export type PtySpawnOptions = {
   startupIngress?: PtyStartupIngressIntent
   /** Why the caller is starting this terminal; presence lets the host defer an automatic restore. */
   spawnIntent?: SpawnIntent
+  /** #44 (a), observe only: the PTY this spawn replaces at a restart (replacesPtyId); the daemon logs a carry-over. */
+  carriesFrom?: string
   /** A restore no user act asked for: a WSL bridge pane whose distro is stopped is held, not started. */
   wslPassiveRestore?: true
   /** A main-side start no user act asked for (orchestration, automations, recovery): held like a passive restore. */

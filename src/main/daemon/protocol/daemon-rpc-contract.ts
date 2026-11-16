@@ -59,6 +59,11 @@ export type CreateOrAttachRequest = {
     startupIngress?: PtyStartupIngressIntent
     /** Optional; an old daemon ignores it and an old client omits it (legacy pacing). */
     spawnIntent?: SpawnIntent
+    /**
+     * #44 (a), observe only: the session this spawn replaces at a restart. Optional both ways: an older daemon ignores
+     * it (the held set then just expires), an older client never sends it.
+     */
+    carriesFrom?: string
     agentSessionEnsure?: {
       claim: AgentSessionExecutionClaim
       surface: AgentSessionSurfaceBinding

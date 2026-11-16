@@ -14,6 +14,8 @@ export type PaneOwnershipHooks = {
   noteClose: (sessionId: string, reason: PaneCloseReason) => void
   observeClose: (sessionId: string, reason: PaneCloseReason) => Promise<void>
   onRootExit: (sessionId: string) => void
+  /** #44 (a): a new agent pane replaces `fromSessionId` at a restart (observe only; optional for older observers). */
+  noteCarry?: (sessionId: string, fromSessionId: string) => void
 }
 
 export type TerminalHostOptions = {

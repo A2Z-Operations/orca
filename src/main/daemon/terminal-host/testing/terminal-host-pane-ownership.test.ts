@@ -155,4 +155,82 @@ describe('TerminalHost and pane ownership (#44 stage 2, observe only)', () => {
     await host.dispose()
     expect(calls).toEqual([])
   })
+
+  describe('#44 (a) restart carry-over: a replacement names the session it replaces', () => {
+    async function create(
+      hooks: PaneOwnershipHooks,
+      extra: { carriesFrom?: string; launchAgent?: 'claude'; attachOnly?: boolean }
+    ): Promise<TerminalHost> {
+      const host = new TerminalHost({
+        paneOwnership: hooks,
+        spawnSubprocess: () => subprocess('claude')
+      })
+      await host
+        .createOrAttach({
+          sessionId: 's2',
+          cols: 80,
+          rows: 24,
+          ...extra,
+          streamClient: { onData: vi.fn(), onExit: vi.fn() }
+        })
+        .catch(() => {})
+      return host
+    }
+    const base = (): PaneOwnershipHooks & { carries: string[] } => {
+      const carries: string[] = []
+      return {
+        carries,
+        noteClose: () => {},
+        observeClose: async () => {},
+        onRootExit: () => {},
+        noteCarry: (id, from) => carries.push(`${from} -> ${id}`)
+      }
+    }
+
+    it('a created agent pane with carriesFrom tells the observer, once', async () => {
+      const hooks = base()
+      const host = await create(hooks, { carriesFrom: 's1', launchAgent: 'claude' })
+      expect(hooks.carries).toEqual(['s1 -> s2'])
+      await host.dispose()
+    })
+
+    it('no carry for a plain shell or without carriesFrom', async () => {
+      const shell = base()
+      const a = await create(shell, { carriesFrom: 's1' })
+      const none = base()
+      const b = await create(none, { launchAgent: 'claude' })
+      expect(shell.carries).toEqual([])
+      expect(none.carries).toEqual([])
+      await a.dispose()
+      await b.dispose()
+    })
+
+    it('a throwing noteCarry never changes the creation; an observer without noteCarry is fine', async () => {
+      const throwing = {
+        ...base(),
+        noteCarry: () => {
+          throw new Error('boom')
+        }
+      }
+      const host = new TerminalHost({
+        paneOwnership: throwing,
+        spawnSubprocess: () => subprocess('claude')
+      })
+      await expect(
+        host.createOrAttach({
+          sessionId: 's2',
+          cols: 80,
+          rows: 24,
+          launchAgent: 'claude',
+          carriesFrom: 's1',
+          streamClient: { onData: vi.fn(), onExit: vi.fn() }
+        })
+      ).resolves.toBeDefined()
+      const { noteCarry: _omit, ...older } = base()
+      const host2 = await create(older, { carriesFrom: 's1', launchAgent: 'claude' })
+      expect(host.listAgentRoots()).toHaveLength(1)
+      await host.dispose()
+      await host2.dispose()
+    })
+  })
 })

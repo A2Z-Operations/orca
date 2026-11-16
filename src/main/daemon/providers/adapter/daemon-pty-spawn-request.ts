@@ -144,6 +144,7 @@ export abstract class DaemonPtySpawnRequest extends DaemonPtyRuntimeState {
         ...(!context.attachOnly && opts.spawnIntent
           ? { spawnIntent: forwardedSpawnIntent(opts.spawnIntent, opts.agentSessionEnsure) }
           : {}),
+        ...(!context.attachOnly && opts.carriesFrom ? { carriesFrom: opts.carriesFrom } : {}),
         ...(!context.attachOnly && opts.agentSessionEnsure
           ? { agentSessionEnsure: opts.agentSessionEnsure }
           : {})

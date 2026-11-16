@@ -1,7 +1,9 @@
 import { markYoungDurable, matchDurableJob, type DurableJobRecord } from './pane-ownership-durable'
 import type { FdInfo } from './pane-ownership-fds'
+import { PaneCarry } from './pane-ownership-carry'
 import { applyKeepMarkers, type KeepMarkers, type MarkerTarget } from './pane-ownership-marker'
 import { PaneClosing } from './pane-ownership-closing'
+import { SamplerHealth } from './pane-ownership-health'
 import { PaneWiring } from './pane-ownership-wiring'
 import type { PaneOwnershipModeRead } from './pane-ownership-mode'
 import {
@@ -51,21 +53,21 @@ export const SAMPLER_PS_INTERVAL_MS = 5_000
 export const SAMPLER_IDLE_INTERVAL_MS = 10_000
 /** A read that keeps failing backs off, doubling up to this. */
 export const SAMPLER_MAX_BACKOFF_MS = 60_000
-export const SAMPLER_FAILURES_BEFORE_LOG = 10
+export { SAMPLER_FAILURES_BEFORE_LOG } from './pane-ownership-health'
 
 export class PaneOwnershipObserver {
   private readonly sets: PaneOwnershipSets
   private readonly wiring: PaneWiring
   private readonly closing: PaneClosing
+  private readonly carry: PaneCarry
   private lastVia: 'in-process' | 'ps' | 'unknown' = 'unknown'
   private readonly summary = new DailySummary()
   private inFlight: Promise<void> | null = null
   private timer: ReturnType<typeof setTimeout> | null = null
   private started = false
   private lastHadRoots = false
-  private failures = 0
   private markerFailures = 0
-  private failingLogged = false
+  private readonly health: SamplerHealth
   private killNoted = false
   private startLogged = false
 
@@ -73,6 +75,8 @@ export class PaneOwnershipObserver {
     this.sets = new PaneOwnershipSets({ hostUid: deps.hostUid, hostPid: deps.hostPid })
     this.wiring = new PaneWiring(deps.log)
     this.closing = new PaneClosing(deps.log)
+    this.health = new SamplerHealth(deps.log)
+    this.carry = new PaneCarry(deps.log)
   }
 
   private now(): number {
@@ -105,8 +109,8 @@ export class PaneOwnershipObserver {
   /** The wait before the next tick, from what the last one saw. */
   nextDelayMs(): number {
     const base = this.activeIntervalMs()
-    if (this.failures > 0) {
-      return Math.min(SAMPLER_MAX_BACKOFF_MS, base * 2 ** Math.min(this.failures, 6))
+    if (this.health.failures > 0) {
+      return Math.min(SAMPLER_MAX_BACKOFF_MS, base * 2 ** Math.min(this.health.failures, 6))
     }
     return this.lastHadRoots ? base : SAMPLER_IDLE_INTERVAL_MS
   }
@@ -133,7 +137,7 @@ export class PaneOwnershipObserver {
   } {
     const all = this.sets.all()
     return {
-      failures: this.failures,
+      failures: this.health.failures,
       fdFailures: this.wiring.fdStatus().fdFailures,
       closesUnfinished: this.closing.unfinishedCount(),
       markerFailures: this.markerFailures,
@@ -148,7 +152,7 @@ export class PaneOwnershipObserver {
       return this.inFlight
     }
     this.inFlight = this.runTick()
-      .catch((error: unknown) => this.noteFailure(error))
+      .catch((error: unknown) => this.health.failure(error))
       .finally(() => {
         this.inFlight = null
       })
@@ -164,6 +168,7 @@ export class PaneOwnershipObserver {
       })
     }
     if (mode.mode === 'off') {
+      this.carry.clear()
       if (this.sets.all().length > 0) {
         this.sets.clear()
         this.wiring.clear()
@@ -180,6 +185,7 @@ export class PaneOwnershipObserver {
     // logged once, not again as an exit; ids whose session is gone are dropped.
     const aliveIds = new Set(alive.map((root) => root.sessionId))
     this.closing.settle(aliveIds, this.now())
+    this.carry.expire(this.now())
     const roots = alive.filter((root) => !this.closing.has(root.sessionId))
     this.lastHadRoots = roots.length > 0
     if (roots.length === 0) {
@@ -187,10 +193,10 @@ export class PaneOwnershipObserver {
     }
     const capture = await this.deps.readTable()
     if (capture.rows.length === 0) {
-      this.noteFailure(new Error('empty process table'))
+      this.health.failure(new Error('empty process table'))
       return
     }
-    this.noteSuccess()
+    this.health.success()
     this.lastVia = capture.via ?? 'unknown'
     if (!this.startLogged) {
       this.startLogged = true
@@ -202,6 +208,7 @@ export class PaneOwnershipObserver {
       })
     }
     const { newlyRecorded } = this.sets.sample(capture, roots)
+    this.carry.adopt(this.sets)
     await markYoungDurable(this.sets.all(), this.now(), this.deps.listDurableJobs)
     this.wiring.noteRecorded(newlyRecorded)
     for (const { sessionId, pid } of newlyRecorded) {
@@ -216,6 +223,11 @@ export class PaneOwnershipObserver {
   /** Called synchronously before the host starts a kill, so the next tick no longer samples that session. */
   noteClose(sessionId: string, reason: CloseReason): void {
     this.closing.note(sessionId, reason, this.now())
+  }
+
+  /** #44 (a): the replacement `sessionId` names the session it replaces (main's replacesPtyId). Observe only. */
+  noteCarry(sessionId: string, fromSessionId: string): void {
+    this.carry.claim(sessionId, fromSessionId, this.now())
   }
 
   /** The agent root exited by itself while its pane stayed open: log the set now (the session is reaped). */
@@ -300,6 +312,13 @@ export class PaneOwnershipObserver {
           })
         )
       }
+      if (reason === 'restart') {
+        this.carry.hold(
+          sessionId,
+          present.map((p) => p.entry),
+          nowMs
+        )
+      }
       this.deps.log('pane-ownership-close', {
         sessionId,
         reason,
@@ -319,24 +338,5 @@ export class PaneOwnershipObserver {
     } finally {
       this.closing.observed(sessionId, this.now())
     }
-  }
-
-  private noteFailure(error: unknown): void {
-    this.failures += 1
-    if (this.failures >= SAMPLER_FAILURES_BEFORE_LOG && !this.failingLogged) {
-      this.failingLogged = true
-      this.deps.log('pane-ownership-sampler-failing', {
-        failures: this.failures,
-        error: String(error)
-      })
-    }
-  }
-
-  private noteSuccess(): void {
-    if (this.failingLogged) {
-      this.deps.log('pane-ownership-sampler-recovered', { afterFailures: this.failures })
-    }
-    this.failures = 0
-    this.failingLogged = false
   }
 }

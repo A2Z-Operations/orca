@@ -1,4 +1,5 @@
 import type { IPtyProvider, PtySpawnResult } from '../../../providers/pty-provider-contract'
+import { carryOverFor } from '../spawn-carry-over'
 import { LocalPtyProvider } from '../../../providers/local-pty/local-pty-provider'
 import { makePaneKey, isTerminalLeafId } from '../../../../shared/workspace-layout/stable-pane-id'
 import { isValidTerminalTabId } from '../../../../shared/workspace-layout/terminal-tab-id'
@@ -83,6 +84,7 @@ export async function buildRuntimePtySpawnOptions(
     paneKey: ctx.spawnIdentityPaneKey,
     sessionId: ctx.sessionId,
     spawnIntent: ctx.preAdoptedStablePane ? undefined : args.spawnIntent,
+    ...carryOverFor(args.replacesPtyId),
     historyIsolationEnabled,
     getSettings: ctx.deps.getSettings,
     store: ctx.deps.store,

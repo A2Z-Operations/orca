@@ -21,6 +21,8 @@ export type CreateOrAttachOptions = {
   command?: string
   startupCommandDelivery?: StartupCommandDelivery
   launchAgent?: TuiAgent
+  /** #44 (a), observe only: the session this one replaces at a restart (main's replacesPtyId). */
+  carriesFrom?: string
   /** Missing ownership is not permission to create during stable-pane adoption. */
   attachOnly?: boolean
   shellOverride?: string
