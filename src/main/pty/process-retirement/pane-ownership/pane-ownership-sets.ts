@@ -4,7 +4,7 @@ import type { OwnershipCapture, OwnershipRow } from './pane-ownership-table'
  * The recorded sets of #44, as pure state: a process table goes in, entries come out. No timers, no I/O, and nothing here
  * (or anywhere in pane-ownership/) can send a signal: stage 2 only observes (S1).
  */
-export type KeptReason = 'durable-job'
+export type KeptReason = 'durable-job' | 'marker'
 
 export type OwnedEntry = {
   pid: number
@@ -19,6 +19,8 @@ export type OwnedEntry = {
   /** Consecutive COMPLETE reads that did not contain this pid (M4). */
   missingCompleteReads: number
   kept: KeptReason | null
+  /** #44 (b): ORCA_PANE_KEEP=1 in its start environment; null = not read (yet, or the read failed). */
+  marker: boolean | null
 }
 
 export type PaneSet = {
@@ -232,7 +234,8 @@ export class PaneOwnershipSets {
       firstSeenMs: nowMs,
       lastSeenMs: nowMs,
       missingCompleteReads: 0,
-      kept
+      kept,
+      marker: null
     })
     return true
   }

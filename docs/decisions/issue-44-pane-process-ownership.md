@@ -172,6 +172,18 @@ Do not require pgid. `setsid` changes the process group, so the pgid match in `m
 
 **The keep marker.** `ORCA_PANE_KEEP=1` in a process's environment, set by the user or by a tool, is read at record time and marks the entry `kept: marker` for good, including its later children. It is read from `/proc/<pid>/environ` on Linux. On macOS the intended source is `KERN_PROCARGS2`, which should be readable for the host's own uid; to be proven in stage 3, like kqueue. It is documented in the user guide next to the switch.
 
+**As built, observe-only (stage 3 piece b, 2026-11-16).**
+
+- The marker is read ONCE, at close, for the recorded processes still present, by `pane-ownership-marker.ts`. A verdict is needed only then. A read of every new process each tick cost about 3x the sampler's CPU under churn (20 panes, measured), and the start environment does not change.
+  - **Linux:** `/proc/<pid>/environ`.
+  - **macOS:** `ps -wwE -o pid=,command= -p <pid>`, once PER PID (at most 64 per close), with the same 2 s timeout as the `lsof` helper. It replaces `KERN_PROCARGS2`, so no native code runs in the terminal host (S3).
+  - Never a pid list: macOS `ps` reads the whole process table for two or more `-p` pids (0.8 s of CPU at ~1,900 processes, measured on the MacBook), and only the one process for a single pid.
+- Both see the start environment, same uid only. Another uid (or root) reads as null.
+- A failed or timed-out read leaves `marker: null` ("not read"), never "no marker", and is counted in `markerFailures`.
+- Only the answer is kept. No environment text reaches the log (a test pins it).
+- The entry line carries `marker`, the verdict is `kept: marker` (children included, through the kept walk), and the daily line lists `topMarked`.
+- **Known limit, macOS:** `ps` prints the arguments and the environment on one line, so an ARGUMENT exactly equal to `ORCA_PANE_KEEP=1` reads as the marker. In observe that changes only a label.
+
 **Per OS (M5, M6).**
 
 - **Linux:** a per-pane launcher calls `prctl(PR_SET_CHILD_SUBREAPER)` and then starts the agent. It becomes the parent of every orphan under the pane, however that orphan detached, and today's close-time parent walk then sees all of them: no timer, no miss, no start-time matching. The alternative is one systemd user scope (one cgroup) per pane. The rule and the keep marker still decide what is signalled.
