@@ -1,6 +1,6 @@
 import { markYoungDurable, matchDurableJob, type DurableJobRecord } from './pane-ownership-durable'
 import type { FdInfo } from './pane-ownership-fds'
-import { applyKeepMarkers, type KeepMarkers } from './pane-ownership-marker'
+import { applyKeepMarkers, type KeepMarkers, type MarkerTarget } from './pane-ownership-marker'
 import { PaneClosing } from './pane-ownership-closing'
 import { PaneWiring } from './pane-ownership-wiring'
 import type { PaneOwnershipModeRead } from './pane-ownership-mode'
@@ -33,7 +33,7 @@ export type PaneOwnershipObserverDeps = {
    * #44 (b): ORCA_PANE_KEEP=1 per pid, ONE batched read at close for the processes still present (a verdict is only
    * needed then; short-lived churn is never read: S2). null/absent = not read.
    */
-  readKeepMarkers?: ((pids: number[]) => Promise<KeepMarkers>) | null
+  readKeepMarkers?: ((targets: MarkerTarget[]) => Promise<KeepMarkers>) | null
   /** Async and cached (DurableJobIndex): asked only for young unmarked entries and at close (S2). */
   listDurableJobs: () => Promise<DurableJobRecord[]>
   readMode: () => Promise<PaneOwnershipModeRead>

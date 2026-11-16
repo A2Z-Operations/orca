@@ -45,8 +45,8 @@ export function paneOwnershipFor(
     readStartTicks: platform === 'linux' ? (pid) => readLinuxStartTicks(pid) : null,
     readKeepMarkers:
       platform === 'darwin'
-        ? (pids) => readMacKeepMarkers(pids)
-        : (pids) => readLinuxKeepMarkers(pids),
+        ? (targets) => readMacKeepMarkers(targets)
+        : (targets) => readLinuxKeepMarkers(targets),
     listDurableJobs: () => durableJobs.refresh(),
     readMode: () => readPaneOwnershipMode(env, options.modeFilePath),
     log: options.log,
