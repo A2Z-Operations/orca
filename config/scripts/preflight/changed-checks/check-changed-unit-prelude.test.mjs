@@ -11,6 +11,15 @@ it('the unit step fetches missing upstream release tags before anything else', (
   })
   expect(steps.map((step) => step.args[0])).toEqual([
     'config/scripts/orca-fork/fetch-upstream-release-tags.mjs',
+    'config/scripts/orca-fork/install-relay-test-dependencies.mjs',
     'config/scripts/native-build/node-addons/ensure-native-runtime.mjs'
   ])
+})
+
+// Fork (#48 slice 12): the relay integration tests import the cloud/ workspace, which only CI's relay job installs.
+it('the unit step installs the relay test dependencies when they are missing', () => {
+  expect(unitTestPrelude('node')[1]).toEqual({
+    program: 'node',
+    args: ['config/scripts/orca-fork/install-relay-test-dependencies.mjs', '--if-missing']
+  })
 })
