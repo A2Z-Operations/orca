@@ -164,6 +164,7 @@ export async function readMacKeepMarkers(
 ): Promise<KeepMarkers> {
   const result: KeepMarkers = new Map()
   // A read must END by the budget even when its ps ignores SIGTERM: its timeout plus the exit grace fits what is left.
+  // now() is sampled before the ps spawn, so the 5s bound can be short by that spawn latency (milliseconds).
   const deadline = now() + MARKER_CLOSE_BUDGET_MS - MARKER_EXIT_GRACE_MS
   const read = async (args: string[]): Promise<string> => {
     const timeoutMs = Math.min(MARKER_HELPER_TIMEOUT_MS, deadline - now())
@@ -202,9 +203,9 @@ export async function readMacKeepMarkers(
 }
 
 /**
- * Linux: /proc/<pid>/environ per pid; unreadable (gone, or another uid) is null. #67: /proc/<pid>/stat is read after
- * the environment and must still show the entry's recorded start ticks (a reused pid is null). An entry whose ticks
- * were never read is null too: no identity, no marker (fail closed).
+ * Linux: /proc/<pid>/environ per pid; unreadable (gone, or another uid) is null and is not followed by a stat read.
+ * #67: /proc/<pid>/stat is read only after a readable environment and must still show the entry's recorded start
+ * ticks (a reused pid is null). An entry whose ticks were never read is null too: no identity, no marker (fail closed).
  */
 export async function readLinuxKeepMarkers(
   targets: readonly MarkerTarget[],
@@ -217,8 +218,12 @@ export async function readLinuxKeepMarkers(
       continue
     }
     const environ = await read(`/proc/${pid}/environ`).catch(() => null)
+    if (environ === null) {
+      result.set(pid, null)
+      continue
+    }
     const same = startTicks !== null && (await readLinuxStartTicks(pid, read)) === startTicks
-    result.set(pid, environ === null || !same ? null : markerInEnviron(environ))
+    result.set(pid, same ? markerInEnviron(environ) : null)
   }
   return result
 }

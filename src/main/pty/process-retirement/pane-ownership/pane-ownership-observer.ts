@@ -214,7 +214,13 @@ export class PaneOwnershipObserver {
     for (const { sessionId, pid } of newlyRecorded) {
       const entry = this.sets.get(sessionId)?.entries.get(pid)
       if (entry && this.deps.readStartTicks) {
-        entry.startTicks = await this.deps.readStartTicks(pid).catch(() => null)
+        const readTicks = this.deps.readStartTicks
+        // One retry: a failed first read (null or a throw) must not leave the pid never marker-read.
+        let ticks = await readTicks(pid).catch(() => null)
+        if (ticks === null) {
+          ticks = await readTicks(pid).catch(() => null)
+        }
+        entry.startTicks = ticks
       }
     }
     await this.wiring.readDue(this.sets, roots, this.deps.readFds, this.now())

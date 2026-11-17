@@ -6,6 +6,7 @@ import {
   SAMPLER_FAILURES_BEFORE_LOG,
   type PaneOwnershipObserverDeps
 } from './pane-ownership-observer'
+import { readLinuxKeepMarkers } from './pane-ownership-marker'
 import type { OwnershipRow } from './pane-ownership-table'
 import type { FdInfo } from './pane-ownership-fds'
 
@@ -60,6 +61,31 @@ describe('pane ownership observer (#44 stage 2)', () => {
     expect(logs.find((l) => l.event === 'pane-ownership-close')!.details).toMatchObject({
       present: 1,
       gone: 0
+    })
+  })
+
+  it('Linux: a failed first start-ticks read is retried once and the close marker sees that value', async () => {
+    const calls: number[] = []
+    const { obs, logs } = observer({
+      tables: [[row(10, 5), row(20, 10)], [row(20, 1)]],
+      readStartTicks: async (pid) => {
+        calls.push(pid)
+        return calls.length === 1 ? null : '4242'
+      },
+      // Same fail-closed reader as production: unknown ticks stay null, so the retry is what makes the marker real.
+      readKeepMarkers: (targets) =>
+        readLinuxKeepMarkers(targets, async (path) =>
+          path.endsWith('/stat') ? `9 (x) S ${'0 '.repeat(18)}4242 0` : 'ORCA_PANE_KEEP=1\0'
+        )
+    })
+    await obs.tick()
+    await obs.observeClose('s1', 'close')
+    expect(calls).toEqual([20, 20])
+    expect(logs.find((l) => l.event === 'pane-ownership-entry')!.details).toMatchObject({
+      pid: 20,
+      startTicks: '4242',
+      marker: true,
+      verdict: 'kept: marker'
     })
   })
 
