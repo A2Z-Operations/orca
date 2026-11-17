@@ -81,6 +81,16 @@ export const electronModuleMock = (): ElectronModuleMock => ({
 export const fsModuleMock = () => ({
   existsSync: existsSyncMock,
   statSync: statSyncMock,
+  // #74: the fake filesystem has no symlinks; lstat answers like stat, ENOENT for an absent path (codex's TOML trust
+  // write lstats its config before writing; without this export every spawn that reached it logged a caught error).
+  lstatSync: (path: string) => {
+    if (!existsSyncMock(path)) {
+      throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' })
+    }
+    return { ...statSyncMock(path), isSymbolicLink: () => false }
+  },
+  // #74: the same write keeps a rolling backup of the config it replaces; a copy is invisible in this fake filesystem.
+  copyFileSync: () => {},
   accessSync: accessSyncMock,
   mkdirSync: mkdirSyncMock,
   readFileSync: readFileSyncMock,
