@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -84,7 +84,9 @@ export function createProcessHostDevRebuildPlugin(root = process.cwd()): Plugin 
       }
       // The installed bundler invalidates exact files; source creation needs a private watch signal.
       if (!signalDirectory) {
-        signalDirectory = mkdtempSync(join(tmpdir(), 'orca-process-host-watch-'))
+        // Real path: on macOS the bundler's watcher never reports a file watched through a symlinked
+        // path, and the temp directory is one (`/var/folders`, `/tmp`).
+        signalDirectory = realpathSync(mkdtempSync(join(tmpdir(), 'orca-process-host-watch-')))
         signalFile = join(signalDirectory, 'source-directory-change')
         writeFileSync(signalFile, String(signalVersion))
       }
