@@ -49,6 +49,8 @@ Avoid type assertions except `as const`. Unavoidable casts need a line-specific 
 - **Design system**: `pnpm run lint:design-system` for the full renderer report (not a gate); the changed-lines gate above is what CI enforces
 - **Real Claude CLI**: when you change Claude structured-session code (`src/main/claude/claude-structured-*`), run `ORCA_REAL_CLAUDE_CLI_TEST=1 pnpm test src/main/claude/claude-structured-real-cli.test.ts src/main/claude/claude-structured-real-cli-fold.test.ts`; it uses your real Claude login
 
+**VERIFICATION: ONE REQUIRED REVIEW, NO CHAINS** (owner order 2026-11-26, BLOWzer #3517). Run the real checks the change needs (the commands above); when the task is done and they pass, STOP and report. Keep the ONE required independent review before merge: the Reviewer PASS at the exact head. Do NOT start extra rounds on your own (reviewer subagents, re-reviews, delta reads, verification passes, checks of checks) unless (a) the code changed materially after the review, (b) a review or gate produced a NEW finding, or (c) Nachumi or the Lead Engineer asks. A merge-up is a trivial head move only if it touches none of the PR's files. If a deeper check seems justified, say so in one line and offer it; do not run it. Tests serve the change: never write code just to pass a test. UNCHANGED: safety and owner holds, required CI statuses, never `--admin` / `--no-verify`.
+
 # Writing Pull Requests
 
 Fill in [`.github/pull_request_template.md`](./.github/pull_request_template.md), written for a reviewer who has never seen this code:
